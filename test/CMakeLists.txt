@@ -1,7 +1,12 @@
 # Build all the necessary executables
 
 set(linkdir ${CMAKE_CURRENT_BINARY_DIR}/../src/)
-set(LINKS ${spg_lib} -lgomp dielgamma lapack)
+
+if (GPU)
+    set(LINKS ${spg_lib} -lgomp dielgamma ${MAGMA_LIBDIR}/libmagma.so)
+else()
+    set(LINKS ${spg_lib} -lgomp dielgamma lapack)
+endif(GPU)
 
 add_executable(test_crystal test_crystal.f90)
 target_include_directories(test_crystal PUBLIC ${linkdir})

@@ -159,20 +159,20 @@ contains
     !> @param[in] h    - head of the dielectric matrix
     !> @param[in] wl   - lower wing of the dielectric matrix
     !> @param[in] wu   - upper wing of the dielectric matrix
-    !> @param[in] ib   - inverse of the body of the dielectric matrix
+    !> @param[in] ib   - inverse of the body of the dielectric matrix (optional)
     subroutine set_dielectric_blocks(this, h, wl, wu, ib)
         
         class(inverse_dielectric_t), intent(inout) :: this
         complex(r64), target, intent(in)      :: h(:,:)
         complex(r64), target, intent(in)      :: wl(:,:)
         complex(r64), target, intent(in)      :: wu(:,:)
-        complex(r64), target, intent(in)      :: ib(:,:)
+        complex(r64), target, optional, intent(in) :: ib(:,:)
 
         ! Associating to internal objects
         this%head    =>  h
         this%wingL   =>  wl
         this%wingU   =>  wu
-        this%Binv    =>  ib
+        if (present(ib)) this%Binv    =>  ib
 
     end subroutine set_dielectric_blocks
     

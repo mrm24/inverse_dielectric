@@ -1,0 +1,7 @@
+module purge
+module load intel-oneapi/2021.3
+module load cuda/11.2
+mkdir build 
+cd build
+cmake -DGPU=ON -DMAGMA_LIBDIR=/users/sol/martirm/progs/magma/lib ..
+make -j 6 -l 6

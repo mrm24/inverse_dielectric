@@ -1,14 +1,35 @@
 cmake_minimum_required(VERSION 3.6.0 FATAL_ERROR)
-project(dielectric_average Fortran)
 
-#Fortran flags
-set(CMAKE_Fortran_COMPILER "ifort")
-set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -O3 -fPIC \
-                         -no-wrap-margin -fp-model source -qopenmp \
-                        ")
-# set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -O3 -fPIC -fbounds-check -Wunused \
-#                         -Wconversion -Wunderflow -Wdo-subscript -fopenmp -ffree-form \
-#                         -std=f2018")
+#Some options
+option(GPU "GPU support" OFF)
+
+# Check GPU support
+if(GPU)
+    project(dielectric_average Fortran CUDA) 
+    set(CMAKE_Fortran_COMPILER "ifort")
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O3 -fPIC \
+                            -no-wrap-margin -fp-model source -qopenmp \
+                            ")
+    add_compile_definitions(USE_GPU) 
+    set(MAGMA_F90_DIR ${PROJECT_SOURCE_DIR}/external/magma)
+    set(SRC_MAGMA_F90 
+            ${MAGMA_F90_DIR}/magma2.F90
+            ${MAGMA_F90_DIR}/magma2_common.F90
+            ${MAGMA_F90_DIR}/magma2_sfortran.F90
+            ${MAGMA_F90_DIR}/magma2_cfortran.F90
+            ${MAGMA_F90_DIR}/magma2_dfortran.F90
+            ${MAGMA_F90_DIR}/magma2_zfortran.F90)
+    set(MAGMA_LIBDIR "None" CACHE PATH "Path to magma library")
+    message(STATUS "magma library path : ${MAGMA_LIBDIR}")
+else()
+    project(dielectric_average Fortran)
+    set(CMAKE_Fortran_COMPILER "ifort")
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O3 -fPIC \
+                            -no-wrap-margin -fp-model source -qopenmp \
+                            ")
+    set(MAGMA_F90_DIR "")
+    set(SRC_MAGMA_F90 "")
+endif(GPU)
 
 # Find SPGLIB
 set(cmd1 "locate")
@@ -21,8 +42,8 @@ execute_process(COMMAND ${cmd1} ${cmd1_arg} COMMAND ${cmd2} ${cmd2_arg}
   OUTPUT_VARIABLE spg_lib OUTPUT_STRIP_TRAILING_WHITESPACE)
 message(STATUS "SPGLIB found : ${spg_lib}")
 
-#Compiles the components
-set(SRC "")
+#Set the components source
+set(SRC "${SRC_MAGMA_F90}")
 add_subdirectory(src)
 
 # Compile test
