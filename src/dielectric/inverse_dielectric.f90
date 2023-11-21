@@ -55,7 +55,9 @@ module m_dielectric_average_gamma
         !> Pointer to the upper wing, i.e. in PW 0G
         complex(r64), pointer, private :: wingU(:,:)   => null()
         !> Pointer to the inverse of the body block of the dielectric matrix 
-        complex(r64), pointer, private :: Binv(:,:) => null()
+        complex(r64), pointer, private :: Binv(:,:)    => null()
+        !> Actual data in case that it has been computed using this library
+        complex(r64), allocatable, private :: Binv_data(:,:)
         !> The head of the inverse
         complex(r64) :: inverse_dielectric_head
         !> The lower wing of the inverse
@@ -69,7 +71,7 @@ module m_dielectric_average_gamma
         !> Number of points of the quadrature
         integer(i64), private :: quadrature_npoints 
     contains
-        procedure, public  :: init_common, set_dielectric_blocks, compute_anisotropic_avg
+        procedure, public  :: init_common, set_dielectric_blocks, compute_anisotropic_avg, invert_body
         final :: clean
     end type inverse_dielectric_t
 
@@ -143,6 +145,7 @@ contains
         if (associated(this%wingL))   nullify(this%wingL)
         if (associated(this%wingU))   nullify(this%wingU)
         if (associated(this%Binv)) nullify(this%Binv)
+        if (allocated(this%Binv_data)) deallocate(this%Binv_data)
         if (allocated(this%weights)) deallocate(this%weights)
         if (allocated(this%xyz)) deallocate(this%xyz)
         if (allocated(this%ang)) deallocate(this%ang)
@@ -315,5 +318,21 @@ contains
         deallocate(head_f, wingL_f, wingU_f, body_f)
     
     end subroutine compute_anisotropic_avg
+
+    !> Inverts the body and stores to the pointer
+    !> @param[in] this - the inverse_dielectric_t in which to store the inverse of body
+    !> @param[in] body - the body to invert
+    subroutine invert_body(this, body)
+    
+        use m_linalg, only: inverse_complex_LU
+
+        class(inverse_dielectric_t), intent(inout), target :: this
+        complex(r64), allocatable, intent(in) :: body(:,:)
+
+        call inverse_complex_LU(body, this%Binv_data)        
+        this%Binv => this%Binv_data
+
+    end subroutine invert_body
+
 
 end module m_dielectric_average_gamma

@@ -40,12 +40,31 @@ interface
         integer(c_int), target :: info  !! int*
     end subroutine
 
+    subroutine magma_zgetrf_gpu_expert(m, n, dA, lda, ipiv, info, nb, mode) &
+    bind(C, name="magma_zgetrf_gpu_expert")
+        use iso_c_binding
+        integer(c_int), value  :: m, n, lda
+        type(c_ptr),    value  :: dA
+        integer(c_int), target :: ipiv(*)
+        integer(c_int), target :: info  !! int*
+        integer(c_int), value  :: nb
+        integer(c_int), value  :: mode
+    end subroutine magma_zgetrf_gpu_expert   
+
     subroutine magma_zpotrf_gpu( uplo, n, dA, lda, info ) &
     bind(C, name="magma_zpotrf_gpu")
         use iso_c_binding
         integer(c_int), value  :: uplo, n, lda
         type(c_ptr),    value  :: dA
         integer(c_int), target :: info  !! int*
+    end subroutine
+
+    subroutine magma_zpotri_gpu( uplo, n, dA, lda, info ) &
+        bind(C, name="magma_zpotri_gpu")
+            use iso_c_binding
+            integer(c_int), value  :: uplo, n, lda
+            type(c_ptr),    value  :: dA
+            integer(c_int), target :: info  !! int*
     end subroutine
 
     subroutine magma_zgetri_gpu( n, dA, lda, ipiv, dwork, lwork, info ) &
@@ -59,6 +78,13 @@ interface
             integer(c_int), value  :: lwork
             integer(c_int), target :: info  !! int*
     end subroutine
+
+    function magma_get_zgetri_nb( n ) result(size) &
+        bind(C, name="magma_get_zgetri_nb")
+            use iso_c_binding
+            integer(c_int) :: n
+            integer(c_int) :: size
+    end function 
 
     !! -------------------------------------------------------------------------
     !! batched GPU interfaces (all arrays in GPU memory)

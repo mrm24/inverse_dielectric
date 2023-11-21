@@ -3,7 +3,7 @@
 set(linkdir ${CMAKE_CURRENT_BINARY_DIR}/../src/)
 
 if (GPU)
-    set(LINKS ${spg_lib} -lgomp dielgamma ${MAGMA_LIBDIR}/libmagma.so)
+    set(LINKS ${spg_lib} -lgomp dielgamma ${MAGMA_DIR}/lib/libmagma.so)
 else()
     set(LINKS ${spg_lib} -lgomp dielgamma lapack)
 endif(GPU)
@@ -25,9 +25,14 @@ execute_process( COMMAND ${CMAKE_COMMAND} -E tar xzf ${PROJECT_SOURCE_DIR}/test_
 target_include_directories(test_dielectric_average_iso PUBLIC ${linkdir})
 target_link_libraries(test_dielectric_average_iso dielgamma ${LINKS})
 
+add_executable(test_inverse test_inverse.f90)
+target_include_directories(test_inverse PUBLIC ${linkdir})
+target_link_libraries(test_inverse ${LINKS})
+
 
 # Enable testing
 include(CTest)
 add_test(NAME test_crystal COMMAND test_crystal)
 add_test(NAME test_quadrature_lebedev COMMAND test_quadrature_lebedev)
 add_test(NAME test_dielectric_average_iso COMMAND test_dielectric_average_iso)
+add_test(NAME test_inverse COMMAND test_inverse)

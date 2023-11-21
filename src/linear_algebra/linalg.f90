@@ -45,18 +45,26 @@ contains
         type(linalg_obj_t)   :: ref_work
 
         ! LAPACK
-        integer(i32) :: info, lwork
+        integer(i32) :: info, lwork, nb, n
         integer(i32), allocatable :: ipiv(:)
         complex(r64), allocatable :: work(:)
 
 #if !defined(USE_GPU)
         ! External
         external :: zgetri, zgetrf
-#endif
+#endif  
+        ! Some constants
+        n = size(A,1)
         ! Allocate
         allocate(inverse_A, source=A)
-        lwork = size(A,1)
-        allocate(work(lwork), ipiv(lwork))
+#ifdef USE_GPU
+        nb = magma_get_zgetri_nb(n)
+#else
+        nb = 64
+#endif
+        lwork = nb * size(A,1)
+        allocate(ipiv(size(A,1)))
+        allocate(work(lwork))
 
         ! If GPU init the queu otherwise this does nothing
         call world%init()
@@ -66,13 +74,16 @@ contains
         call ref_A%transfer_cpu_gpu(inverse_A, world%get_queue())
         call ref_work%allocate_gpu(work)
 
-        ! Perform here the inversion
+        ! Perform here the inversion (memory overflow is possible)
 #ifdef USE_GPU
+        !call magma_zgetrf(n, n, inverse_A, n, ipiv, info)
         call magma_zgetrf_gpu(ref_A%rows(), ref_A%rows(), ref_A%gpu_ptr(), ref_A%rows(), ipiv, info)
-        if (info /= 0) error stop "inverse_complex_LU: error calling magma_zgetrf_gpu"
+        if (info /= 0) error stop "inverse_complex_LU: error calling magma_zgetrf"
         call magma_zgetri_gpu(ref_A%rows(), ref_A%gpu_ptr(), ref_A%rows(), ipiv, ref_work%gpu_ptr(), lwork, info)
         if (info /= 0) error stop "inverse_complex_LU: error calling magma_zgetri_gpu"
-#else
+#else   
+        call ref_A%allocate_gpu(inverse_A)
+        call ref_A%transfer_cpu_gpu(inverse_A, world%get_queue())
         call zgetrf(ref_A%rows(), ref_A%rows(), ref_A%gpu_ptr(), ref_A%rows(), ipiv, info)
         if (info /= 0) error stop "inverse_complex_LU: error calling zgetrf"
         call zgetri(ref_A%rows(), ref_A%gpu_ptr(), ref_A%rows(), ipiv, ref_work%gpu_ptr(), lwork, info)

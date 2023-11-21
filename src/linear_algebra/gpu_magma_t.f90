@@ -30,11 +30,11 @@ module m_gpu_magma_t
     !> Type to handle the GPU Magma queue and world
     type linalg_world_t
         !> Device id taking care of control
-        integer :: device = 0
+        integer :: device = -1
         !> GPU queue
         type(C_ptr), private  :: queue    = C_null_ptr
     contains
-        procedure, public :: init, finish, is_queue_set, get_queue
+        procedure, public :: init, finish, is_queue_set, get_queue, syncronize
     end type linalg_world_t
 
 
@@ -66,7 +66,7 @@ contains
 
     !> This subroutine inits the MAGMA world and the queue
     !> @param[in] this - the GPU magma world to initialize
-    !> @param[in] device - (optional) the device that should hold the queue (default: 0, which is the CPU)
+    !> @param[in] device - (optional) the device that should hold the queue (if not compute)
     subroutine init(this, device)
             
         class(linalg_world_t), intent(inout) :: this
@@ -76,7 +76,11 @@ contains
         call magma_init()
         
         ! Set device
-        if (present(device)) this%device = device
+        if (present(device)) then
+            this%device = device
+        else
+            call magma_get_device(this%device)
+        end if
 
         ! Init the GPU queue
         call magma_queue_create(this%device, this%queue)
@@ -118,6 +122,13 @@ contains
         queue => this%queue 
 
     end function get_queue
+
+    !> This syncronizes the queue
+    !> @param[in] this - the world object from which the queue is syncronized
+    subroutine syncronize(this)
+        class(linalg_world_t), target, intent(in) :: this
+        call magma_queue_sync(this%queue)
+    end subroutine syncronize
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !                   UTILS                             !
@@ -209,7 +220,6 @@ contains
         this%kind_size = sizeof_this(A)
 
         nbytes = int(this%n_cols * this%n_rows * this%kind_size, C_size_t)
-
         info = magma_malloc(this%dA, nbytes)
 
         if (info /= 0) error stop "linalg_obj_t%allocate: Error in allocating GPU memory"
@@ -223,7 +233,7 @@ contains
     subroutine transfer_cpu_gpu(this, A, queue)
         
         class(linalg_obj_t), intent(inout)       :: this
-        class(*), contiguous, intent(in), target :: A(..)
+        type(*), contiguous, intent(in), target :: A(..)
         type(C_ptr), intent(inout)               :: queue
 
         ! Select the appropiate case
@@ -235,7 +245,6 @@ contains
             case default
                 error stop "linalg_obj_t%fill: Error filling matrix"
         end select
-
     end subroutine transfer_cpu_gpu
 
     !> This subroutine retrieve a GPU element to the CPU (sync)
@@ -245,7 +254,7 @@ contains
     subroutine transfer_gpu_cpu(this, A, queue)
         
         class(linalg_obj_t), intent(inout)          :: this
-        class(*), contiguous, intent(inout), target :: A(..)
+        type(*), contiguous, intent(inout), target :: A(..)
         type(C_ptr), intent(inout)                  :: queue
 
         ! Select the appropiate case

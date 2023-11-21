@@ -41,7 +41,10 @@ integer(c_int), parameter ::   &
     
     MagmaLeft          = 141,  &
     MagmaRight         = 142,  &
-    MagmaBothSides     = 143
+    MagmaBothSides     = 143,  &
+
+    MagmaHybrid        = 701,  &
+    MagmaNative        = 702
 !! todo all the rest
 
 

@@ -34,7 +34,7 @@ module m_cpu_magma_t
         !> GPU queue
         type(C_ptr), private  :: queue    = C_null_ptr
     contains
-        procedure, public :: init, finish, is_queue_set, get_queue
+        procedure, public :: init, finish, is_queue_set, get_queue, syncronize
     end type linalg_world_t
 
 
@@ -94,7 +94,13 @@ contains
         type(C_ptr), pointer :: queue
         queue => this%queue
 
-    end function get_queue
+    end function get_queue 
+
+    !> This syncronizes the queue
+    !> @param[in] this - the world object from which the queue is syncronized
+    subroutine syncronize(this)
+        class(linalg_world_t), target, intent(in) :: this
+    end subroutine syncronize
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !                   UTILS                             !
@@ -192,7 +198,7 @@ contains
     !> @param[in] queue  - queue for GPU operations 
     subroutine transfer_cpu_gpu(this, A, queue)
         class(linalg_obj_t), intent(inout)          :: this
-        class(*), contiguous, intent(inout), target :: A(..)
+        type(*), contiguous, intent(inout), target :: A(..)
         type(C_ptr), intent(inout)                  :: queue
     end subroutine transfer_cpu_gpu
 
@@ -202,7 +208,7 @@ contains
     !> @param[in] queue  - queue for GPU operations 
     subroutine transfer_gpu_cpu(this, A, queue)
         class(linalg_obj_t), intent(inout)          :: this
-        class(*), contiguous, intent(inout), target :: A(..)
+        type(*), contiguous, intent(inout), target :: A(..)
         type(C_ptr), intent(inout)                  :: queue
     end subroutine transfer_gpu_cpu
 
