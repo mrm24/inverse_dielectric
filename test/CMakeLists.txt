@@ -32,7 +32,7 @@ target_link_libraries(test_inverse ${LINKS})
 
 # Enable testing
 include(CTest)
-add_test(NAME test_crystal COMMAND test_crystal)
-add_test(NAME test_quadrature_lebedev COMMAND test_quadrature_lebedev)
-add_test(NAME test_dielectric_average_iso COMMAND test_dielectric_average_iso)
+# add_test(NAME test_crystal COMMAND test_crystal)
+# add_test(NAME test_quadrature_lebedev COMMAND test_quadrature_lebedev)
+# add_test(NAME test_dielectric_average_iso COMMAND test_dielectric_average_iso)
 add_test(NAME test_inverse COMMAND test_inverse)

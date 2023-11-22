@@ -19,7 +19,7 @@ program test_inverse
     use m_constants,         only: i64, r64, zzero
     use m_linalg,            only: inverse_complex_LU
 
-    integer(i64), parameter :: n = 1000_i64
+    integer(i64), parameter :: n = 3000_i64
     complex(r64), allocatable :: A(:,:), inverse_A(:,:)
     integer(i64) :: i
     real(r64) :: rdiff
