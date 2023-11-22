@@ -16,7 +16,10 @@ add_subdirectory(linear_algebra)
 add_subdirectory(dielectric)
 
 message(STATUS "FILES: ${SRC}")
-add_library(inverse_dielectric SHARED ${SRC})
+set(MOD_DIR "${CMAKE_BINARY_DIR}/include")
+set(CMAKE_Fortran_MODULE_DIRECTORY ${MOD_DIR})
+add_library(inverse_dielectric_objects OBJECT ${SRC})
+add_library(inverse_dielectric SHARED $<TARGET_OBJECTS:inverse_dielectric_objects>)
 
 
 

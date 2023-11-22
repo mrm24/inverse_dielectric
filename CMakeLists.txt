@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.6.0 FATAL_ERROR)
 
 #Some options
 option(GPU "GPU support" OFF)
+option(PYTHON "Python bindings" OFF)
 
 # Check GPU support
 if(GPU)
@@ -46,6 +47,9 @@ message(STATUS "SPGLIB found : ${spg_lib}")
 #Set the components source
 set(SRC "${SRC_MAGMA_F90}")
 add_subdirectory(src)
+
+# Python bindings
+add_subdirectory(python)
 
 # Compile test
 add_subdirectory(test)

@@ -16,7 +16,7 @@
 !> Contains procedures for averages of the dielectric matrix
 
 !> This module contains the procedures for the computation of the dielectric matrix averages
-module m_dielectric_average_gamma
+module m_inverse_dielectric
     
     use m_constants, only: i64, r64, twopi, pi, zzero, zone, iunit
     use m_crystal_cell, only: cell_t
@@ -324,4 +324,4 @@ contains
 
     end subroutine invert_body
 
-end module m_dielectric_average_gamma
+end module m_inverse_dielectric

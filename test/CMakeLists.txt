@@ -1,6 +1,6 @@
 # Build all the necessary executables
 
-set(linkdir ${CMAKE_CURRENT_BINARY_DIR}/../src/)
+set(linkdir ${CMAKE_Fortran_MODULE_DIRECTORY})
 
 if (GPU)
     set(LINKS ${spg_lib} inverse_dielectric ${MAGMA_DIR}/lib/libmagma.so)
