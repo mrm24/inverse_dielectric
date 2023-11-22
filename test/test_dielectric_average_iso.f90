@@ -98,7 +98,7 @@ program test_dielectric_average_iso
             stop 1
         end if
 
-        ! Check that the wings are zzero
+        ! Check that the wings are zzero (though they are by construction)
         rdiff = sum(abs(inv_diel%inverse_dielectric_wingL))
         write(*,'(A,I3,A, E11.6)')  '  * Regression (WING L,',iom,') result (relative difference): ', rdiff
         if ( rdiff .lt. tolerance) then
@@ -140,6 +140,7 @@ contains
 
         open(file=fname, newunit=fin)
         read(fin,*) data_shape
+
         select rank(data)
         rank(1)
             niom = data_shape(1)

@@ -5,9 +5,8 @@ option(GPU "GPU support" OFF)
 
 # Check GPU support
 if(GPU)
-    project(dielectric_average Fortran CUDA) 
-    # set(CMAKE_CXX_STANDARD 11)
-    # set(CMAKE_CXX_STANDARD_REQUIRED on)
+    project(inverse_dielectric_library Fortran CUDA)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -qopenmp")
     set(CMAKE_Fortran_COMPILER "ifort")
     set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O3 -fPIC \
                             -no-wrap-margin -fp-model source -qopenmp \
@@ -23,9 +22,8 @@ if(GPU)
            ${MAGMA_F90_DIR}/magma2_zfortran.F90)
     set(MAGMA_DIR "None" CACHE PATH "Path to magma library")
     message(STATUS "magma library path : ${MAGMA_DIR}")
-    include_directories(${MAGMA_DIR})
 else()
-    project(dielectric_average Fortran)
+    project(inverse_dielectric_library Fortran)
     set(CMAKE_Fortran_COMPILER "ifort")
     set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O3 -fPIC \
                             -no-wrap-margin -fp-model source -qopenmp \

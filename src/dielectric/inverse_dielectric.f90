@@ -180,7 +180,7 @@ contains
     end subroutine set_dielectric_blocks
     
     !> This computes the block inverse at Gamma
-    !> @param[in] this   - the current inverse_dielectric_t object for which to compute the average
+    !> @param[in] this       - the current inverse_dielectric_t object for which to compute the average
     subroutine compute_anisotropic_avg(this)
 
         class(inverse_dielectric_t), intent(inout) :: this
@@ -219,8 +219,8 @@ contains
         ! Allocate space
         allocate(head_f(this%quadrature_npoints))
         allocate(wingL_f(this%quadrature_npoints, nbasis))
-        allocate(wingU_f(this%quadrature_npoints, nbasis), source=zzero)
-        allocate(body_f(this%quadrature_npoints, nbasis, nbasis), source=zzero)
+        allocate(wingU_f(this%quadrature_npoints, nbasis))
+        allocate(body_f(this%quadrature_npoints, nbasis, nbasis))
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !           AUXILIARY VECTORS         ! 
@@ -250,7 +250,7 @@ contains
         L   = this%head - lfe 
         ! Symmetrize the elements
         L   = this%symmetry%symmetryze_complex_tensor(L)
-        
+
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !               Compute the functions                   !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -276,22 +276,14 @@ contains
         !$omp end do
         !$omp end parallel
 
-        ! Here finish the Wings object and build the body 
-        !$omp parallel shared(wingL_f, wingU_f, head_f) private(ii)
-        !$omp do 
-        do ii = 1, nbasis
-            wingL_f(:, ii) =  - head_f(:) * wingL_f(:, ii)
-            wingU_f(:, ii) =  - head_f(:) * wingU_f(:, ii)
-        end do
-        !$omp end do
-        !$omp end parallel
+        ! Note that wings functions are odd functions and thus their integral is zero, so no more is done regarding those.
 
         deallocate(S,T)
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !  Do the anisotropic averaging !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+        
         allocate(this%inverse_dielectric_wingL(nbasis), source=zzero)
         allocate(this%inverse_dielectric_wingU(nbasis), source=zzero)
         allocate(this%inverse_dielectric_body, source = this%Binv)
@@ -301,11 +293,9 @@ contains
         !$omp parallel shared(this, wingL_f, wingU_f, body_f) private(ii, jj)
         !$omp do 
         do ii = 1, nbasis
-            this%inverse_dielectric_wingL(ii) = sum(wingL_f(:,ii))
-            this%inverse_dielectric_wingU(ii) = sum(wingU_f(:,ii))
             do jj = 1, nbasis
-                this%inverse_dielectric_body(ii,jj) = this%inverse_dielectric_body(ii,jj) + &
-                    sum(body_f(:,ii,jj) )
+                this%inverse_dielectric_body(jj,ii) = this%inverse_dielectric_body(jj,ii) + &
+                    sum(body_f(:,jj,ii) )
             end do
         end do 
         !$omp end do
@@ -319,7 +309,7 @@ contains
     
     end subroutine compute_anisotropic_avg
 
-    !> Inverts the body and stores to the pointer
+    !> Inverts the body and stores it (GPU or CPU depending on the compilation)
     !> @param[in] this - the inverse_dielectric_t in which to store the inverse of body
     !> @param[in] body - the body to invert
     subroutine invert_body(this, body)
@@ -333,6 +323,5 @@ contains
         this%Binv => this%Binv_data
 
     end subroutine invert_body
-
 
 end module m_dielectric_average_gamma

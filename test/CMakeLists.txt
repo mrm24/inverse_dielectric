@@ -3,9 +3,9 @@
 set(linkdir ${CMAKE_CURRENT_BINARY_DIR}/../src/)
 
 if (GPU)
-    set(LINKS ${spg_lib} -lgomp dielgamma ${MAGMA_DIR}/lib/libmagma.so)
+    set(LINKS ${spg_lib} inverse_dielectric ${MAGMA_DIR}/lib/libmagma.so)
 else()
-    set(LINKS ${spg_lib} -lgomp dielgamma lapack)
+    set(LINKS ${spg_lib} inverse_dielectric lapack)
 endif(GPU)
 
 add_executable(test_crystal test_crystal.f90)
@@ -23,7 +23,7 @@ execute_process( COMMAND ${CMAKE_COMMAND} -E tar xzf ${PROJECT_SOURCE_DIR}/test_
 execute_process( COMMAND ${CMAKE_COMMAND} -E tar xzf ${PROJECT_SOURCE_DIR}/test_resources/dielectric/wingL.dat.tar.gz WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 execute_process( COMMAND ${CMAKE_COMMAND} -E tar xzf ${PROJECT_SOURCE_DIR}/test_resources/dielectric/wingU.dat.tar.gz WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 target_include_directories(test_dielectric_average_iso PUBLIC ${linkdir})
-target_link_libraries(test_dielectric_average_iso dielgamma ${LINKS})
+target_link_libraries(test_dielectric_average_iso ${LINKS})
 
 add_executable(test_inverse test_inverse.f90)
 target_include_directories(test_inverse PUBLIC ${linkdir})

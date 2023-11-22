@@ -16,6 +16,7 @@ add_subdirectory(linear_algebra)
 add_subdirectory(dielectric)
 
 message(STATUS "FILES: ${SRC}")
-add_library(dielgamma SHARED ${SRC})
+add_library(inverse_dielectric SHARED ${SRC})
+
 
 
