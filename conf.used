@@ -3,5 +3,5 @@ module load intel-oneapi/2021.3
 module load cuda/11.2
 mkdir build 
 cd build
-cmake -DGPU=ON -DMAGMA_DIR=/users/sol/martirm/libs/magma/build/ ..
+cmake -DGPU=ON -DMAGMA_DIR=/users/sol/martirm/progs/magma -DINTERFACES -DPYBIND_CMAKE_DIR=/users/sol/martirm/.local/share/cmake/pybind11 ..
 make -j 6 -l 6

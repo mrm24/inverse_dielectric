@@ -87,10 +87,10 @@ contains
     subroutine init_common(this, lattice, redpos, elements, nq, report)
 
         class(inverse_dielectric_t), intent(inout) :: this
-        real(r64), intent(in) :: lattice(3,3)
-        real(r64), allocatable, intent(in) :: redpos(:,:) 
-        integer(r64), allocatable, intent(in) :: elements(:)
-        integer(i64), intent(in) :: nq(3)
+        real(r64), intent(in)         :: lattice(3,3)
+        real(r64),  intent(in)        :: redpos(:,:) 
+        integer(r64),  intent(in)     :: elements(:)
+        integer(i64), intent(in)      :: nq(3)
         integer, optional, intent(in) :: report
 
         ! Locals

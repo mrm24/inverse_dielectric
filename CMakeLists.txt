@@ -2,11 +2,14 @@ cmake_minimum_required(VERSION 3.6.0 FATAL_ERROR)
 
 #Some options
 option(GPU "GPU support" OFF)
-option(PYTHON "Python bindings" OFF)
+option(INTERFACES "Python bindings" OFF)
 
 # Check GPU support
 if(GPU)
-    project(inverse_dielectric_library Fortran CUDA)
+    project(inverse_dielectric_library Fortran CUDA CXX)
+    set(CMAKE_CXX_STANDARD 11)
+    set(CMAKE_CXX_STANDARD_REQUIRED on)
+    set(CMAKE_CXX_COMPILER "icpc")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -qopenmp")
     set(CMAKE_Fortran_COMPILER "ifort")
     set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O3 -fPIC \
@@ -24,7 +27,11 @@ if(GPU)
     set(MAGMA_DIR "None" CACHE PATH "Path to magma library")
     message(STATUS "magma library path : ${MAGMA_DIR}")
 else()
-    project(inverse_dielectric_library Fortran)
+    project(inverse_dielectric_library Fortran CXX)
+    set(CMAKE_CXX_STANDARD 11)
+    set(CMAKE_CXX_STANDARD_REQUIRED on)
+    set(CMAKE_CXX_COMPILER "icpc")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -qopenmp")
     set(CMAKE_Fortran_COMPILER "ifort")
     set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O3 -fPIC \
                             -no-wrap-margin -fp-model source -qopenmp \
@@ -46,10 +53,15 @@ message(STATUS "SPGLIB found : ${spg_lib}")
 
 #Set the components source
 set(SRC "${SRC_MAGMA_F90}")
+set(MODDIR "")
 add_subdirectory(src)
 
 # Python bindings
-add_subdirectory(python)
+if (INTERFACES)
+  set(PYBIND_CMAKE_DIR "None" CACHE PATH "Path to CMake configuration of pybind")
+  message(STATUS "Pybind11 CMake Configuration path : ${MAGMA_DIR}")
+  add_subdirectory(interfaces)
+endif(INTERFACES)
 
 # Compile test
 add_subdirectory(test)

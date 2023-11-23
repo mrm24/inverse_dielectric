@@ -19,7 +19,7 @@
 program test_dielectric_average_iso
 
     use m_constants, only: r64, i64, pi, twopi, zzero
-    use m_dielectric_average_gamma, only: inverse_dielectric_t
+    use m_inverse_dielectric, only: inverse_dielectric_t
 
     implicit none
 
