@@ -30,6 +30,8 @@ extern "C" {
     extern void set_dielectric_blocks(void* object_ptr, std::complex<double>* h, std::complex<double>* wl, std::complex<double>* wu, std::complex<double>* ib);
     extern void compute_anisotropic_avg(void* object_ptr);
     extern void invert_body(void* object_ptr, std::complex<double>* body);
+    extern long int get_n_basis(void* object_ptr);
+    extern void get_inverted_blocks(void* object_ptr, std::complex<double>* inv_head, std::complex<double>* inv_wingL, std::complex<double>* inv_wingU, std::complex<double>* inv_body);
 }
 
 class inverse_dielectric_cxx {
@@ -78,6 +80,15 @@ public:
     void invertBody(std::complex<double>* body) {
         invert_body(inverse_dielectric_f90, body);
     }
+
+    long int getNBasis(){
+        get_n_basis(inverse_dielectric_f90);
+    }
+
+    void getInvertedBlocks(std::complex<double>* inv_head, std::complex<double>* inv_wingL, 
+                           std::complex<double>* inv_wingU, std::complex<double>* inv_body) {
+        get_inverted_blocks(inverse_dielectric_f90, inv_head, inv_wingL, inv_wingU, inv_body);
+    }
 };
 
 
@@ -92,5 +103,7 @@ PYBIND11_MODULE(InverseDielectric, m) {
         .def("setDielectricBlocks", &inverse_dielectric_cxx::setDielectricBlocksPartial)
         .def("computeAnisotropicAvg", &inverse_dielectric_cxx::computeAnisotropicAvg)
         .def("invertBody", &inverse_dielectric_cxx::invertBody)
+        .def("getNBasis", &inverse_dielectric_cxx::getNBasis)
+        .def("getInvertedBlocks", &inverse_dielectric_cxx::getInvertedBlocks)
         .def("destroy", &inverse_dielectric_cxx::destroy); 
 };

@@ -71,7 +71,7 @@ module m_inverse_dielectric
         !> Number of points of the quadrature
         integer(i64), private :: quadrature_npoints 
     contains
-        procedure, public  :: init_common, set_dielectric_blocks, compute_anisotropic_avg, invert_body
+        procedure, public  :: init_common, set_dielectric_blocks, compute_anisotropic_avg, invert_body, get_inverted_blocks, get_n_basis
         final :: clean
     end type inverse_dielectric_t
 
@@ -323,5 +323,35 @@ contains
         this%Binv => this%Binv_data
 
     end subroutine invert_body
+
+    !> This function returns the basis size (for CXX and Python compatibility)
+    !> @param[in] this - the inverse_dielectric_t object to check the size of the used basis
+    function get_n_basis(this) result(nbasis)
+        class(inverse_dielectric_t), intent(inout), target :: this
+        integer(i64) :: nbasis
+        if (.not. associated(this%Binv)) error stop "inverse_dielectric_t%get_n_basis: Error set inverse dielectric matrix for this" 
+        nbasis = size(this%Binv, 1)
+    end function
+
+    !> This functions returns the information
+    !> @param[in] this - the inverse_dielectric_t object from which to retrieve data
+    !> @param[out] inv_head  - on exit the inverse dielectric head
+    !> @param[out] inv_wingL - on exit the inverse dielectric lower wing
+    !> @param[out] inv_wingU - on exit the inverse dielectric upper wing
+    !> @param[out] inv_body  - on exit the inverse dielectric body
+    subroutine get_inverted_blocks(this, inv_head, inv_wingL, inv_wingU, inv_body)
+
+        class(inverse_dielectric_t), intent(in), target :: this
+        complex(r64), intent(inout) :: inv_head
+        complex(r64), intent(inout) :: inv_wingL(:)
+        complex(r64), intent(inout) :: inv_wingU(:)
+        complex(r64), intent(inout) :: inv_body(:,:)
+
+        inv_head      = this%inverse_dielectric_head
+        inv_wingL(:)  = this%inverse_dielectric_wingL(:)
+        inv_wingU(:)  = this%inverse_dielectric_wingU(:)
+        inv_body(:,:) = this%inverse_dielectric_body(:,:)
+
+    end subroutine  get_inverted_blocks
 
 end module m_inverse_dielectric

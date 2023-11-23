@@ -107,5 +107,32 @@ contains
         call object%invert_body(body)
 
     end subroutine invert_body
+
+    function get_n_basis(object_ptr) result(nbasis) bind(C)
+        type(c_ptr), intent(in) :: object_ptr
+        integer(i64) :: nbasis
+        
+        type(inverse_dielectric_t), pointer :: object
+        call C_F_pointer(object_ptr, object)
+
+        nbasis = object%get_n_basis()
+
+    end function get_n_basis
+
+    subroutine get_inverted_blocks(object_ptr, inv_head, inv_wingL, inv_wingU, inv_body) bind(C)
+        type(c_ptr),  intent(in) :: object_ptr
+        complex(r64), intent(inout) :: inv_head
+        complex(r64), intent(inout) :: inv_wingL(:)
+        complex(r64), intent(inout) :: inv_wingU(:)
+        complex(r64), intent(inout) :: inv_body(:,:)
+        
+        type(inverse_dielectric_t), pointer :: object
+        call C_F_pointer(object_ptr, object)
+        
+        call object%get_inverted_blocks(inv_head, inv_wingL, inv_wingU, inv_body)
+        
+    end subroutine get_inverted_blocks
+
+    
     
 end module m_inverse_dielectric_f90
