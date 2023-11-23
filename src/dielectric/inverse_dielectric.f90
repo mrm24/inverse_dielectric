@@ -16,7 +16,7 @@
 !> Contains procedures for averages of the dielectric matrix
 
 !> This module contains the procedures for the computation of the dielectric matrix averages
-module m_dielectric_average_gamma
+module m_inverse_dielectric
     
     use m_constants, only: i64, r64, twopi, pi, zzero, zone, iunit
     use m_crystal_cell, only: cell_t
@@ -87,10 +87,10 @@ contains
     subroutine init_common(this, lattice, redpos, elements, nq, report)
 
         class(inverse_dielectric_t), intent(inout) :: this
-        real(r64), intent(in) :: lattice(3,3)
-        real(r64), allocatable, intent(in) :: redpos(:,:) 
-        integer(r64), allocatable, intent(in) :: elements(:)
-        integer(i64), intent(in) :: nq(3)
+        real(r64), intent(in)         :: lattice(3,3)
+        real(r64),  intent(in)        :: redpos(:,:) 
+        integer(r64),  intent(in)     :: elements(:)
+        integer(i64), intent(in)      :: nq(3)
         integer, optional, intent(in) :: report
 
         ! Locals
@@ -324,4 +324,4 @@ contains
 
     end subroutine invert_body
 
-end module m_dielectric_average_gamma
+end module m_inverse_dielectric

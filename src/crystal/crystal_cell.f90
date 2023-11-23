@@ -65,9 +65,9 @@ contains
     !> @param[in]     elements_ - list of elements
     subroutine init_cell_t(this, lattice_, redpos_, elements_)
         class(cell_t), intent(inout) :: this
-        real(r64), intent(in) :: lattice_(3,3)
-        real(r64), allocatable, intent(in) :: redpos_(:,:) 
-        integer(r64), allocatable, intent(in) :: elements_(:)
+        real(r64), intent(in)        :: lattice_(3,3)
+        real(r64), intent(in)        :: redpos_(:,:) 
+        integer(r64), intent(in)     :: elements_(:)
 
         ! Locals
         real(r64) :: a(3), b(3), c(3)
@@ -75,8 +75,8 @@ contains
 
         ! Init class variables
         this%lattice  = lattice_
-        this%redpos   = redpos_
-        this%elements = elements_
+        allocate(this%redpos, source = redpos_)
+        allocate(this%elements, source = elements_)
         this%natoms   = size(this%redpos,2) 
         
         ! The elements of the lattice
