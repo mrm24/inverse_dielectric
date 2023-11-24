@@ -1,4 +1,5 @@
 # Inverse dielectric
+
 **Inverse dielectric** is a modern Fortran library providing a common framework for GW codes, specifically for the most common operations involving the inverse dielectric function. The code is parallelized via multithreading (OPENMP) and GPUs (via MAGMA library). 
 
 **Supported operations:**
@@ -8,4 +9,22 @@
 **Experimental:**
 * _Interfaces_: several major methods are exposed to C++, and to Python (via pybind11). Notice, that the ordering of arrays must be the Fortran one.
 
+# Install:
 
+The programm can be easily installed using CMake (version >= 3.20).
+
+**CMake Options:**
+
+* _GPU_: Set to ON to allow for GPU acceleration
+* _MAGMA_DIR_: If _GPU_ is ON, this option provides the path to MAGMA directory (installed with make)
+* _INTERFACES_: If ON, create interface for C++ and Python (this last using pybind11)  
+* _PYBIND_CMAKE_DIR_: If _INTERFACES_ is ON, this provides the path to _PYBIND11_ CMake file; in case you installed it via pip (i.e. pip3 install --user pybind11
+; pip3 install "pybind11[global]" --user) it will be located in "~/.local/share/cmake/pybind11".
+
+**Testing:**
+
+The test suit is provided via CTest, to run the test cases, go to test folder and execute "ctest".
+
+**Documentation:**
+
+The documentation is build using Doxygen. To compile it run "make doc".
