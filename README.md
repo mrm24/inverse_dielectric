@@ -6,6 +6,6 @@
 * _Body inversion_: the code provides functions for inverting the body of the dielectric matrix either using CPUs or GPUs.
 
 **Experimental:**
-*_Interfaces_: several major methods are exposed to C++, and to Python (via pybind11). Notice, that the ordering of arrays must be the Fortran one.
+* _Interfaces_: several major methods are exposed to C++, and to Python (via pybind11). Notice, that the ordering of arrays must be the Fortran one.
 
 
