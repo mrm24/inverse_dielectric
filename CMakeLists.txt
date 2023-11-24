@@ -70,7 +70,7 @@ add_subdirectory(test)
 find_package(Doxygen)
 if(DOXYGEN_FOUND)
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/doc/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/doc/Doxyfile @ONLY)
-  file(INSTALL ${CMAKE_CURRENT_SOURCE_DIR}/doc/greenx_logo.png DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/doc)
+  file(INSTALL ${CMAKE_CURRENT_SOURCE_DIR}/doc/logo.png DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/doc)
   add_custom_target(doc
     ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/doc/Doxyfile
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doc
