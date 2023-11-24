@@ -20,3 +20,8 @@ add_library(inverse_dielectric_interfaces SHARED ${SRC_INTERFACES})
 target_include_directories(inverse_dielectric_interfaces PUBLIC ${MOD_DIR} ${pybind11_INCLUDE_DIRS})
 
 pybind11_add_module(InverseDielectric MODULE interface.cpp)
+target_include_directories(InverseDielectric PRIVATE ${MOD_DIR} ${pybind11_INCLUDE_DIRS} ${Python3_INCLUDE_DIRS})
+target_link_libraries(InverseDielectric PRIVATE ${LINKS} inverse_dielectric_interfaces ${Python3_LIBRARIES})
+
+
+

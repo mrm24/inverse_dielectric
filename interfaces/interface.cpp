@@ -24,14 +24,14 @@ namespace py = pybind11;
 
 /// External functions to call Fortran stuff
 extern "C" {
-    extern void allocate_inverse_dielectric_t(void* object_ptr);
-    extern void deallocate_inverse_dielectric_t(void* object_ptr);
-    extern void init_common(void* object_ptr, double* lattice, double* redpos, long int* elements, long nq[3]);
-    extern void set_dielectric_blocks(void* object_ptr, std::complex<double>* h, std::complex<double>* wl, std::complex<double>* wu, std::complex<double>* ib);
-    extern void compute_anisotropic_avg(void* object_ptr);
-    extern void invert_body(void* object_ptr, std::complex<double>* body);
-    extern long int get_n_basis(void* object_ptr);
-    extern void get_inverted_blocks(void* object_ptr, std::complex<double>* inv_head, std::complex<double>* inv_wingL, std::complex<double>* inv_wingU, std::complex<double>* inv_body);
+    extern void allocate_inverse_dielectric_t(void** object_ptr);
+    extern void deallocate_inverse_dielectric_t(void** object_ptr);
+    extern void init_common(void** object_ptr, double* lattice, double* redpos, long int* elements, long nq[3]);
+    extern void set_dielectric_blocks(void** object_ptr, std::complex<double>* h, std::complex<double>* wl, std::complex<double>* wu, std::complex<double>* ib);
+    extern void compute_anisotropic_avg(void** object_ptr);
+    extern void invert_body(void** object_ptr, std::complex<double>* body);
+    extern long int get_n_basis(void** object_ptr);
+    extern void get_inverted_blocks(void** object_ptr, std::complex<double>* inv_head, std::complex<double>* inv_wingL, std::complex<double>* inv_wingU, std::complex<double>* inv_body);
 }
 
 class inverse_dielectric_cxx {
@@ -48,7 +48,7 @@ public:
 
     // Destructor
     ~inverse_dielectric_cxx() {
-        deallocate_inverse_dielectric_t(inverse_dielectric_f90);
+        deallocate_inverse_dielectric_t(&inverse_dielectric_f90);
     }
 
     // Declare copy and movement constructor deleted
@@ -56,38 +56,38 @@ public:
     inverse_dielectric_cxx(inverse_dielectric_cxx&& A)      = delete;
 
     void destroy(){
-        deallocate_inverse_dielectric_t(inverse_dielectric_f90);
+        deallocate_inverse_dielectric_t(&inverse_dielectric_f90);
     }
 
     void initialize(double* lattice, double* redpos, long* elements, long nq[3]) {
-        init_common(inverse_dielectric_f90, lattice, redpos, elements, nq);
+        init_common(&inverse_dielectric_f90, lattice, redpos, elements, nq);
     }
 
     void setDielectricBlocksFull(std::complex<double>* h, std::complex<double>* wl,
                              std::complex<double>* wu, std::complex<double>* ib) {
-        set_dielectric_blocks(inverse_dielectric_f90, h, wl, wu, ib);
+        set_dielectric_blocks(&inverse_dielectric_f90, h, wl, wu, ib);
     }
 
     void setDielectricBlocksPartial(std::complex<double>* h, std::complex<double>* wl,
                              std::complex<double>* wu) {
-        set_dielectric_blocks(inverse_dielectric_f90, h, wl, wu, nullptr);
+        set_dielectric_blocks(&inverse_dielectric_f90, h, wl, wu, nullptr);
     }
 
     void computeAnisotropicAvg() {
-        compute_anisotropic_avg(inverse_dielectric_f90);
+        compute_anisotropic_avg(&inverse_dielectric_f90);
     }
 
     void invertBody(std::complex<double>* body) {
-        invert_body(inverse_dielectric_f90, body);
+        invert_body(&inverse_dielectric_f90, body);
     }
 
     long int getNBasis(){
-        get_n_basis(inverse_dielectric_f90);
+        get_n_basis(&inverse_dielectric_f90);
     }
 
     void getInvertedBlocks(std::complex<double>* inv_head, std::complex<double>* inv_wingL, 
                            std::complex<double>* inv_wingU, std::complex<double>* inv_body) {
-        get_inverted_blocks(inverse_dielectric_f90, inv_head, inv_wingL, inv_wingU, inv_body);
+        get_inverted_blocks(&inverse_dielectric_f90, inv_head, inv_wingL, inv_wingU, inv_body);
     }
 };
 
@@ -107,3 +107,7 @@ PYBIND11_MODULE(InverseDielectric, m) {
         .def("getInvertedBlocks", &inverse_dielectric_cxx::getInvertedBlocks)
         .def("destroy", &inverse_dielectric_cxx::destroy); 
 };
+
+int main() {
+    auto thing = inverse_dielectric_cxx();
+}

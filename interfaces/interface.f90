@@ -59,35 +59,25 @@ contains
         
     end subroutine init_common
     
-    subroutine set_dielectric_blocks_full(object_ptr, h, wl, wu, ib)
+    subroutine set_dielectric_blocks(object_ptr, h, wl, wu, ib) bind(C)
         type(c_ptr), intent(in) :: object_ptr
-        complex(r64), target, intent(in)      :: h(:,:)
-        complex(r64), target, intent(in)      :: wl(:,:)
-        complex(r64), target, intent(in)      :: wu(:,:)
-        complex(r64), target, intent(in)      :: ib(:,:)
+        complex(r64), target, intent(in)                :: h(:,:)
+        complex(r64), target, intent(in)                :: wl(:,:)
+        complex(r64), target, intent(in)                :: wu(:,:)
+        complex(r64), target, optional, intent(in)      :: ib(:,:)
         
         type(inverse_dielectric_t), pointer :: object
         call C_F_pointer(object_ptr, object)
         
-        call object%set_dielectric_blocks(h, wl, wu, ib)
-        
-    end subroutine set_dielectric_blocks_full
-    
-    subroutine set_dielectric_blocks_partial(object_ptr, h, wl, wu)
-        type(c_ptr), intent(in) :: object_ptr
-        complex(r64), target, intent(in)      :: h(:,:)
-        complex(r64), target, intent(in)      :: wl(:,:)
-        complex(r64), target, intent(in)      :: wu(:,:)
-        
-        type(inverse_dielectric_t), pointer :: object
-        call C_F_pointer(object_ptr, object)
-        
-        call object%set_dielectric_blocks(h, wl, wu)
-        
-    end subroutine set_dielectric_blocks_partial
+        if (present(ib)) then
+            call object%set_dielectric_blocks(h, wl, wu, ib)
+        else 
+            call object%set_dielectric_blocks(h, wl, wu)
+        end if 
 
+    end subroutine set_dielectric_blocks
 
-    subroutine compute_anisotropic_avg(object_ptr)
+    subroutine compute_anisotropic_avg(object_ptr) bind(C)
         type(c_ptr), intent(in) :: object_ptr
         
         type(inverse_dielectric_t), pointer :: object
@@ -97,7 +87,7 @@ contains
         
     end subroutine compute_anisotropic_avg
     
-    subroutine invert_body(object_ptr, body)
+    subroutine invert_body(object_ptr, body) bind(C)
         type(c_ptr), intent(in) :: object_ptr
         complex(r64), allocatable, intent(in) :: body(:,:)
         
