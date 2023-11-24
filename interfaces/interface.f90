@@ -132,7 +132,5 @@ contains
         call object%get_inverted_blocks(inv_head, inv_wingL, inv_wingU, inv_body)
         
     end subroutine get_inverted_blocks
-
-    
     
 end module m_inverse_dielectric_f90

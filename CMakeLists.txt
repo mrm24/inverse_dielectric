@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.6.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.20.0 FATAL_ERROR)
 
 #Some options
 option(GPU "GPU support" OFF)
