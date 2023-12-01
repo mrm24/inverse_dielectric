@@ -15,7 +15,7 @@
 !> @file
 !> This module contains parameters and constans
 !>
-module m_constants
+module idiel_constants
     
     use iso_fortran_env, only: real64, int32, int64
     
@@ -44,4 +44,4 @@ module m_constants
     !> Complex zero
     complex(r64), parameter :: zzero = cmplx(0.0_r64, 0.0_r64, kind=r64)
     
-end module m_constants
+end module idiel_constants

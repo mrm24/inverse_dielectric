@@ -16,12 +16,12 @@
 !> Contains procedures for averages of the dielectric matrix
 
 !> This module contains the procedures for the computation of the dielectric matrix averages
-module m_inverse_dielectric
+module idiel_inverse_dielectric
     
-    use m_constants, only: i64, r64, twopi, pi, zzero, zone, iunit
-    use m_crystal_cell, only: cell_t
-    use m_crystal_symmetry, only: symmetry_t
-    use m_sph_quadrature, only: compute_angular_mesh_lebedev
+    use idiel_constants, only: i64, r64, twopi, pi, zzero, zone, iunit
+    use idiel_crystal_cell, only: cell_t
+    use idiel_crystal_symmetry, only: symmetry_t
+    use idiel_sph_quadrature, only: compute_angular_mesh_lebedev
 
     implicit none
 
@@ -225,11 +225,11 @@ contains
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !           AUXILIARY VECTORS         ! 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+        
         ! Init the U_{G\alpha} auxiliary vector (Eq. B.7) in 10.1016/j.cpc.2006.07.018
         allocate(U, source=this%wingL)
 
-        ! Compute S_{\alpha}(\mathbf{G}) = \sum_{\mathbf{G'\neq 0}} B^{-1}_{\mathbf{GG'}} U_{\alpha}(\mathbf{G}) (Eq. B.13)
+        ! Compute S_{\alpha}(\mathbf{G}) = \suidiel_{\mathbf{G'\neq 0}} B^{-1}_{\mathbf{GG'}} U_{\alpha}(\mathbf{G}) (Eq. B.13)
         S = matmul(this%Binv,U)
 
         ! Now for the upper wing
@@ -314,7 +314,7 @@ contains
     !> @param[in] body - the body to invert
     subroutine invert_body(this, body)
     
-        use m_linalg, only: inverse_complex_LU
+        use idiel_linalg, only: inverse_complex_LU
 
         class(inverse_dielectric_t), intent(inout), target :: this
         complex(r64), allocatable, intent(in) :: body(:,:)
@@ -354,4 +354,4 @@ contains
 
     end subroutine  get_inverted_blocks
 
-end module m_inverse_dielectric
+end module idiel_inverse_dielectric

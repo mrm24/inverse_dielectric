@@ -1,9 +1,4 @@
-
-if (GPU)
-    set(LINKS ${spg_lib} inverse_dielectric ${MAGMA_DIR}/lib/libmagma.so)
-else()
-    set(LINKS ${spg_lib} inverse_dielectric lapack)
-endif(GPU)
+set(LINKS inverse_dielectric)
 
 find_package (Python3 COMPONENTS Interpreter Development)
 include_directories(${Python3_INCLUDE_DIRS})

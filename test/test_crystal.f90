@@ -16,9 +16,9 @@
 !> Tests the generated crystal structure as well as the symmetry and compares it with reference results
 program test_crystal
     
-    use m_constants,         only: i64, r64, pi, twopi
-    use m_crystal_cell,      only: cell_t
-    use m_crystal_symmetry,  only: symmetry_t
+    use idiel_constants,         only: i64, r64, pi, twopi
+    use idiel_crystal_cell,      only: cell_t
+    use idiel_crystal_symmetry,  only: symmetry_t
 
     implicit none
 

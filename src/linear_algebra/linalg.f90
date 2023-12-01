@@ -16,15 +16,15 @@
 !> This file contain subroutines of linear algebra using MAGMA (GPU) or LAPACK (CPU) like library
 
 !> This module contains the subroutines for the linear algebra
-module m_linalg
+module idiel_linalg
 
-    use m_constants, only: i32, i64, r64
+    use idiel_constants, only: i32, i64, r64
 #ifdef USE_GPU
     use iso_c_binding
     use magma2
-    use m_gpu_magma_t, only: linalg_world_t, linalg_obj_t
+    use idiel_gpu_magma_t, only: linalg_world_t, linalg_obj_t
 #else
-    use m_cpu_magma_t, only: linalg_world_t, linalg_obj_t
+    use idiel_cpu_magma_t, only: linalg_world_t, linalg_obj_t
 #endif
     
     implicit none
@@ -100,4 +100,4 @@ contains
 
     end subroutine inverse_complex_LU
 
-end module m_linalg
+end module idiel_linalg

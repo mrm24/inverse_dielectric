@@ -18,8 +18,8 @@
 !> This module contains the procedures for the test of averaging of the dielectric matrix averages for isotropic case
 program test_dielectric_average_iso
 
-    use m_constants, only: r64, i64, pi, twopi, zzero
-    use m_inverse_dielectric, only: inverse_dielectric_t
+    use idiel_constants, only: r64, i64, pi, twopi, zzero
+    use idiel_inverse_dielectric, only: inverse_dielectric_t
 
     implicit none
 
@@ -75,10 +75,10 @@ program test_dielectric_average_iso
     call inv_diel%init_common(lattice, redpos, types, ngrid)
 
     ! Read the dielectric data from previous G0W0 run
-    call load_from_file('head.dat', head)
-    call load_from_file('wingL.dat', wingL)
-    call load_from_file('wingU.dat', wingU)
-    call load_from_file('Binv.dat', Binv)
+    call load_froidiel_file('head.dat', head)
+    call load_froidiel_file('wingL.dat', wingL)
+    call load_froidiel_file('wingU.dat', wingU)
+    call load_froidiel_file('Binv.dat', Binv)
 
     ! Do the average
     write(*,*) '[TEST : inverse_dielectric_t]' 
@@ -127,7 +127,7 @@ contains
     !> @param[in] fname - the file name   
     !> @param[in] data_shape - the shape of the data to reads
     !> @param[out] data - the data
-    subroutine load_from_file(fname, data)
+    subroutine load_froidiel_file(fname, data)
 
         character(len=*), intent(in) :: fname
         complex(r64), allocatable, intent(out) :: data(..)
@@ -176,6 +176,6 @@ contains
 
         close(fin)
 
-    end subroutine load_from_file
+    end subroutine load_froidiel_file
 
 end program test_dielectric_average_iso

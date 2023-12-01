@@ -14,11 +14,11 @@
 
 !> @file
 !> This module contains information regarding crystal symmetry agnostic of any DFT solver
-module m_crystal_symmetry    
+module idiel_crystal_symmetry    
     
-    use m_constants,    only: i32, i64, r64, twopi, zzero
+    use idiel_constants,    only: i32, i64, r64, twopi, zzero
     use iso_c_binding,  only: C_int, C_double, C_char
-    use m_crystal_cell, only: cell_t
+    use idiel_crystal_cell, only: cell_t
 
     implicit none
 
@@ -206,7 +206,7 @@ contains
     !> Symmetrizes a Cartesian complex double precision tensor
     !> @param[in] this - symmetry object
     !> @param[in] mat33 - the matrix to symmetrize
-    !> @result sym_mat33 - the symmetrized vector
+    !> @result syidiel_mat33 - the symmetrized vector
     function symmetryze_complex_tensor(this, mat33) result(sym_mat33)
         class(symmetry_t), intent(in) :: this
         complex(r64), intent(in) :: mat33(3,3)
@@ -226,4 +226,4 @@ contains
     end function symmetryze_complex_tensor
 
 
-end module m_crystal_symmetry
+end module idiel_crystal_symmetry

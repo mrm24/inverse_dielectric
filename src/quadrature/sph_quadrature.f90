@@ -27,9 +27,9 @@
 
 
 !> This module contains subroutines to compute meshes and weights for integrals over a sphere using Lebedev quadrature
-module m_sph_quadrature
+module idiel_sph_quadrature
     
-    use m_constants,   only: i64, r64, pi, twopi
+    use idiel_constants,   only: i64, r64, pi, twopi
 
     implicit none
     
@@ -497,4 +497,4 @@ contains
     end subroutine compute_angular_mesh_lebedev 
 
 
-end module m_sph_quadrature
+end module idiel_sph_quadrature

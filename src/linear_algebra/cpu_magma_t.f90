@@ -17,10 +17,10 @@
 !> but using CPU
 
 !> Module containing types to handle MAGMA like but for CPU so the code does not need to be rewritten
-module m_cpu_magma_t
+module idiel_cpu_magma_t
     
     use iso_c_binding
-    use m_constants, only: i32, i64, r64
+    use idiel_constants, only: i32, i64, r64
 
     implicit none
 
@@ -242,4 +242,4 @@ contains
         answer = this%kind
     end function get_kind
 
-end module m_cpu_magma_t
+end module idiel_cpu_magma_t

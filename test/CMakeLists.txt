@@ -2,11 +2,7 @@
 set(MOD_DIR "${CMAKE_BINARY_DIR}/include")
 set(linkdir ${MOD_DIR})
 
-if (GPU)
-    set(LINKS ${spg_lib} inverse_dielectric ${MAGMA_DIR}/lib/libmagma.so)
-else()
-    set(LINKS ${spg_lib} inverse_dielectric lapack)
-endif(GPU)
+set(LINKS inverse_dielectric)
 
 add_executable(test_crystal test_crystal.f90)
 target_include_directories(test_crystal PUBLIC ${linkdir})

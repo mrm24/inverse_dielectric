@@ -17,11 +17,11 @@
 !> 
 
 !> This module defines the subroutines for exposing the inverse_dielectric_t to C
-module m_inverse_dielectric_f90
+module idiel_inverse_dielectric_f90
 
     use iso_c_binding
-    use m_constants, only: i64, r64
-    use m_inverse_dielectric, only: inverse_dielectric_t
+    use idiel_constants, only: i64, r64
+    use idiel_inverse_dielectric, only: inverse_dielectric_t
     
     implicit none
     
@@ -123,4 +123,4 @@ contains
         
     end subroutine get_inverted_blocks
     
-end module m_inverse_dielectric_f90
+end module idiel_inverse_dielectric_f90

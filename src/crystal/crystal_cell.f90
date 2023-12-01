@@ -16,9 +16,9 @@
 !> This module contains modules for crystalline structure
 
 !> Module containing the information about crystal structure except for symmetry
-module m_crystal_cell
+module idiel_crystal_cell
 
-    use m_constants, only: i64, r64, twopi
+    use idiel_constants, only: i64, r64, twopi
 
     implicit none
 
@@ -177,4 +177,4 @@ contains
 
     end subroutine get_kmax_subcell_bz
 
-end module m_crystal_cell
+end module idiel_crystal_cell

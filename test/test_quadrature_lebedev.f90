@@ -17,8 +17,8 @@
 
 program test_quadrature_lebedev
     
-    use m_constants, only: r64, i64, pi, twopi
-    use m_sph_quadrature, only: compute_angular_mesh_lebedev
+    use idiel_constants, only: r64, i64, pi, twopi
+    use idiel_sph_quadrature, only: compute_angular_mesh_lebedev
 
     implicit none
 
@@ -40,7 +40,7 @@ program test_quadrature_lebedev
 
     ! Storage
     real(r64), allocatable :: f(:)
-    real(r64) :: num_integral, rdiff
+    real(r64) :: nuidiel_integral, rdiff
 
     write(*,*) '[TEST : compute_ang_lebedev]' 
     write(*,*) ' * kind : regression test against precomputed data'
@@ -50,8 +50,8 @@ program test_quadrature_lebedev
 
     ! Compute integral 1 and check
     f = f1(xyz_mesh)
-    num_integral = sum(weights * f)
-    rdiff = abs( num_integral - I1 ) / I1
+    nuidiel_integral = sum(weights * f)
+    rdiff = abs( nuidiel_integral - I1 ) / I1
     write(*,'(A, E11.6)')  '  * Regression (f1) result (relative difference): ', rdiff
     if (rdiff .lt. tolerance) then
         write(*,*)  '[TEST : compute_ang_lebedev f1: PASSED]'
@@ -62,8 +62,8 @@ program test_quadrature_lebedev
 
     !Compute integral 2 and check (this one has lower convergence for all quadratures, thus we reduce convergence criteria)
     f = f2(xyz_mesh)
-    num_integral = sum(weights * f)
-    rdiff = abs( num_integral - I2 ) / I2
+    nuidiel_integral = sum(weights * f)
+    rdiff = abs( nuidiel_integral - I2 ) / I2
     write(*,'(A, E11.6)')  '  * Regression (f2) result (relative difference): ', rdiff
     if (rdiff .lt. 1.0e+3_r64 * tolerance) then
         write(*,*)  '[TEST : compute_ang_lebedev f2: PASSED]'
@@ -74,8 +74,8 @@ program test_quadrature_lebedev
 
     ! Compute integral 3 and check
     f = f3(xyz_mesh)
-    num_integral = sum(weights * f)
-    rdiff = abs( num_integral - I3 ) / I3
+    nuidiel_integral = sum(weights * f)
+    rdiff = abs( nuidiel_integral - I3 ) / I3
     write(*,'(A, E11.6)')  '  * Regression (f3) result (relative difference): ', rdiff
     if (rdiff .lt. tolerance) then
         write(*,*)  '[TEST : compute_ang_lebedev f3: PASSED]'
@@ -86,8 +86,8 @@ program test_quadrature_lebedev
 
     ! Compute integral 4 and check
     f = f4(xyz_mesh)
-    num_integral = sum(weights * f)
-    rdiff = abs( num_integral - I4 ) / I4
+    nuidiel_integral = sum(weights * f)
+    rdiff = abs( nuidiel_integral - I4 ) / I4
     write(*,'(A, E11.6)')  '  * Regression (f4) result (relative difference): ', rdiff
     if (rdiff .lt. tolerance) then
         write(*,*)  '[TEST : compute_ang_lebedev f4: PASSED]'
@@ -98,8 +98,8 @@ program test_quadrature_lebedev
 
     ! Compute integral 5 and check
     f = f5(xyz_mesh)
-    num_integral = sum(weights * f)
-    rdiff = abs( num_integral - I5 ) / I5
+    nuidiel_integral = sum(weights * f)
+    rdiff = abs( nuidiel_integral - I5 ) / I5
     write(*,'(A, E11.6)')  '  * Regression (f5) result (relative difference): ', rdiff
     if (rdiff .lt. tolerance) then
         write(*,*)  '[TEST : compute_ang_lebedev f5: PASSED]'
