@@ -49,17 +49,24 @@ execute_process(COMMAND ${cmd1} ${cmd1_arg} COMMAND ${cmd2} ${cmd2_arg}
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
   RESULT_VARIABLE spg_result
   OUTPUT_VARIABLE spg_lib OUTPUT_STRIP_TRAILING_WHITESPACE)
-message(STATUS "SPGLIB found : ${spg_lib}")
+  message(STATUS "SPGLIB found : ${spg_lib}")
 
-#Set the components source
+# Create INSTALL DIRECTORY
+set(INSTALL_DIR "${PROJECT_SOURCE_DIR}/IDieL")
+message(STATUS "INSTALL DIRECTORY : ${PROJECT_SOURCE_DIR}")
+file(MAKE_DIRECTORY ${INSTALL_DIR})
+file(MAKE_DIRECTORY ${INSTALL_DIR}/lib)
+
+# Set the components source
 set(SRC "${SRC_MAGMA_F90}")
 set(MODDIR "")
 add_subdirectory(src)
 
 # Python bindings
 if (INTERFACES)
+  file(MAKE_DIRECTORY ${INSTALL_DIR}/interfaces)
   set(PYBIND_CMAKE_DIR "None" CACHE PATH "Path to CMake configuration of pybind")
-  message(STATUS "Pybind11 CMake Configuration path : ${MAGMA_DIR}")
+  message(STATUS "Pybind11 CMake Configuration path : ${PYBIND_CMAKE_DIR}")
   add_subdirectory(interfaces)
 endif(INTERFACES)
 

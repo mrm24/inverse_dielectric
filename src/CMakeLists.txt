@@ -32,3 +32,15 @@ else()
 endif(GPU)
 
 target_link_libraries(inverse_dielectric ${LINKS})
+
+install(DIRECTORY ${MOD_DIR}
+        DESTINATION ${INSTALL_DIR}
+        DIRECTORY_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+                            GROUP_READ GROUP_EXECUTE
+                            WORLD_READ WORLD_EXECUTE
+        FILE_PERMISSIONS OWNER_READ OWNER_WRITE
+                         GROUP_READ
+                         WORLD_READ
+        )
+
+install(TARGETS inverse_dielectric DESTINATION ${INSTALL_DIR}/lib)
