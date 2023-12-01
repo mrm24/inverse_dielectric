@@ -1,9 +1,4 @@
-
-# if (GPU)
-#     set(LINKS ${spg_lib} inverse_dielectric ${MAGMA_DIR}/lib/libmagma.so)
-# else()
-#     set(LINKS ${spg_lib} inverse_dielectric lapack)
-# endif(GPU)
+# This first creates a CXX library and then uses it to create a python version
 
 find_package (Python3 COMPONENTS Interpreter Development)
 include_directories(${Python3_INCLUDE_DIRS})
