@@ -22,6 +22,11 @@ module idiel_inverse_dielectric
     use idiel_crystal_cell, only: cell_t
     use idiel_crystal_symmetry, only: symmetry_t
     use idiel_sph_quadrature, only: compute_angular_mesh_lebedev
+#ifdef USE_GPU
+    use idiel_gpu_magma_t, only: linalg_world_t
+#else
+    use idiel_cpu_magma_t, only: linalg_world_t
+#endif
 
     implicit none
 
@@ -66,10 +71,10 @@ module idiel_inverse_dielectric
         complex(r64), allocatable :: inverse_dielectric_wingU(:)
         !> The body of the inverse
         complex(r64), allocatable :: inverse_dielectric_body(:,:)
-        !> Kind of quadrature used
-        character(len=:), allocatable, private :: quadrature_scheme
         !> Number of points of the quadrature
         integer(i64), private :: quadrature_npoints 
+        !> The handler of linear algebra queues
+        type(linalg_world_t), private :: world
     contains
         procedure, public  :: init_common, set_dielectric_blocks, compute_anisotropic_avg, invert_body, get_inverted_blocks, get_n_basis
         final :: clean
@@ -133,6 +138,9 @@ contains
             write(report,*) '  Relative error of the volume integral : ', rel_error
         end if
 
+        ! Init algebra world
+        call this%world%init()
+
     end subroutine init_common
 
     !> This nullify and deallocates the objects
@@ -154,6 +162,7 @@ contains
         if (allocated(this%inverse_dielectric_wingL)) deallocate(this%inverse_dielectric_wingL)
         if (allocated(this%inverse_dielectric_wingU)) deallocate(this%inverse_dielectric_wingU)
         if (allocated(this%inverse_dielectric_body))  deallocate(this%inverse_dielectric_body)
+        if (this%world%is_queue_set()) call this%world%finish()
 
     end subroutine clean
 
@@ -319,7 +328,9 @@ contains
         class(inverse_dielectric_t), intent(inout), target :: this
         complex(r64), allocatable, intent(in) :: body(:,:)
 
-        call inverse_complex_LU(body, this%Binv_data)        
+        if (.not. this%world%is_queue_set()) call this%world%init()
+
+        call inverse_complex_LU(body, this%Binv_data, this%world)        
         this%Binv => this%Binv_data
 
     end subroutine invert_body

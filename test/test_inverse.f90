@@ -18,9 +18,15 @@ program test_inverse
     
     use idiel_constants,         only: i64, r64, zzero
     use idiel_linalg,            only: inverse_complex_LU
+#ifdef USE_GPU
+    use idiel_gpu_magma_t, only: linalg_world_t
+#else
+    use idiel_cpu_magma_t, only: linalg_world_t
+#endif
 
     integer(i64), parameter :: n = 3000_i64
     complex(r64), allocatable :: A(:,:), inverse_A(:,:)
+    type(linalg_world_t) :: world
     integer(i64) :: i
     real(r64) :: rdiff
     real(r64), parameter    :: tolerance = 1.0e-12_r64
@@ -30,8 +36,9 @@ program test_inverse
     do i = 1, n
         A(i,i) = cmplx(i, 0, r64)
     end do
-
-    call inverse_complex_LU(A, inverse_A)
+    call world%init()
+    call inverse_complex_LU(A, inverse_A, world)
+    call world%finish()
     write(*,*) '[TEST : inverse_complex_LU]' 
     do i = 1, n
         write(*,*) 1.0_r64 / A(i,i), inverse_A(i,i)

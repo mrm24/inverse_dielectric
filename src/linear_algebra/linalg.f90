@@ -34,13 +34,14 @@ contains
     !> Inverts the A matrix and save the result to inverse_A
     !> @param[in] A - the complex matrix to invert
     !> @param[in] inverse_A - the inverse of A
-    subroutine inverse_complex_LU(A, inverse_A)
+    !> @param[in] world - the linalg_world_t handler 
+    subroutine inverse_complex_LU(A, inverse_A, world)
         
         complex(r64), contiguous, intent(in)            :: A(:,:)
         complex(r64), target, allocatable, intent(out)  :: inverse_A(:,:)
+        type(linalg_world_t), intent(inout)             :: world
 
         ! Locals
-        type(linalg_world_t) :: world 
         type(linalg_obj_t)   :: ref_A
         type(linalg_obj_t)   :: ref_work
 
@@ -53,10 +54,12 @@ contains
         ! External
         external :: zgetri, zgetrf
 #endif  
+
         ! Some constants
         n = size(A,1)
         ! Allocate
-        allocate(inverse_A, source=A)
+        allocate(inverse_A, source = A)
+
 #ifdef USE_GPU
         nb = magma_get_zgetri_nb(n)
 #else
@@ -67,7 +70,7 @@ contains
         allocate(work(lwork))
 
         ! If GPU init the queu otherwise this does nothing
-        call world%init()
+        ! call world%init()
 
         ! In case of GPU transfer if not this call does nothing
         call ref_A%allocate_gpu(inverse_A)
@@ -95,7 +98,7 @@ contains
         call world%syncronize()
         call ref_A%destroy()
         call ref_work%destroy()
-        call world%finish()
+        ! call world%finish()
 
     end subroutine inverse_complex_LU
 
