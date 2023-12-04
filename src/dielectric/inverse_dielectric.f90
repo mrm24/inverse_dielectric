@@ -76,7 +76,7 @@ module idiel_inverse_dielectric
         !> The handler of linear algebra queues
         type(linalg_world_t), private :: world
     contains
-        procedure, public  :: init_common, set_dielectric_blocks, compute_anisotropic_avg, invert_body, get_inverted_blocks, get_n_basis
+        procedure, public  :: init_common, set_dielectric_blocks, compute_anisotropic_avg, invert_body, get_inverted_blocks, get_n_basis, nullify_body
         final :: clean
     end type inverse_dielectric_t
 
@@ -364,5 +364,12 @@ contains
         inv_body(:,:) = this%inverse_dielectric_body(:,:)
 
     end subroutine  get_inverted_blocks
+
+    !> Nullifies the body pointer
+    !> @param[in,out] this - the inverse_dielectric_t object from which to retrieve data
+    subroutine nullify_body(this)
+        class(inverse_dielectric_t), intent(inout), target :: this
+        if (associated(this%Binv)) nullify(this%Binv)
+    end subroutine nullify_body
 
 end module idiel_inverse_dielectric

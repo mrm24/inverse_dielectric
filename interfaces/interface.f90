@@ -122,5 +122,15 @@ contains
         call object%get_inverted_blocks(inv_head, inv_wingL, inv_wingU, inv_body)
         
     end subroutine get_inverted_blocks
+
+    subroutine nullify_body(object_ptr) bind(C)
+        type(c_ptr),  intent(in) :: object_ptr
+        
+        type(inverse_dielectric_t), pointer :: object
+        call C_F_pointer(object_ptr, object)
+        
+        call object%nullify_body()
+        
+    end subroutine nullify_body
     
 end module idiel_inverse_dielectric_f90
