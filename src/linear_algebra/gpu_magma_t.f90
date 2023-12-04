@@ -151,11 +151,10 @@ contains
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     !> This deallocates the object in the GPU 
-    !> @param[in] this - gpu_matrix object to destroy
-    subroutine destroy(this, queue)
+    !> @param[in] this - linalg_obj_t object to destroy
+    subroutine destroy(this)
         
-        class(linalg_obj_t), intent(inout) :: this
-        type(C_ptr), intent(inout)      :: queue
+        class(linalg_obj_t), intent(inout)   :: this
 
         integer :: info
 
@@ -229,19 +228,19 @@ contains
     !> This subroutine fills a GPU matrix (sync)
     !> @param[in] this - gpu_matrix object for which GPU memory is allocated
     !> @param[in] A    - object to transfer to the GPU
-    !> @param[in] queue  - queue for GPU operations 
-    subroutine transfer_cpu_gpu(this, A, queue)
+    !> @param[in] world  - linalg_world_t for GPU operations 
+    subroutine transfer_cpu_gpu(this, A, world)
         
         class(linalg_obj_t), intent(inout)       :: this
-        type(*), contiguous, intent(in), target :: A(..)
-        type(C_ptr), intent(inout)               :: queue
+        type(*), contiguous, intent(in), target  :: A(..)
+        type(linalg_world_t), intent(inout)      :: world
 
         ! Select the appropiate case
         select case(this%rank)
             case(1)
-                call magma_setvector(this%n_rows, this%kind_size, C_loc(A), 1, this%dA, 1, queue)
+                call magma_setvector(this%n_rows, this%kind_size, C_loc(A), 1, this%dA, 1, world%get_queue())
             case(2)
-                call magma_setmatrix(this%n_rows, this%n_cols, this%kind_size, C_loc(A), this%n_rows, this%dA, this%n_rows, queue)
+                call magma_setmatrix(this%n_rows, this%n_cols, this%kind_size, C_loc(A), this%n_rows, this%dA, this%n_rows, world%get_queue())
             case default
                 error stop "linalg_obj_t%fill: Error filling matrix"
         end select
@@ -250,19 +249,19 @@ contains
     !> This subroutine retrieve a GPU element to the CPU (sync)
     !> @param[in] this - gpu_matrix object for which GPU memory is allocated
     !> @param[in] A    - object to which the element from the GPU would be transfered to
-    !> @param[in] queue  - queue for GPU operations 
-    subroutine transfer_gpu_cpu(this, A, queue)
+    !> @param[in] world  - linalg_world_t for GPU operations 
+    subroutine transfer_gpu_cpu(this, A, world)
         
         class(linalg_obj_t), intent(inout)          :: this
-        type(*), contiguous, intent(inout), target :: A(..)
-        type(C_ptr), intent(inout)                  :: queue
+        type(*), contiguous, intent(inout), target  :: A(..)
+        type(linalg_world_t), intent(inout)         :: world
 
         ! Select the appropiate case
         select case(this%rank)
             case(1)
-                call magma_getvector(this%n_rows, this%kind_size, this%dA, 1, C_loc(A), 1, queue)
+                call magma_getvector(this%n_rows, this%kind_size, this%dA, 1, C_loc(A), 1, world%get_queue())
             case(2)
-                call magma_getmatrix(this%n_rows, this%n_cols, this%kind_size, this%dA, this%n_rows, C_loc(A), this%n_rows, queue)
+                call magma_getmatrix(this%n_rows, this%n_cols, this%kind_size, this%dA, this%n_rows, C_loc(A), this%n_rows, world%get_queue())
             case default
                 error stop "linalg_obj_t%fill: Error filling matrix"
         end select

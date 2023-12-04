@@ -57,7 +57,7 @@ module idiel_inverse_dielectric
         !> Pointer to the inverse of the body block of the dielectric matrix 
         complex(r64), pointer, private :: Binv(:,:)    => null()
         !> Actual data in case that it has been computed using this library
-        complex(r64), allocatable, private :: Binv_data(:,:)
+        complex(r64), allocatable :: Binv_data(:,:)
         !> The head of the inverse
         complex(r64) :: inverse_dielectric_head
         !> The lower wing of the inverse
@@ -225,11 +225,11 @@ contains
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !           AUXILIARY VECTORS         ! 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        
+
         ! Init the U_{G\alpha} auxiliary vector (Eq. B.7) in 10.1016/j.cpc.2006.07.018
         allocate(U, source=this%wingL)
 
-        ! Compute S_{\alpha}(\mathbf{G}) = \suidiel_{\mathbf{G'\neq 0}} B^{-1}_{\mathbf{GG'}} U_{\alpha}(\mathbf{G}) (Eq. B.13)
+        ! Compute S_{\alpha}(\mathbf{G}) = \sum_{\mathbf{G'\neq 0}} B^{-1}_{\mathbf{GG'}} U_{\alpha}(\mathbf{G}) (Eq. B.13)
         S = matmul(this%Binv,U)
 
         ! Now for the upper wing

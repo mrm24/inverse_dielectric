@@ -123,11 +123,10 @@ contains
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     !> This deallocates the object in the GPU 
-    !> @param[in] this - gpu_matrix object to destroy
-    subroutine destroy(this, queue)
+    !> @param[in] this - linalg_obj_t object to destroy
+    subroutine destroy(this)
         
         class(linalg_obj_t), intent(inout) :: this
-        type(C_ptr), intent(inout)      :: queue
 
         if (associated(this%dA)) nullify(this%dA)
         
@@ -143,11 +142,11 @@ contains
     !> @param[in] A    - object to mold the allocation
     subroutine allocate_gpu(this, A)
         
-        class(linalg_obj_t), intent(inout)  :: this
+        class(linalg_obj_t), intent(inout)       :: this
         class(*), target, contiguous, intent(in) :: A(..)
 
-        integer :: info
-        integer(C_size_t) :: nbytes
+        integer, parameter :: info = 0
+        integer(C_size_t)  :: nbytes
 
         ! Select the rank of the object
         select rank(A)
@@ -183,10 +182,8 @@ contains
                 error stop "linalg_obj_t%allocate: Error in rank, only 1 and 2 are accepted"
         end select
 
-        ! Allocating memory in the GPU
+        ! Get some information of the kind size
         this%kind_size = sizeof_this(A)
-
-        nbytes = int(this%n_cols * this%n_rows * this%kind_size, C_size_t)
 
         if (info /= 0) error stop "linalg_obj_t%allocate: Error in allocating CPU memory"
 
@@ -195,21 +192,21 @@ contains
     !> This subroutine fills a GPU matrix (sync) [DUMMY]
     !> @param[in] this - gpu_matrix object for which GPU memory is allocated
     !> @param[in] A    - object to transfer to the GPU
-    !> @param[in] queue  - queue for GPU operations 
+    !> @param[in] world  - linalg_world_t for GPU operations 
     subroutine transfer_cpu_gpu(this, A, queue)
         class(linalg_obj_t), intent(inout)          :: this
-        type(*), contiguous, intent(inout), target :: A(..)
-        type(C_ptr), intent(inout)                  :: queue
+        type(*), contiguous, intent(inout), target  :: A(..)
+        type(linalg_world_t), intent(inout)         :: world
     end subroutine transfer_cpu_gpu
 
     !> This subroutine retrieve a GPU element to the CPU (sync) [DUMMY]
     !> @param[in] this - gpu_matrix object for which GPU memory is allocated
     !> @param[in] A    - object to which the element from the GPU would be transfered to
-    !> @param[in] queue  - queue for GPU operations 
-    subroutine transfer_gpu_cpu(this, A, queue)
+    !> @param[in] world  - linalg_world_t for GPU operations 
+    subroutine transfer_gpu_cpu(this, A, world)
         class(linalg_obj_t), intent(inout)          :: this
-        type(*), contiguous, intent(inout), target :: A(..)
-        type(C_ptr), intent(inout)                  :: queue
+        type(*), contiguous, intent(inout), target  :: A(..)
+        type(linalg_world_t), intent(inout)         :: world
     end subroutine transfer_gpu_cpu
 
     !> This function retrieves the pointer to the GPU data

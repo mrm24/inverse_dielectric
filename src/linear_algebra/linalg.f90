@@ -71,7 +71,7 @@ contains
 
         ! In case of GPU transfer if not this call does nothing
         call ref_A%allocate_gpu(inverse_A)
-        call ref_A%transfer_cpu_gpu(inverse_A, world%get_queue())
+        call ref_A%transfer_cpu_gpu(inverse_A, world)
         call ref_work%allocate_gpu(work)
 
         ! Perform here the inversion (memory overflow is possible)
@@ -82,8 +82,6 @@ contains
         call magma_zgetri_gpu(ref_A%rows(), ref_A%gpu_ptr(), ref_A%rows(), ipiv, ref_work%gpu_ptr(), lwork, info)
         if (info /= 0) error stop "inverse_complex_LU: error calling magma_zgetri_gpu"
 #else   
-        call ref_A%allocate_gpu(inverse_A)
-        call ref_A%transfer_cpu_gpu(inverse_A, world%get_queue())
         call zgetrf(ref_A%rows(), ref_A%rows(), ref_A%gpu_ptr(), ref_A%rows(), ipiv, info)
         if (info /= 0) error stop "inverse_complex_LU: error calling zgetrf"
         call zgetri(ref_A%rows(), ref_A%gpu_ptr(), ref_A%rows(), ipiv, ref_work%gpu_ptr(), lwork, info)
@@ -91,11 +89,12 @@ contains
 #endif
 
         ! If GPU retrieve otherwise this does nothing
-        call ref_A%transfer_gpu_cpu(inverse_A, world%get_queue())
+        call ref_A%transfer_gpu_cpu(inverse_A, world)
         
         ! Clean
-        call ref_A%destroy(world%get_queue())
-        call ref_work%destroy(world%get_queue())
+        call world%syncronize()
+        call ref_A%destroy()
+        call ref_work%destroy()
         call world%finish()
 
     end subroutine inverse_complex_LU

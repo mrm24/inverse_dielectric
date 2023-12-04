@@ -32,6 +32,10 @@ else()
 endif(GPU)
 
 target_link_libraries(inverse_dielectric ${LINKS})
+set_target_properties(inverse_dielectric PROPERTIES
+    INSTALL_RPATH "${MAGMA_DIR}/lib/libmagma.so"
+    INSTALL_RPATH_USE_LINK_PATH TRUE
+)
 
 install(DIRECTORY ${MOD_DIR}
         DESTINATION ${INSTALL_DIR}
