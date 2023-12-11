@@ -40,6 +40,12 @@ else()
     set(SRC_MAGMA_F90 "")
 endif(GPU)
 
+#Find BOOST
+find_package(Boost)
+include_directories(${Boost_INCLUDE_DIR})
+link_directories(${Boost_LIBRARY_DIR})
+set(Boost_USE_MULTITHREADED OFF)
+
 # Find SPGLIB
 set(cmd1 "locate")
 set(cmd1_arg "libsymspg.so")

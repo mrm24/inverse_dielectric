@@ -40,8 +40,8 @@ module idiel_cpu_magma_t
 
     !> Type to handle matrices in the GPU, if GPU is not enanbled it handles normal matrices
     type linalg_obj_t
-        !> The pointer of the object (matrix/vector) in the CPU
-        class(*), pointer, private  :: dA => null()
+        !> The pointer of the object (matrix/vector) in the CPU (fake the GPU)
+        class(*), pointer, private :: dA => null()
         !> Rows
         integer, private :: n_rows    = -1
         !> Cols
@@ -193,7 +193,7 @@ contains
     !> @param[in] this - gpu_matrix object for which GPU memory is allocated
     !> @param[in] A    - object to transfer to the GPU
     !> @param[in] world  - linalg_world_t for GPU operations 
-    subroutine transfer_cpu_gpu(this, A, queue)
+    subroutine transfer_cpu_gpu(this, A, world)
         class(linalg_obj_t), intent(inout)          :: this
         type(*), contiguous, intent(inout), target  :: A(..)
         type(linalg_world_t), intent(inout)         :: world
@@ -231,7 +231,7 @@ contains
         cols = this%n_cols
     end function cols
 
-    !> This function retrieves the number of cols
+    !> This function retrieves the kind of the object
     !> @param[in] this - the obj from which retrieve info
     pure function get_kind(this) result(answer)
         class(linalg_obj_t), intent(in) :: this

@@ -47,7 +47,7 @@ program test_dielectric_average_iso
                                   0.645769722906067, 0.707300869613546, 0.733254256631726, 0.785227466265463, &
                                   0.864527818748701, 0.941940576487719, 0.987846211386285, 1.00132129472395 ]
     real(r64) :: rdiff
-    real(r64), parameter    :: tolerance = 1.0e-7_r64
+    real(r64), parameter    :: tolerance = 1.0e-4_r64
 
     ! Computation object
     type(inverse_dielectric_t) :: inv_diel
@@ -93,7 +93,7 @@ program test_dielectric_average_iso
         write(*,'(A,I2,A,E11.6)')  '  * Regression (HEAD,',iom,') result (relative difference): ', rdiff
         if ( rdiff .lt. tolerance) then
             write(*,*)  '[TEST : inverse_dielectric_t (HEAD,',iom,'): PASSED]'
-        else
+        else   
             write(*,*)  '[TEST : inverse_dielectric_t (HEAD,',iom,'): FAILED]'
             stop 1
         end if

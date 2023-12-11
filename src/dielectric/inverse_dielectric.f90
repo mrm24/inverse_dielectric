@@ -23,9 +23,9 @@ module idiel_inverse_dielectric
     use idiel_crystal_symmetry, only: symmetry_t
     use idiel_sph_quadrature, only: compute_angular_mesh_lebedev
 #ifdef USE_GPU
-    use idiel_gpu_magma_t, only: linalg_world_t
+    use idiel_gpu_magma_t, only: linalg_world_t, linalg_obj_t
 #else
-    use idiel_cpu_magma_t, only: linalg_world_t
+    use idiel_cpu_magma_t, only: linalg_world_t, linalg_obj_t
 #endif
 
     implicit none
@@ -46,7 +46,9 @@ module idiel_inverse_dielectric
         !> Angular mesh (Cartesian)
         real(r64), allocatable, private :: ang(:,:) 
         !> Mesh points (Cartesian)
-        real(r64), allocatable, private :: xyz(:,:) 
+        complex(r64), allocatable, private :: xyz(:,:) 
+        !> Linear algebra handler of xyz
+        type(linalg_obj_t), private :: ref_xyz
         !> Weights for the integrals
         real(r64), allocatable, private :: weights(:)
         !> The distance to subcell surface with Gamma in the center
@@ -103,6 +105,7 @@ contains
         real(r64) :: v_bz
         real(r64) :: rel_error
         real(r64), parameter :: onethird = 1.0_r64 / 3.0_r64
+        real(r64), allocatable :: xyz(:,:)
 
         ! Initialize the crystal structure
         call this%cell%initialize(lattice, redpos, elements)
@@ -118,13 +121,14 @@ contains
         this%v_integral = product(this%nq) / v_bz
 
         ! Initalize the angular mesh and the weights for the angular part of the integral
-        call compute_angular_mesh_lebedev(this%ang, this%weights, this%xyz)
+        call compute_angular_mesh_lebedev(this%ang, this%weights, xyz)
+        allocate(this%xyz,source=transpose(cmplx(xyz,0.0,r64)))
 
         ! Get the number of points used in the angular quadrature
-        this%quadrature_npoints = size(this%xyz, 1)
+        this%quadrature_npoints = size(xyz, 1)
 
         ! Compute kmax (the boundary)
-        call this%cell%get_kmax_subcell_bz(this%nq, this%xyz, this%kmax)
+        call this%cell%get_kmax_subcell_bz(this%nq, xyz, this%kmax)
 
         ! Construct the geometric function
         allocate(this%kmax_f(this%quadrature_npoints))
@@ -140,6 +144,8 @@ contains
 
         ! Init algebra world
         call this%world%init()
+        call this%ref_xyz%allocate_gpu(this%xyz)
+        call this%ref_xyz%transfer_cpu_gpu(this%xyz, this%world)
 
     end subroutine init_common
 
@@ -162,6 +168,7 @@ contains
         if (allocated(this%inverse_dielectric_wingL)) deallocate(this%inverse_dielectric_wingL)
         if (allocated(this%inverse_dielectric_wingU)) deallocate(this%inverse_dielectric_wingU)
         if (allocated(this%inverse_dielectric_body))  deallocate(this%inverse_dielectric_body)
+        call this%ref_xyz%destroy()
         if (this%world%is_queue_set()) call this%world%finish()
 
     end subroutine clean
@@ -192,17 +199,17 @@ contains
     !> @param[in] this       - the current inverse_dielectric_t object for which to compute the average
     subroutine compute_anisotropic_avg(this)
 
+        use idiel_linalg
+
         class(inverse_dielectric_t), intent(inout) :: this
 
         ! Auxiliary vectors
-        complex(r64), allocatable :: U(:,:), V(:,:)
-        complex(r64), allocatable :: S(:,:), T(:,:)
+        complex(r64), allocatable :: S(:,:)
+        type(linalg_obj_t) :: ref_S
         
-        ! local field effects 
-        complex(r64) :: lfe(3,3)
-
         ! Macroscopic dielectric matrix
-        complex(r64) :: L(3,3)
+        complex(r64), allocatable :: L(:,:)
+        type(linalg_obj_t) :: ref_L
 
         ! Function from which to compute the integral 
         complex(r64), allocatable :: kmax_f(:)
@@ -228,36 +235,31 @@ contains
         ! Allocate space
         allocate(head_f(this%quadrature_npoints))
         allocate(wingL_f(this%quadrature_npoints, nbasis))
-        allocate(wingU_f(this%quadrature_npoints, nbasis))
         allocate(body_f(this%quadrature_npoints, nbasis, nbasis))
 
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        !           AUXILIARY VECTORS         ! 
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! CHECK : Do we really need to impose it ?
+        ! Here we force the Hermiticity of the Wings
+        !$omp parallel shared(this) private(ii, jj)
+        !$omp do collapse(2)
+        do ii = 1, 3
+            do jj = 1, nbasis
+                this%wingL(jj,ii) = 0.5_r64 * (this%wingL(jj,ii) + conjg(this%wingU(jj,ii)))
+            end do
+        end do
+        !$omp end do
+        !$omp end parallel
+        this%wingU = conjg(this%wingL)
 
-        ! Init the U_{G\alpha} auxiliary vector (Eq. B.7) in 10.1016/j.cpc.2006.07.018
-        allocate(U, source=this%wingL)
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        !  Auxiliary vectorws and macroscopic dielectric matrix !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         ! Compute S_{\alpha}(\mathbf{G}) = \sum_{\mathbf{G'\neq 0}} B^{-1}_{\mathbf{GG'}} U_{\alpha}(\mathbf{G}) (Eq. B.13)
-        S = matmul(this%Binv,U)
+        ! and the local field effects of the head (Eq. B.14) in 10.1016/j.cpc.2006.07.018
+        allocate(L, source=this%head)
+        call compute_S_and_L(this%Binv, this%wingL, S, ref_S, L, ref_L, this%world)
 
-        ! Now for the upper wing
-        allocate(V, source=transpose(this%wingU))
-        T = matmul(V, this%Binv)
-
-        ! Clean
-        deallocate(U,V)
-
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        !      Compute macroscopic dielectric matrix      ! 
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-        ! Compute the macroscopic dielectric matrix (Eq. B.14) in 10.1016/j.cpc.2006.07.018
-        ! First compute the local field effects
-        lfe = matmul(transpose(this%wingU),S)
-        ! Now compute the macroscopic dielectric matrix
-        L   = this%head - lfe 
-        ! Symmetrize the elements
+        ! Symmetrize the elements of the macroscopic dielectric matrix
         L   = this%symmetry%symmetryze_complex_tensor(L)
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -265,29 +267,30 @@ contains
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         ! HEAD: Compute \frac{1.0}{\mathbf{\hat{q} L \hat{q}}}  for the space grid
-        head_f(:)  =  this%kmax_f(:) / sum(transpose(this%xyz) * matmul(L,transpose(this%xyz)), dim=1)
+        head_f(:)  =  this%kmax_f(:) / compute_qLq(ref_L, this%xyz, this%ref_xyz, this%world)
+        call ref_L%destroy()
+        deallocate(L)
 
         ! WINGS : Compute \frac{ \mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})}{\mathbf{\hat{q} L \hat{q}}} and
         ! \frac{ \mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})}{\mathbf{\hat{q} L \hat{q}}} 
         ! Note that there is head missing term to allow for the efficient computation of the body term
-        wingL_f =  matmul(this%xyz, transpose(S))
-        wingU_f =  matmul(this%xyz, T)
+        wingL_f =  compute_qS(this%ref_xyz, ref_S, this%world)
+        call ref_S%destroy()
+        deallocate(S)
         
         ! Compute the part the body
         ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
-        !$omp parallel shared(this, wingL_f, wingU_f, body_f) private(ii, jj)
-        !$omp do 
+        !$omp parallel shared(this, wingL_f, body_f) private(ii, jj)
+        !$omp do collapse(2)
         do ii = 1, nbasis
             do jj = 1, nbasis
-                body_f(:, ii, jj) = head_f(:) * wingL_f(:, ii) * wingU_f(:, jj)
+                body_f(:, ii, jj) = head_f(:) * wingL_f(:, ii) * conjg(wingL_f(:, jj))
             end do 
         end do
         !$omp end do
         !$omp end parallel
 
         ! Note that wings functions are odd functions and thus their integral is zero, so no more is done regarding those.
-
-        deallocate(S,T)
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !  Do the anisotropic averaging !
@@ -296,7 +299,7 @@ contains
         allocate(this%inverse_dielectric_wingL(nbasis), source=zzero)
         allocate(this%inverse_dielectric_wingU(nbasis), source=zzero)
         allocate(this%inverse_dielectric_body, source = this%Binv)
-
+        
         this%inverse_dielectric_head  = sum(head_f)
         
         !$omp parallel shared(this, wingL_f, wingU_f, body_f) private(ii, jj)
@@ -304,7 +307,7 @@ contains
         do ii = 1, nbasis
             do jj = 1, nbasis
                 this%inverse_dielectric_body(jj,ii) = this%inverse_dielectric_body(jj,ii) + &
-                    sum(body_f(:,jj,ii) )
+                    sum(body_f(:,jj,ii))
             end do
         end do 
         !$omp end do
@@ -314,7 +317,7 @@ contains
         !            Clean              !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-        deallocate(head_f, wingL_f, wingU_f, body_f)
+        deallocate(head_f, wingL_f, body_f)
     
     end subroutine compute_anisotropic_avg
 
