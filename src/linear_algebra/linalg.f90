@@ -99,6 +99,13 @@ contains
     end subroutine inverse_complex_LU
 
     !> It computes the auxiliary S auxiliary vector and the macroscopic dielectric matrix
+    !> @param[in] Binv     - the inverse of the body
+    !> @param[in] wingL    - the lower wing
+    !> @param[out] S       - the auxiliary vector
+    !> @param[out] ref_S   - the algebra handler to S
+    !> @param[inout] L     - the macroscopic dielectric ternsor, on entry contains the head
+    !> @param[out]   ref_L - the linear algebra handler to L
+    !> @param[inout] world - the linear algebra manager   
     subroutine compute_S_and_L(Binv, wingL, S, ref_S, L, ref_L, world)
         complex(r64), intent(inout)            :: Binv(:,:)
         complex(r64), intent(inout)            :: wingL(:,:)
