@@ -73,7 +73,7 @@ contains
         call ref_A%allocate_gpu(inverse_A)
         call ref_A%transfer_cpu_gpu(inverse_A, world)
         call ref_work%allocate_gpu(work)
-
+        
         ! Perform here the inversion (memory overflow is possible)
 #ifdef USE_GPU
         !call magma_zgetrf(n, n, inverse_A, n, ipiv, info)
@@ -100,25 +100,22 @@ contains
 
     !> It computes the auxiliary S auxiliary vector and the macroscopic dielectric matrix
     subroutine compute_S_and_L(Binv, wingL, S, ref_S, L, ref_L, world)
-        complex(r64), intent(in)               :: Binv(:,:)
-        complex(r64), intent(in)               :: wingL(:,:)
+        complex(r64), intent(inout)            :: Binv(:,:)
+        complex(r64), intent(inout)            :: wingL(:,:)
         complex(r64), allocatable, intent(out) :: S(:,:)
         type(linalg_obj_t), intent(out)        :: ref_S
         complex(r64), intent(inout)            :: L(:,:)
         type(linalg_obj_t), intent(out)        :: ref_L
-        type(linalg_world_t), intent(inout)   :: world
+        type(linalg_world_t), intent(inout)    :: world
 
         type(linalg_obj_t) :: ref_Binv
         type(linalg_obj_t) :: ref_wingL
-        complex(r64) :: head(3,3)
 
-        integer(i32) :: nb 
-        
+        integer(i32) :: nb, i, j 
         nb = size(Binv,1)
 
         allocate(S, mold=wingL)
-        head = L
-
+        
         ! Allocate and transfer to the GPU/CPU
         call ref_Binv%allocate_gpu(Binv)
         call ref_Binv%transfer_cpu_gpu(Binv, world)
@@ -135,7 +132,7 @@ contains
         call magma_zgemm(MagmaConjTrans, MagmaNoTrans, 3, 3, nb, -zone, ref_wingL%gpu_ptr(), &
                         nb, ref_S%gpu_ptr(), nb, zone, ref_L%gpu_ptr(), 3, world%get_queue())
 #else   
-        call zgemm('n', 'n',nb, 3, nb, zone, ref_Binv%gpu_ptr(), &
+        call zgemm('n', 'n', nb, 3, nb, zone, ref_Binv%gpu_ptr(), &
                    nb, ref_wingL%gpu_ptr(), nb, zzero, ref_S%gpu_ptr(), nb)
         call zgemm('c', 'n',  3, 3, nb, -zone, ref_wingL%gpu_ptr(), &
                    nb, ref_S%gpu_ptr(), nb, zone, ref_L%gpu_ptr(), 3)
@@ -177,7 +174,8 @@ contains
         call magma_zgemm(MagmaNoTrans, MagmaNoTrans, 3, nr, 3, zone, ref_L%gpu_ptr(), & 
                          3, ref_q%gpu_ptr(), 3, zzero, ref_Lq%gpu_ptr(), 3, world%get_queue())
 #else   
-        call zgemm('n', 'n', 3, nr, 3, zone, L%gpu_ptr(), 3, ref_q%gpu_ptr(), 3, zzero, ref_Lq%gpu_ptr(), 3)
+        call zgemm('n', 'n', 3, nr, 3, zone, ref_L%gpu_ptr(), & 
+                   3, ref_q%gpu_ptr(), 3, zzero, ref_Lq%gpu_ptr(), 3)
 #endif  
         call ref_Lq%transfer_gpu_cpu(Lq, world)
         call world%syncronize()
@@ -197,13 +195,13 @@ contains
 
 
     !> It computes Sq
-    !> @param[in] ref_S - the linear algebra object containing S
     !> @param[in] ref_q - the linear algebra object containing q
+    !> @param[in] ref_S - the linear algebra object containing S
     !> @param[in] world - the linalg_world_t handler 
     !> @returns qS
-    function compute_qS(ref_S, ref_q, world) result(qS)
-        type(linalg_obj_t),   intent(inout)   :: ref_S
+    function compute_qS(ref_q, ref_S, world) result(qS)
         type(linalg_obj_t),   intent(inout)   :: ref_q
+        type(linalg_obj_t),   intent(inout)   :: ref_S
         type(linalg_world_t), intent(inout)   :: world
 
         complex(r64), allocatable :: qS(:,:)
@@ -214,13 +212,12 @@ contains
         nb = ref_S%rows()
         allocate(qS(nr,nb))
         call ref_qS%allocate_gpu(qS)
-
 #ifdef USE_GPU
         call magma_zgemm(MagmaTrans, MagmaTrans, nr, nb, 3, zone, ref_q%gpu_ptr(), & 
                         3, ref_S%gpu_ptr(), nb, zzero, ref_qS%gpu_ptr(), nr, world%get_queue())
 #else   
-        call zgemm('t', 't', nr, nr, nb, 3, zone, ref_q%gpu_ptr(), & 
-                  3, ref_S%gpu_ptr(), nb, zzero, ref_qS%gpu_ptr(), nr)
+        call zgemm('T', 'T', nr, nb, 3, zone, ref_q%gpu_ptr(), & 
+                    3, ref_S%gpu_ptr(), nb, zzero, ref_qS%gpu_ptr(), nr)
 #endif  
         call ref_qS%transfer_gpu_cpu(qS, world)
         call world%syncronize()

@@ -205,7 +205,7 @@ contains
     !> @param[in] world  - linalg_world_t for GPU operations 
     subroutine transfer_gpu_cpu(this, A, world)
         class(linalg_obj_t), intent(inout)          :: this
-        type(*), contiguous, intent(inout), target  :: A(..)
+        type(*), contiguous, intent(in), target     :: A(..)
         type(linalg_world_t), intent(inout)         :: world
     end subroutine transfer_gpu_cpu
 

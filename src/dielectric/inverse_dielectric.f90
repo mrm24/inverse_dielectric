@@ -258,9 +258,10 @@ contains
         ! and the local field effects of the head (Eq. B.14) in 10.1016/j.cpc.2006.07.018
         allocate(L, source=this%head)
         call compute_S_and_L(this%Binv, this%wingL, S, ref_S, L, ref_L, this%world)
-
-        ! Symmetrize the elements of the macroscopic dielectric matrix
-        L   = this%symmetry%symmetryze_complex_tensor(L)
+        
+        ! Symmetrize the elements of the macroscopic dielectric matrix and update it
+        L   = this%symmetry%symmetryze_complex_tensor(L) 
+        call ref_L%transfer_cpu_gpu(L, this%world)
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !               Compute the functions                   !
