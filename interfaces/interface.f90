@@ -77,13 +77,14 @@ contains
 
     end subroutine set_dielectric_blocks
 
-    subroutine compute_anisotropic_avg(object_ptr) bind(C)
+    subroutine compute_anisotropic_avg(object_ptr, hermitian) bind(C)
         type(c_ptr), intent(in) :: object_ptr
+        logical,     intent(in) :: hermitian
         
         type(inverse_dielectric_t), pointer :: object
         call C_F_pointer(object_ptr, object)
         
-        call object%compute_anisotropic_avg()
+        call object%compute_anisotropic_avg(hermitian)
         
     end subroutine compute_anisotropic_avg
     

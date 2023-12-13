@@ -86,7 +86,7 @@ program test_dielectric_average_iso
         ! Load the data to the worker
         call inv_diel%set_dielectric_blocks(head(:,:,iom), wingL(:,:,iom), wingU(:,:,iom), Binv(:,:,iom))
         ! Compute the average
-        call inv_diel%compute_anisotropic_avg()
+        call inv_diel%compute_anisotropic_avg(.false.)
         
         ! Check the head
         rdiff = abs(inv_diel%inverse_dielectric_head - head_ref(iom))/head_ref(iom)

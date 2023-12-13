@@ -28,7 +28,7 @@ extern "C" {
     extern void deallocate_inverse_dielectric_t(void** object_ptr);
     extern void init_common(void** object_ptr, double* lattice, double* redpos, long int* elements, long nq[3]);
     extern void set_dielectric_blocks(void** object_ptr, std::complex<double>* h, std::complex<double>* wl, std::complex<double>* wu, std::complex<double>* ib);
-    extern void compute_anisotropic_avg(void** object_ptr);
+    extern void compute_anisotropic_avg(void** object_ptr, bool hermitian);
     extern void invert_body(void** object_ptr, std::complex<double>* body);
     extern long int get_n_basis(void** object_ptr);
     extern void get_inverted_blocks(void** object_ptr, std::complex<double>* inv_head, std::complex<double>* inv_wingL, std::complex<double>* inv_wingU, std::complex<double>* inv_body);
@@ -74,8 +74,8 @@ public:
         set_dielectric_blocks(&inverse_dielectric_f90, h, wl, wu, nullptr);
     }
 
-    void computeAnisotropicAvg() {
-        compute_anisotropic_avg(&inverse_dielectric_f90);
+    void computeAnisotropicAvg(bool hermitian) {
+        compute_anisotropic_avg(&inverse_dielectric_f90, hermitian);
     }
 
     void invertBody(std::complex<double>* body) {

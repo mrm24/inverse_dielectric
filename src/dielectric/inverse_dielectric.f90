@@ -79,6 +79,7 @@ module idiel_inverse_dielectric
         type(linalg_world_t), private :: world
     contains
         procedure, public  :: init_common, set_dielectric_blocks, compute_anisotropic_avg, invert_body, get_inverted_blocks, get_n_basis, nullify_body
+        procedure, private :: compute_anisotropic_avg_hermitian, compute_anisotropic_avg_general
         final :: clean
     end type inverse_dielectric_t
 
@@ -194,10 +195,26 @@ contains
         if (present(ib)) this%Binv    =>  ib
 
     end subroutine set_dielectric_blocks
-    
-    !> This computes the block inverse at Gamma
+
+    !> This computes the block inverse at Gamma 
     !> @param[in] this       - the current inverse_dielectric_t object for which to compute the average
-    subroutine compute_anisotropic_avg(this)
+    !> @param[in] hermitian  - is the dielectric matrix hermitian
+    subroutine compute_anisotropic_avg(this, hermitian)
+        
+        class(inverse_dielectric_t), intent(inout) :: this
+        logical, intent(in)                        :: hermitian
+
+        if (hermitian) then
+            call this%compute_anisotropic_avg_hermitian()
+        else
+            call this%compute_anisotropic_avg_general()
+        end if
+
+    end subroutine compute_anisotropic_avg
+    
+    !> This computes the block inverse at Gamma when the dielectric matrix is Hermitic
+    !> @param[in] this       - the current inverse_dielectric_t object for which to compute the average
+    subroutine compute_anisotropic_avg_hermitian(this)
 
         use idiel_linalg
 
@@ -206,6 +223,119 @@ contains
         ! Auxiliary vectors
         complex(r64), allocatable :: S(:,:)
         type(linalg_obj_t) :: ref_S
+        
+        ! Macroscopic dielectric matrix
+        complex(r64), allocatable :: L(:,:)
+        type(linalg_obj_t) :: ref_L
+
+        ! Function from which to compute the integral 
+        complex(r64), allocatable :: kmax_f(:)
+        complex(r64), allocatable :: head_f(:) 
+        complex(r64), allocatable :: wingL_f(:,:)
+        complex(r64), allocatable :: body_f(:,:,:)
+
+        ! Basis size
+        integer(i64) :: nbasis
+        
+        ! Dummy indexes
+        integer(i64) :: ii, jj
+
+        ! Get the basis size
+        nbasis = size(this%Binv, 1)
+
+        ! Free final containers
+        if (allocated(this%inverse_dielectric_wingL)) deallocate(this%inverse_dielectric_wingL)
+        if (allocated(this%inverse_dielectric_wingU)) deallocate(this%inverse_dielectric_wingU)
+        if (allocated(this%inverse_dielectric_body))  deallocate(this%inverse_dielectric_body)
+
+        ! Allocate space
+        allocate(head_f(this%quadrature_npoints))
+        allocate(wingL_f(this%quadrature_npoints, nbasis))
+        allocate(body_f(this%quadrature_npoints, nbasis, nbasis))
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        !  Auxiliary vectorws and macroscopic dielectric matrix !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+        ! Compute S_{\alpha}(\mathbf{G}) = \sum_{\mathbf{G'\neq 0}} B^{-1}_{\mathbf{GG'}} U_{\alpha}(\mathbf{G}) (Eq. B.13)
+        ! and the local field effects of the head (Eq. B.14) in 10.1016/j.cpc.2006.07.018
+        allocate(L, source=this%head)
+        call compute_auxiliary_and_macroscopic(this%Binv, this%wingL, S, ref_S, L, ref_L, this%world)
+        
+        ! Symmetrize the elements of the macroscopic dielectric matrix and update it
+        L   = this%symmetry%symmetryze_complex_tensor(L) 
+        call ref_L%transfer_cpu_gpu(L, this%world)
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        !               Compute the functions                   !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+        ! HEAD: Compute \frac{\omega(\Omega)}{\mathbf{\hat{q} L \hat{q}}}  for the space grid
+        head_f(:)  =  this%kmax_f(:) * compute_inverse_head(ref_L, this%xyz, this%ref_xyz, this%world)
+        call ref_L%destroy()
+        deallocate(L)
+
+        ! WINGS : Compute \frac{ \mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})}{\mathbf{\hat{q} L \hat{q}}} and
+        ! \frac{ \mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})}{\mathbf{\hat{q} L \hat{q}}} 
+        ! Note that there is head missing term to allow for the efficient computation of the body term
+        wingL_f =  compute_inverse_wingL(this%ref_xyz, ref_S, this%world)
+        call ref_S%destroy()
+        deallocate(S)
+        
+        ! Compute the part the body
+        ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
+        !$omp parallel shared(this, wingL_f, body_f) private(ii, jj)
+        !$omp do collapse(2)
+        do ii = 1, nbasis
+            do jj = 1, nbasis
+                body_f(:, ii, jj) = head_f(:) * wingL_f(:, ii) * conjg(wingL_f(:, jj))
+            end do 
+        end do
+        !$omp end do
+        !$omp end parallel
+
+        ! Note that wings functions are odd functions and thus their integral is zero, so no more is done regarding those.
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        !  Do the anisotropic averaging !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        
+        allocate(this%inverse_dielectric_wingL(nbasis), source=zzero)
+        allocate(this%inverse_dielectric_wingU(nbasis), source=zzero)
+        allocate(this%inverse_dielectric_body, source = this%Binv)
+        
+        this%inverse_dielectric_head  = sum(head_f)
+        
+        !$omp parallel shared(this, body_f) private(ii, jj)
+        !$omp do 
+        do ii = 1, nbasis
+            do jj = 1, nbasis
+                this%inverse_dielectric_body(jj,ii) = this%inverse_dielectric_body(jj,ii) + &
+                    sum(body_f(:,jj,ii))
+            end do
+        end do 
+        !$omp end do
+        !$omp end parallel
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        !            Clean              !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+        deallocate(head_f, wingL_f, body_f)
+    
+    end subroutine compute_anisotropic_avg_hermitian
+
+    !> This computes the block inverse at Gamma for a general dielectric matrix 
+    !> @param[in] this       - the current inverse_dielectric_t object for which to compute the average
+    subroutine compute_anisotropic_avg_general(this)
+
+        use idiel_linalg
+
+        class(inverse_dielectric_t), intent(inout) :: this
+
+        ! Auxiliary vectors
+        complex(r64), allocatable :: S(:,:), T(:,:)
+        type(linalg_obj_t) :: ref_S, ref_T
         
         ! Macroscopic dielectric matrix
         complex(r64), allocatable :: L(:,:)
@@ -237,27 +367,15 @@ contains
         allocate(wingL_f(this%quadrature_npoints, nbasis))
         allocate(body_f(this%quadrature_npoints, nbasis, nbasis))
 
-        ! CHECK : Do we really need to impose it ?
-        ! Here we force the Hermiticity of the Wings
-        !$omp parallel shared(this) private(ii, jj)
-        !$omp do collapse(2)
-        do ii = 1, 3
-            do jj = 1, nbasis
-                this%wingL(jj,ii) = 0.5_r64 * (this%wingL(jj,ii) + conjg(this%wingU(jj,ii)))
-            end do
-        end do
-        !$omp end do
-        !$omp end parallel
-        this%wingU = conjg(this%wingL)
-
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !  Auxiliary vectorws and macroscopic dielectric matrix !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         ! Compute S_{\alpha}(\mathbf{G}) = \sum_{\mathbf{G'\neq 0}} B^{-1}_{\mathbf{GG'}} U_{\alpha}(\mathbf{G}) (Eq. B.13)
+        ! it also computes in this case the term for the upper wing
         ! and the local field effects of the head (Eq. B.14) in 10.1016/j.cpc.2006.07.018
         allocate(L, source=this%head)
-        call compute_S_and_L(this%Binv, this%wingL, S, ref_S, L, ref_L, this%world)
+        call compute_auxiliary_and_macroscopic(this%Binv, this%wingL, S, ref_S, L, ref_L, this%world, this%wingU, T, ref_T)
         
         ! Symmetrize the elements of the macroscopic dielectric matrix and update it
         L   = this%symmetry%symmetryze_complex_tensor(L) 
@@ -267,17 +385,20 @@ contains
         !               Compute the functions                   !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-        ! HEAD: Compute \frac{1.0}{\mathbf{\hat{q} L \hat{q}}}  for the space grid
-        head_f(:)  =  this%kmax_f(:) / compute_qLq(ref_L, this%xyz, this%ref_xyz, this%world)
+        ! HEAD: Compute \frac{\omega(\Omega)}{\mathbf{\hat{q} L \hat{q}}}  for the space grid
+        head_f(:)  =  this%kmax_f(:) * compute_inverse_head(ref_L, this%xyz, this%ref_xyz, this%world)
         call ref_L%destroy()
         deallocate(L)
 
         ! WINGS : Compute \frac{ \mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})}{\mathbf{\hat{q} L \hat{q}}} and
         ! \frac{ \mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})}{\mathbf{\hat{q} L \hat{q}}} 
         ! Note that there is head missing term to allow for the efficient computation of the body term
-        wingL_f =  compute_qS(this%ref_xyz, ref_S, this%world)
+        wingL_f =  compute_inverse_wingL(this%ref_xyz, ref_S, this%world)
         call ref_S%destroy()
         deallocate(S)
+        wingU_f = compute_inverse_wingU(this%ref_xyz, ref_T, this%world)
+        call ref_T%destroy()
+        deallocate(T)
         
         ! Compute the part the body
         ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
@@ -285,7 +406,7 @@ contains
         !$omp do collapse(2)
         do ii = 1, nbasis
             do jj = 1, nbasis
-                body_f(:, ii, jj) = head_f(:) * wingL_f(:, ii) * conjg(wingL_f(:, jj))
+                body_f(:, ii, jj) = head_f(:) * wingL_f(:, ii) * wingU_f(:, jj)
             end do 
         end do
         !$omp end do
@@ -303,7 +424,7 @@ contains
         
         this%inverse_dielectric_head  = sum(head_f)
         
-        !$omp parallel shared(this, wingL_f, wingU_f, body_f) private(ii, jj)
+        !$omp parallel shared(this, body_f) private(ii, jj)
         !$omp do 
         do ii = 1, nbasis
             do jj = 1, nbasis
@@ -318,9 +439,9 @@ contains
         !            Clean              !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-        deallocate(head_f, wingL_f, body_f)
+        deallocate(head_f, wingL_f, wingU_f, body_f)
     
-    end subroutine compute_anisotropic_avg
+    end subroutine compute_anisotropic_avg_general
 
     !> Inverts the body and stores it (GPU or CPU depending on the compilation)
     !> @param[in] this - the inverse_dielectric_t in which to store the inverse of body
