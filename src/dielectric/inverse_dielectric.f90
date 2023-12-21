@@ -451,7 +451,7 @@ contains
         use idiel_linalg, only: inverse_complex_LU
 
         class(inverse_dielectric_t), intent(inout), target :: this
-        complex(r64), allocatable, intent(in) :: body(:,:)
+        complex(r64), intent(in) :: body(:,:)
 
         if (.not. this%world%is_queue_set()) call this%world%init()
 
