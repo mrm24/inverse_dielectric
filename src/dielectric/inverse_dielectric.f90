@@ -232,7 +232,7 @@ contains
         complex(r64), allocatable :: kmax_f(:)
         complex(r64), allocatable :: head_f(:) 
         complex(r64), allocatable :: wingL_f(:,:)
-        complex(r64), allocatable :: body_f(:,:,:)
+        complex(r64), allocatable :: body_f(:)
 
         ! Basis size
         integer(i64) :: nbasis
@@ -251,7 +251,7 @@ contains
         ! Allocate space
         allocate(head_f(this%quadrature_npoints))
         allocate(wingL_f(this%quadrature_npoints, nbasis))
-        allocate(body_f(this%quadrature_npoints, nbasis, nbasis))
+        allocate(body_f(this%quadrature_npoints))
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !  Auxiliary vectorws and macroscopic dielectric matrix !
@@ -282,17 +282,7 @@ contains
         call ref_S%destroy()
         deallocate(S)
         
-        ! Compute the part the body
-        ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
-        !$omp parallel shared(this, wingL_f, body_f) private(ii, jj)
-        !$omp do collapse(2)
-        do ii = 1, nbasis
-            do jj = 1, nbasis
-                body_f(:, ii, jj) = head_f(:) * wingL_f(:, ii) * conjg(wingL_f(:, jj))
-            end do 
-        end do
-        !$omp end do
-        !$omp end parallel
+        ! The body is directly computed as saving it to RAM is too intensive
 
         ! Note that wings functions are odd functions and thus their integral is zero, so no more is done regarding those.
 
@@ -306,12 +296,15 @@ contains
         
         this%inverse_dielectric_head  = sum(head_f)
         
-        !$omp parallel shared(this, body_f) private(ii, jj)
+        ! Here we compute the body 
+        ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
+        !$omp parallel shared(this, head_f, wingL_f, body_f) private(ii, jj)
         !$omp do 
         do ii = 1, nbasis
             do jj = 1, nbasis
+                body_f(:) = head_f(:) * wingL_f(:, ii) * conjg(wingL_f(:, jj))
                 this%inverse_dielectric_body(jj,ii) = this%inverse_dielectric_body(jj,ii) + &
-                    sum(body_f(:,jj,ii))
+                    sum(body_f)
             end do
         end do 
         !$omp end do
@@ -346,7 +339,7 @@ contains
         complex(r64), allocatable :: head_f(:) 
         complex(r64), allocatable :: wingL_f(:,:)
         complex(r64), allocatable :: wingU_f(:,:)
-        complex(r64), allocatable :: body_f(:,:,:)
+        complex(r64), allocatable :: body_f(:)
 
         ! Basis size
         integer(i64) :: nbasis
@@ -365,7 +358,7 @@ contains
         ! Allocate space
         allocate(head_f(this%quadrature_npoints))
         allocate(wingL_f(this%quadrature_npoints, nbasis))
-        allocate(body_f(this%quadrature_npoints, nbasis, nbasis))
+        allocate(body_f(this%quadrature_npoints))
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !  Auxiliary vectorws and macroscopic dielectric matrix !
@@ -400,17 +393,7 @@ contains
         call ref_T%destroy()
         deallocate(T)
         
-        ! Compute the part the body
-        ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
-        !$omp parallel shared(this, wingL_f, body_f) private(ii, jj)
-        !$omp do collapse(2)
-        do ii = 1, nbasis
-            do jj = 1, nbasis
-                body_f(:, ii, jj) = head_f(:) * wingL_f(:, ii) * wingU_f(:, jj)
-            end do 
-        end do
-        !$omp end do
-        !$omp end parallel
+        ! The body is directly computed as saving it to RAM is too intensive
 
         ! Note that wings functions are odd functions and thus their integral is zero, so no more is done regarding those.
 
@@ -424,12 +407,16 @@ contains
         
         this%inverse_dielectric_head  = sum(head_f)
         
-        !$omp parallel shared(this, body_f) private(ii, jj)
+        
+        ! Here we compute the body 
+        ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
+        !$omp parallel shared(this, head_f, wingL_f, wingU_f, body_f) private(ii, jj)
         !$omp do 
         do ii = 1, nbasis
             do jj = 1, nbasis
+                body_f(:) = head_f(:) * wingL_f(:, ii) * wingU_f(:, jj)
                 this%inverse_dielectric_body(jj,ii) = this%inverse_dielectric_body(jj,ii) + &
-                    sum(body_f(:,jj,ii))
+                    sum(body_f)
             end do
         end do 
         !$omp end do
