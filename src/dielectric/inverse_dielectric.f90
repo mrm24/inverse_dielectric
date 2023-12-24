@@ -298,7 +298,7 @@ contains
         
         ! Here we compute the body 
         ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
-        !$omp parallel shared(this, head_f, wingL_f, body_f) private(ii, jj)
+        !$omp parallel shared(this, head_f, wingL_f) private(ii, jj, body_f)
         !$omp do 
         do ii = 1, nbasis
             do jj = 1, nbasis
@@ -410,7 +410,7 @@ contains
         
         ! Here we compute the body 
         ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
-        !$omp parallel shared(this, head_f, wingL_f, wingU_f, body_f) private(ii, jj)
+        !$omp parallel shared(this, head_f, wingL_f, wingU_f) private(ii, jj, body_f)
         !$omp do 
         do ii = 1, nbasis
             do jj = 1, nbasis
