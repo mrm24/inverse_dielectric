@@ -302,7 +302,7 @@ contains
         !$omp do 
         do ii = 1, nbasis
             do jj = 1, nbasis
-                body_f(:) = head_f(:) * wingL_f(:, ii) * conjg(wingL_f(:, jj))
+                body_f(:) = head_f(:) * wingL_f(:, jj) * conjg(wingL_f(:, ii))
                 this%inverse_dielectric_body(jj,ii) = this%inverse_dielectric_body(jj,ii) + &
                     sum(body_f)
             end do
@@ -414,7 +414,7 @@ contains
         !$omp do 
         do ii = 1, nbasis
             do jj = 1, nbasis
-                body_f(:) = head_f(:) * wingL_f(:, ii) * wingU_f(:, jj)
+                body_f(:) = head_f(:) * wingL_f(:, jj) * wingU_f(:, ii)
                 this%inverse_dielectric_body(jj,ii) = this%inverse_dielectric_body(jj,ii) + &
                     sum(body_f)
             end do
