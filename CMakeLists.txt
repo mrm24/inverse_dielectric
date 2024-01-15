@@ -40,12 +40,6 @@ else()
     set(SRC_MAGMA_F90 "")
 endif(GPU)
 
-#Find BOOST
-find_package(Boost)
-include_directories(${Boost_INCLUDE_DIR})
-link_directories(${Boost_LIBRARY_DIR})
-set(Boost_USE_MULTITHREADED OFF)
-
 # Find SPGLIB
 set(cmd1 "locate")
 set(cmd1_arg "libsymspg.so")
@@ -55,7 +49,8 @@ execute_process(COMMAND ${cmd1} ${cmd1_arg} COMMAND ${cmd2} ${cmd2_arg}
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
   RESULT_VARIABLE spg_result
   OUTPUT_VARIABLE spg_lib OUTPUT_STRIP_TRAILING_WHITESPACE)
-  message(STATUS "SPGLIB found : ${spg_lib}")
+set(spg_lib "/users/sol/martirm/progs/spglib/build/libsymspg.so")
+message(STATUS "SPGLIB found : ${spg_lib}")
 
 # Create INSTALL DIRECTORY
 set(INSTALL_DIR "${PROJECT_SOURCE_DIR}/IDieL")
