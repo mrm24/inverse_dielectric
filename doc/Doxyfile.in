@@ -771,6 +771,7 @@ WARN_LOGFILE           =
 INPUT                  = @CMAKE_CURRENT_SOURCE_DIR@/src/constants \
                          @CMAKE_CURRENT_SOURCE_DIR@/src/crystal \
                          @CMAKE_CURRENT_SOURCE_DIR@/src/quadrature \
+                         @CMAKE_CURRENT_SOURCE_DIR@/src/spherical_harmonics \
                          @CMAKE_CURRENT_SOURCE_DIR@/src/linear_algebra \
                          @CMAKE_CURRENT_SOURCE_DIR@/src/dielectric \
                          @CMAKE_CURRENT_SOURCE_DIR@/doc
