@@ -21,7 +21,8 @@ module idiel_inverse_dielectric
     use idiel_constants, only: i64, r64, twopi, pi, zzero, zone, iunit
     use idiel_crystal_cell, only: cell_t
     use idiel_crystal_symmetry, only: symmetry_t
-    use idiel_sph_quadrature, only: compute_angular_mesh_lebedev
+    use idiel_sph_quadrature, only: compute_angular_mesh_lebedev_131, compute_angular_mesh_lebedev_21
+    use idiel_spherical_harmonics, only: sph_harm, sph_harm_expansion
 #ifdef USE_GPU
     use idiel_gpu_magma_t, only: linalg_world_t, linalg_obj_t
 #else
@@ -41,8 +42,6 @@ module idiel_inverse_dielectric
         type(symmetry_t), private :: symmetry
         !> The BZ mesh size
         integer(i64), private :: nq(3) 
-        !> The volume in which the integral is performed
-        real(r64), private :: v_integral
         !> Angular mesh (Cartesian)
         real(r64), allocatable, private :: ang(:,:) 
         !> Mesh points (Cartesian)
@@ -51,10 +50,10 @@ module idiel_inverse_dielectric
         type(linalg_obj_t), private :: ref_xyz
         !> Weights for the integrals
         real(r64), allocatable, private :: weights(:)
-        !> The distance to subcell surface with Gamma in the center
-        real(r64), allocatable, private :: kmax(:)
-        !> Geometric part of the integral at given point, note that is multiplied by the weight
-        real(r64), allocatable, private :: kmax_f(:)
+        !> Spherical harmonics
+        complex(r64), allocatable, private :: ylm(:,:)
+        !> angular integrals]
+        complex(r64), allocatable, private :: angular_integrals(:)
         !> Pointer to the head of the dielectric matrix
         complex(r64), pointer, private :: head(:,:)    => null()
         !> Pointer to the lower wing, i.e. in PW G0
@@ -78,10 +77,15 @@ module idiel_inverse_dielectric
         !> The handler of linear algebra queues
         type(linalg_world_t), private :: world
     contains
-        procedure, public  :: init_common, set_dielectric_blocks, compute_anisotropic_avg, invert_body, get_inverted_blocks, get_n_basis, nullify_body
+        procedure, public  :: init_common, set_dielectric_blocks, invert_body, get_n_basis, compute_anisotropic_avg
         procedure, private :: compute_anisotropic_avg_hermitian, compute_anisotropic_avg_general
         final :: clean
     end type inverse_dielectric_t
+
+    !> Order of harmonic spherics expansion
+    integer(i64), parameter :: lmax = 10_i64
+    ! Number of spherical harmonics
+    integer(i64), parameter :: nsph = (lmax + 1)**2
 
 contains
 
@@ -91,22 +95,29 @@ contains
     !> @param[in]     redpos   - reduced positions (3,natoms)
     !> @param[in]     elements - list of elements
     !> @param[in]     nq       - the BZ mesh
-    !> @param[]
-    subroutine init_common(this, lattice, redpos, elements, nq, report)
+    subroutine init_common(this, lattice, redpos, elements, nq)
 
         class(inverse_dielectric_t), intent(inout) :: this
         real(r64), intent(in)         :: lattice(3,3)
         real(r64),  intent(in)        :: redpos(:,:) 
         integer(r64),  intent(in)     :: elements(:)
         integer(i64), intent(in)      :: nq(3)
-        integer, optional, intent(in) :: report
 
         ! Locals
-        integer(i64) :: ir, il, ii
+        integer(i64) :: ii
         real(r64) :: v_bz
         real(r64) :: rel_error
         real(r64), parameter :: onethird = 1.0_r64 / 3.0_r64
         real(r64), allocatable :: xyz(:,:)
+
+        ! The volume in which the integral is performed
+        real(r64) :: v_integral
+        ! The distance to subcell surface with Gamma in the center
+        real(r64), allocatable :: kmax(:)
+        ! Geometric part of the integral at given point, note that is multiplied by the weight
+        real(r64), allocatable :: kmax_f(:)
+        ! Spherical harmonics
+        complex(r64), allocatable :: ylm(:,:)
 
         ! Initialize the crystal structure
         call this%cell%initialize(lattice, redpos, elements)
@@ -119,29 +130,50 @@ contains
 
         ! Compute the volume in which the integral will be performed
         v_bz = 8.0 * pi**3 / this%cell%vuc 
-        this%v_integral = product(this%nq) / v_bz
+        v_integral = product(this%nq) / v_bz
 
-        ! Initalize the angular mesh and the weights for the angular part of the integral
-        call compute_angular_mesh_lebedev(this%ang, this%weights, xyz)
-        allocate(this%xyz,source=transpose(cmplx(xyz,0.0,r64)))
+        ! Initalize the big angular mesh and the weights for the angular part of the integral
+        call compute_angular_mesh_lebedev_131(this%ang, this%weights, xyz)
 
         ! Get the number of points used in the angular quadrature
         this%quadrature_npoints = size(xyz, 1)
 
         ! Compute kmax (the boundary)
-        call this%cell%get_kmax_subcell_bz(this%nq, xyz, this%kmax)
+        call this%cell%get_kmax_subcell_bz(this%nq, xyz, kmax)
 
         ! Construct the geometric function
-        allocate(this%kmax_f(this%quadrature_npoints))
+        allocate(kmax_f(this%quadrature_npoints))
 
+        ! Compute the geometric part of the integral
+        ! Notice that this needs to be done in a dense mesh since
+        ! we are trying to integrate parallelepiped using spherical coordinates 
+        ! and that is an object of infinite degree as for its spherical harmonic expansion
         ! K function :  \frac{q_{max}^{3}}{3V_{\Gamma}} 
-        this%kmax_f(:) =  this%weights * this%v_integral * onethird * this%kmax(:)**3
-        
-        if (present(report)) then
-            rel_error = abs(sum(this%kmax_f) - 1.0_r64)
-            write(report,*) 'inverse_dielectric_t%init_common: ' 
-            write(report,*) '  Relative error of the volume integral : ', rel_error
-        end if
+        kmax_f(:) =  this%weights * v_integral * onethird * kmax(:)**3
+
+        ! Precompute the angular part, we first need the spherical harmonics in the big mesh
+        call sph_harm(lmax, this%ang, ylm)
+
+        allocate(this%angular_integrals(nsph))
+
+        !$omp parallel shared(ylm, this, kmax_f) private(ii)
+        !$omp do schedule(dynamic)
+        do ii = 1, nsph
+            this%angular_integrals(ii) = sum(ylm(:, ii) * kmax_f(:))
+        end do 
+        !$omp end do
+        !$omp end parallel
+
+        ! Set now to smaller mesh, as dielectric terms converge quite fast with l in comparison
+        ! to the geometric part, and thus a smaller Lebedev order can be used
+        deallocate(this%ang, this%weights, xyz)
+        ! Recompute things in the small mesh
+        call compute_angular_mesh_lebedev_21(this%ang, this%weights, xyz)
+        allocate(this%xyz,source=transpose(cmplx(xyz,0.0,r64)))
+        this%quadrature_npoints = size(xyz, 1)
+
+        ! Compute the spherical harmonics in the smaller mesh
+        call sph_harm(lmax, this%ang, this%ylm)
 
         ! Init algebra world
         call this%world%init()
@@ -162,10 +194,10 @@ contains
         if (associated(this%Binv)) nullify(this%Binv)
         if (allocated(this%Binv_data)) deallocate(this%Binv_data)
         if (allocated(this%weights)) deallocate(this%weights)
+        if (allocated(this%angular_integrals)) deallocate(this%angular_integrals)
         if (allocated(this%xyz)) deallocate(this%xyz)
         if (allocated(this%ang)) deallocate(this%ang)
-        if (allocated(this%kmax)) deallocate(this%kmax)
-        if (allocated(this%kmax_f)) deallocate(this%kmax_f)
+        if (allocated(this%ylm)) deallocate(this%ylm)
         if (allocated(this%inverse_dielectric_wingL)) deallocate(this%inverse_dielectric_wingL)
         if (allocated(this%inverse_dielectric_wingU)) deallocate(this%inverse_dielectric_wingU)
         if (allocated(this%inverse_dielectric_body))  deallocate(this%inverse_dielectric_body)
@@ -229,10 +261,14 @@ contains
         type(linalg_obj_t) :: ref_L
 
         ! Function from which to compute the integral 
-        complex(r64), allocatable :: kmax_f(:)
         complex(r64), allocatable :: head_f(:) 
         complex(r64), allocatable :: wingL_f(:,:)
-        complex(r64), allocatable :: body_f(:,:,:)
+        complex(r64), allocatable :: body_f(:)
+
+        ! Harmonic expansion coefficients
+        complex(r64) :: clm_head(nsph)
+        complex(r64) :: clm_body(nsph) 
+        real(r64)    :: error 
 
         ! Basis size
         integer(i64) :: nbasis
@@ -251,7 +287,7 @@ contains
         ! Allocate space
         allocate(head_f(this%quadrature_npoints))
         allocate(wingL_f(this%quadrature_npoints, nbasis))
-        allocate(body_f(this%quadrature_npoints, nbasis, nbasis))
+        allocate(body_f(this%quadrature_npoints))
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !  Auxiliary vectorws and macroscopic dielectric matrix !
@@ -271,7 +307,7 @@ contains
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         ! HEAD: Compute \frac{\omega(\Omega)}{\mathbf{\hat{q} L \hat{q}}}  for the space grid
-        head_f(:)  =  this%kmax_f(:) * compute_inverse_head(ref_L, this%xyz, this%ref_xyz, this%world)
+        head_f(:)  =  compute_inverse_head(ref_L, this%xyz, this%ref_xyz, this%world)
         call ref_L%destroy()
         deallocate(L)
 
@@ -282,19 +318,8 @@ contains
         call ref_S%destroy()
         deallocate(S)
         
-        ! Compute the part the body
-        ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
-        !$omp parallel shared(this, wingL_f, body_f) private(ii, jj)
-        !$omp do collapse(2)
-        do ii = 1, nbasis
-            do jj = 1, nbasis
-                body_f(:, ii, jj) = head_f(:) * wingL_f(:, ii) * conjg(wingL_f(:, jj))
-            end do 
-        end do
-        !$omp end do
-        !$omp end parallel
-
-        ! Note that wings functions are odd functions and thus their integral is zero, so no more is done regarding those.
+        ! The body is directly computed as saving it to RAM is too intensive
+        ! Note that wings functions are odd functions and thus their integral is zero, so no more work is done regarding those.
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !  Do the anisotropic averaging !
@@ -304,14 +329,24 @@ contains
         allocate(this%inverse_dielectric_wingU(nbasis), source=zzero)
         allocate(this%inverse_dielectric_body, source = this%Binv)
         
-        this%inverse_dielectric_head  = sum(head_f)
+        call sph_harm_expansion(lmax, head_f, this%weights, this%ylm, clm_head)
+        this%inverse_dielectric_head  = sum(clm_head(:) * this%angular_integrals(:))
+
+        error = maxval(abs(clm_head(100:121)))
+        if (error > 1.0e-8_r64) then
+            write(*,*) "Warning (compute_anisotropic_avg_hermitian) the expansion coefficient can be not large enough"
+        end if
         
-        !$omp parallel shared(this, body_f) private(ii, jj)
-        !$omp do 
+        ! Here we compute the body 
+        ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
+        !$omp parallel shared(this, head_f, wingL_f, nbasis) private(ii, jj, body_f)
+        !$omp do schedule(dynamic) collapse(2)
         do ii = 1, nbasis
             do jj = 1, nbasis
+                body_f(:) = head_f(:) * wingL_f(:, jj) * conjg(wingL_f(:, ii))
+                call sph_harm_expansion(lmax, body_f, this%weights, this%ylm, clm_body)
                 this%inverse_dielectric_body(jj,ii) = this%inverse_dielectric_body(jj,ii) + &
-                    sum(body_f(:,jj,ii))
+                    sum(clm_body(:) * this%angular_integrals(:))
             end do
         end do 
         !$omp end do
@@ -325,7 +360,8 @@ contains
     
     end subroutine compute_anisotropic_avg_hermitian
 
-    !> This computes the block inverse at Gamma for a general dielectric matrix 
+
+        !> This computes the block inverse at Gamma for a general dielectric matrix 
     !> @param[in] this       - the current inverse_dielectric_t object for which to compute the average
     subroutine compute_anisotropic_avg_general(this)
 
@@ -342,11 +378,15 @@ contains
         type(linalg_obj_t) :: ref_L
 
         ! Function from which to compute the integral 
-        complex(r64), allocatable :: kmax_f(:)
         complex(r64), allocatable :: head_f(:) 
         complex(r64), allocatable :: wingL_f(:,:)
         complex(r64), allocatable :: wingU_f(:,:)
-        complex(r64), allocatable :: body_f(:,:,:)
+        complex(r64), allocatable :: body_f(:)
+
+        ! Harmonic expansion coefficients
+        complex(r64) :: clm_head(nsph)
+        complex(r64) :: clm_body(nsph) 
+        real(r64) :: error
 
         ! Basis size
         integer(i64) :: nbasis
@@ -365,7 +405,7 @@ contains
         ! Allocate space
         allocate(head_f(this%quadrature_npoints))
         allocate(wingL_f(this%quadrature_npoints, nbasis))
-        allocate(body_f(this%quadrature_npoints, nbasis, nbasis))
+        allocate(body_f(this%quadrature_npoints))
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !  Auxiliary vectorws and macroscopic dielectric matrix !
@@ -386,7 +426,7 @@ contains
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         ! HEAD: Compute \frac{\omega(\Omega)}{\mathbf{\hat{q} L \hat{q}}}  for the space grid
-        head_f(:)  =  this%kmax_f(:) * compute_inverse_head(ref_L, this%xyz, this%ref_xyz, this%world)
+        head_f(:)  =  compute_inverse_head(ref_L, this%xyz, this%ref_xyz, this%world)
         call ref_L%destroy()
         deallocate(L)
 
@@ -400,17 +440,7 @@ contains
         call ref_T%destroy()
         deallocate(T)
         
-        ! Compute the part the body
-        ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
-        !$omp parallel shared(this, wingL_f, body_f) private(ii, jj)
-        !$omp do collapse(2)
-        do ii = 1, nbasis
-            do jj = 1, nbasis
-                body_f(:, ii, jj) = head_f(:) * wingL_f(:, ii) * wingU_f(:, jj)
-            end do 
-        end do
-        !$omp end do
-        !$omp end parallel
+        ! The body is directly computed as saving it to RAM is too intensive
 
         ! Note that wings functions are odd functions and thus their integral is zero, so no more is done regarding those.
 
@@ -422,14 +452,24 @@ contains
         allocate(this%inverse_dielectric_wingU(nbasis), source=zzero)
         allocate(this%inverse_dielectric_body, source = this%Binv)
         
-        this%inverse_dielectric_head  = sum(head_f)
+        call sph_harm_expansion(lmax, head_f, this%weights, this%ylm, clm_head)
+        this%inverse_dielectric_head  = sum(clm_head(:) * this%angular_integrals(:))
+
+        error = maxval(abs(clm_head(100:121)))
+        if (error > 1.0e-8_r64) then
+            write(*,*) "Warning (compute_anisotropic_avg_general) the expansion coefficient can be not large enough"
+        end if
         
-        !$omp parallel shared(this, body_f) private(ii, jj)
-        !$omp do 
+        ! Here we compute the body 
+        ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
+        !$omp parallel shared(this, head_f, wingL_f, wingU_f, nbasis) private(ii, jj, body_f)
+        !$omp do schedule(dynamic) collapse(2)
         do ii = 1, nbasis
             do jj = 1, nbasis
+                body_f(:) = head_f(:) * wingL_f(:, jj) * wingU_f(:, ii)
+                call sph_harm_expansion(lmax, body_f, this%weights, this%ylm, clm_body)
                 this%inverse_dielectric_body(jj,ii) = this%inverse_dielectric_body(jj,ii) + &
-                    sum(body_f(:,jj,ii))
+                    sum(clm_body(:) * this%angular_integrals(:))
             end do
         end do 
         !$omp end do
@@ -451,7 +491,7 @@ contains
         use idiel_linalg, only: inverse_complex_LU
 
         class(inverse_dielectric_t), intent(inout), target :: this
-        complex(r64), allocatable, intent(in) :: body(:,:)
+        complex(r64), intent(in) :: body(:,:)
 
         if (.not. this%world%is_queue_set()) call this%world%init()
 
@@ -468,33 +508,5 @@ contains
         if (.not. associated(this%Binv)) error stop "inverse_dielectric_t%get_n_basis: Error set inverse dielectric matrix for this" 
         nbasis = size(this%Binv, 1)
     end function
-
-    !> This functions returns the information
-    !> @param[in] this - the inverse_dielectric_t object from which to retrieve data
-    !> @param[out] inv_head  - on exit the inverse dielectric head
-    !> @param[out] inv_wingL - on exit the inverse dielectric lower wing
-    !> @param[out] inv_wingU - on exit the inverse dielectric upper wing
-    !> @param[out] inv_body  - on exit the inverse dielectric body
-    subroutine get_inverted_blocks(this, inv_head, inv_wingL, inv_wingU, inv_body)
-
-        class(inverse_dielectric_t), intent(in), target :: this
-        complex(r64), intent(inout) :: inv_head
-        complex(r64), intent(inout) :: inv_wingL(:)
-        complex(r64), intent(inout) :: inv_wingU(:)
-        complex(r64), intent(inout) :: inv_body(:,:)
-
-        inv_head      = this%inverse_dielectric_head
-        inv_wingL(:)  = this%inverse_dielectric_wingL(:)
-        inv_wingU(:)  = this%inverse_dielectric_wingU(:)
-        inv_body(:,:) = this%inverse_dielectric_body(:,:)
-
-    end subroutine  get_inverted_blocks
-
-    !> Nullifies the body pointer
-    !> @param[in,out] this - the inverse_dielectric_t object from which to retrieve data
-    subroutine nullify_body(this)
-        class(inverse_dielectric_t), intent(inout), target :: this
-        if (associated(this%Binv)) nullify(this%Binv)
-    end subroutine nullify_body
 
 end module idiel_inverse_dielectric

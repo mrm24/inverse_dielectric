@@ -3,6 +3,9 @@
 # Constants
 add_subdirectory(constants)
 
+# Special functions
+add_subdirectory(spherical_harmonics)
+
 # Cell
 add_subdirectory(crystal)
 

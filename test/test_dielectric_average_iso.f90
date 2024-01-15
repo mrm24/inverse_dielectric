@@ -19,7 +19,7 @@
 program test_dielectric_average_iso
 
     use idiel_constants, only: r64, i64, pi, twopi, zzero
-    use idiel_inverse_dielectric, only: inverse_dielectric_t
+    use idiel_inverse_dielectric2, only: inverse_dielectric_t
 
     implicit none
 
@@ -75,10 +75,10 @@ program test_dielectric_average_iso
     call inv_diel%init_common(lattice, redpos, types, ngrid)
 
     ! Read the dielectric data from previous G0W0 run
-    call load_froidiel_file('head.dat', head)
-    call load_froidiel_file('wingL.dat', wingL)
-    call load_froidiel_file('wingU.dat', wingU)
-    call load_froidiel_file('Binv.dat', Binv)
+    call load_from_file('head.dat', head)
+    call load_from_file('wingL.dat', wingL)
+    call load_from_file('wingU.dat', wingU)
+    call load_from_file('Binv.dat', Binv)
 
     ! Do the average
     write(*,*) '[TEST : inverse_dielectric_t]' 
@@ -86,11 +86,11 @@ program test_dielectric_average_iso
         ! Load the data to the worker
         call inv_diel%set_dielectric_blocks(head(:,:,iom), wingL(:,:,iom), wingU(:,:,iom), Binv(:,:,iom))
         ! Compute the average
-        call inv_diel%compute_anisotropic_avg(.false.)
+        call inv_diel%compute_anisotropic_avg(.true.)
         
         ! Check the head
         rdiff = abs(inv_diel%inverse_dielectric_head - head_ref(iom))/head_ref(iom)
-        write(*,'(A,I2,A,E11.6)')  '  * Regression (HEAD,',iom,') result (relative difference): ', rdiff
+        write(*,'(A,I2,A,e20.13)')  '  * Regression (HEAD,',iom,') result (relative difference): ', rdiff
         if ( rdiff .lt. tolerance) then
             write(*,*)  '[TEST : inverse_dielectric_t (HEAD,',iom,'): PASSED]'
         else   
@@ -100,7 +100,7 @@ program test_dielectric_average_iso
 
         ! Check that the wings are zzero (though they are by construction)
         rdiff = sum(abs(inv_diel%inverse_dielectric_wingL))
-        write(*,'(A,I3,A, E11.6)')  '  * Regression (WING L,',iom,') result (relative difference): ', rdiff
+        write(*,'(A,I3,A, e20.13)')  '  * Regression (WING L,',iom,') result (relative difference): ', rdiff
         if ( rdiff .lt. tolerance) then
             write(*,*)  '[TEST : inverse_dielectric_t (WING L,',iom,'): PASSED]'
         else
@@ -109,7 +109,7 @@ program test_dielectric_average_iso
         end if
 
         rdiff = sum(abs(inv_diel%inverse_dielectric_wingU))
-        write(*,'(A,I3,A, E11.6)')  '  * Regression (WING U,',iom,') result (relative difference): ', rdiff
+        write(*,'(A,I3,A, e20.13)')  '  * Regression (WING U,',iom,') result (relative difference): ', rdiff
         if ( rdiff .lt. tolerance) then
             write(*,*)  '[TEST : inverse_dielectric_t (WING U,',iom,'): PASSED]'
         else
@@ -127,7 +127,7 @@ contains
     !> @param[in] fname - the file name   
     !> @param[in] data_shape - the shape of the data to reads
     !> @param[out] data - the data
-    subroutine load_froidiel_file(fname, data)
+    subroutine load_from_file(fname, data)
 
         character(len=*), intent(in) :: fname
         complex(r64), allocatable, intent(out) :: data(..)
@@ -176,6 +176,6 @@ contains
 
         close(fin)
 
-    end subroutine load_froidiel_file
+    end subroutine load_from_file
 
 end program test_dielectric_average_iso

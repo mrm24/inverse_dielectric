@@ -34,8 +34,12 @@ module idiel_constants
     real(r64), parameter :: pi    = 4.0_r64 * atan(1.0_r64)
     !> Two pi
     real(r64), parameter :: twopi = 2.0_r64 * pi
+    !> Four pi
+    real(r64), parameter :: fourpi = 4.0_r64 * pi
     !> 1.0/3.0
     real(r64), parameter :: onethird = 1.0_r64 / 3.0_r64
+    !> The Y_{0}^{0} spherical harmonic
+    complex(r64), parameter :: y00 = cmplx(0.5_r64 * sqrt(1.0/pi),  0.0_r64, kind=r64)
     
     !> Imaginary unit
     complex(r64), parameter :: iunit = cmplx(0.0_r64, 1.0_r64, kind=r64)

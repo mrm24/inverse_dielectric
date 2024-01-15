@@ -130,7 +130,7 @@ program test_crystal
 
     write(*,*) '[TEST : cell_t and symmetry_t]' 
     write(*,*) ' * kind : regression test against precomputed data'
-    write(*,'(A, E11.6)') '  * tolerance : ', tolerance
+    write(*,'(A, e20.13)') '  * tolerance : ', tolerance
 
     ! Data for WZ ZnSe
 
@@ -159,7 +159,7 @@ program test_crystal
 
     ! Check computed values
     rdiff = abs(my_cell%vuc - vuc_ref)/vuc_ref
-    write(*,'(A, E11.6)')  '  * Regression (vuc) result (relative difference): ', rdiff
+    write(*,'(A, e20.13)')  '  * Regression (vuc) result (relative difference): ', rdiff
     if ( rdiff .lt. tolerance) then
         write(*,*)  '[TEST : cell_t%vuc : PASSED]'
     else
@@ -168,7 +168,7 @@ program test_crystal
     end if
 
     rdiff = relative_diference_m(my_cell%rlattice,invlat)
-    write(*,'(A, E11.6)')  '  * Regression (rlattice) result (relative difference): ', rdiff
+    write(*,'(A, e20.13)')  '  * Regression (rlattice) result (relative difference): ', rdiff
     if ( rdiff .lt. tolerance) then
         write(*,*)  '[TEST : cell_t%rlattice : PASSED]'
     else
@@ -196,7 +196,7 @@ program test_crystal
     end if
 
     rdiff = relative_diference_i3(my_symmetry%rot, rot_ref)
-    write(*,'(A, E11.6)')  '  * Regression (rotations) result (relative difference): ', rdiff
+    write(*,'(A, e20.13)')  '  * Regression (rotations) result (relative difference): ', rdiff
     if ( rdiff .lt. tolerance) then
         write(*,*)  '[TEST : symmetry_t%rot : PASSED]'
     else
@@ -205,7 +205,7 @@ program test_crystal
     end if
 
     rdiff = relative_diference_r3(my_symmetry%crot, crot_ref)
-    write(*,'(A, E11.6)')  '  * Regression (Cartesian rotations) result (relative difference): ', rdiff
+    write(*,'(A, e20.13)')  '  * Regression (Cartesian rotations) result (relative difference): ', rdiff
     if ( rdiff .lt. tolerance) then
         write(*,*)  '[TEST : symmetry_t%crot : PASSED]'
     else
