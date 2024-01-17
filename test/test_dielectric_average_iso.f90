@@ -19,7 +19,7 @@
 program test_dielectric_average_iso
 
     use idiel_constants, only: r64, i64, pi, twopi, zzero
-    use idiel_inverse_dielectric2, only: inverse_dielectric_t
+    use idiel_inverse_dielectric, only: inverse_dielectric_t
 
     implicit none
 
