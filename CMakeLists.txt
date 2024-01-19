@@ -49,7 +49,7 @@ execute_process(COMMAND ${cmd1} ${cmd1_arg} COMMAND ${cmd2} ${cmd2_arg}
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
   RESULT_VARIABLE spg_result
   OUTPUT_VARIABLE spg_lib OUTPUT_STRIP_TRAILING_WHITESPACE)
-set(spg_lib "/users/sol/martirm/progs/spglib/build/libsymspg.so")
+set(spg_lib "${spg_lib}")
 message(STATUS "SPGLIB found : ${spg_lib}")
 
 # Create INSTALL DIRECTORY

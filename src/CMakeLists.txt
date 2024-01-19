@@ -4,10 +4,13 @@
 add_subdirectory(constants)
 
 # Special functions
-add_subdirectory(spherical_harmonics)
+add_subdirectory(special_functions)
 
 # Cell
 add_subdirectory(crystal)
+
+# Interpolation
+add_subdirectory(interpolation)
 
 # Spherical quadrature
 add_subdirectory(quadrature)

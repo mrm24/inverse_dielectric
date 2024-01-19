@@ -18,20 +18,22 @@
 module idiel_circle_quadrature
         
     use idiel_constants,   only: i64, r64, pi, twopi
-    use iso_c_binding
+    use iso_c_binding,     only: C_int, C_ptr, C_loc
 
     implicit none
     
     private 
     public :: compute_angular_mesh_gauss_legendre
 
-    !> Interface to CXX boost implementation of gauss legendre quadrature
+interface
+    !> Interface to CXX boost implementation of gauss legendre quadrature (TODO: substitution by pure Fortran procedure)
     subroutine compute_gauss_legendre_cxx(n, x, w) bind(C,name="double_compute_gauss_legendre")
         import
         integer(C_int), value  :: n
         type(C_ptr), value     :: x
         type(C_ptr), value     :: w
     end subroutine compute_gauss_legendre_cxx
+end interface
 
 contains 
 
@@ -61,13 +63,12 @@ contains
         !> The angular mesh (theta,phi)
         real(r64), allocatable :: rphi(:,:)
 
-        allocate(rphi(size(xyz,1),2), sourece=0.0_r64)
+        allocate(rphi(size(xyz,1),2), source=0.0_r64)
 
         rphi(:,1) = hypot(xyz(:,1),xyz(:,2))
         rphi(:,2) = atan2(xyz(:,2),xyz(:,1))
 
     end function cartesian_2_polar
-
 
     !> Compute the gauss legendre mesh
     !> @param[in]   n - the number of points 
@@ -87,7 +88,7 @@ contains
          
         allocate(x(n),w(n))
 
-        call compute_gauss_legendre_cxx(int(n,C_int),C_loc(x),C_loc(w))
+        call compute_gauss_legendre_cxx( int(n,C_int), C_loc(x), C_loc(w))
 
         ! Remap
         dx    = 0.5_r64 * ( b - a )
@@ -97,34 +98,37 @@ contains
 
     end subroutine compute_gauss_legendre_f90
 
-
     !> Compute an angular mesh Gauss-Legendre for the angle
-    !> @param[out]  rphi - the angles (r,phi)
-    !> @param[out]  w    - weights
-    !> @param[out]  xyz  - the mesh in cartesian coordinates
-    subroutine compute_angular_mesh_gauss_legendre(rphi, w, xyz)
+    !> @param[in]   order     - the max order to integrate (relates to the mesh_size as max_order=2*mesh_size-1)
+    !> @param[out]  rphi      - the angles (r,phi)
+    !> @param[out]  w         - weights
+    !> @param[out]  xyz       - the mesh in cartesian coordinates
+    subroutine compute_angular_mesh_gauss_legendre(order, rphi, w, xyz)
         
+        integer(i64), intent(in)            :: order
         real(r64), allocatable, intent(out) :: rphi(:,:)
         real(r64), allocatable, intent(out) :: w(:)
         real(r64), allocatable, intent(out) :: xyz(:,:)
 
         ! Phi mesh
-        real(r64), allocatable :: w_phi(:), x_phi(:)
+        real(r64), allocatable :: x_phi(:)
 
         ! Mesh size
-        integer(i64), parameter :: mesh_size = 2500_i64 
+        integer(i64) :: mesh_size
+
         ! Idx
         integer(i64) :: i, idx 
 
-        ! Build theta mesh
-        call compute_gauss_legendre_f90(mesh_size, 0.0_r64, twopi, x_theta, w_theta)
+        ! Get mesh size
+        mesh_size = ceiling((order + 1.0) / 2.0)
 
-        allocate(w(mesh_size))
-        allocate(ang(mesh_size,2), source=1.0_r64)
+        ! Build theta mesh
+        call compute_gauss_legendre_f90(mesh_size, 0.0_r64, twopi, x_phi, w)
+
+        allocate(rphi(mesh_size,2), source=1.0_r64)
 
         ! Save in proper format
         rphi(:,2) = x_phi(:)
-        rphi(:,1) = w_phi(:)
 
         ! Go to cartesian
         xyz =  polar_2_cartesian(rphi)

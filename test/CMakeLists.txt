@@ -30,6 +30,10 @@ file(COPY ${PROJECT_SOURCE_DIR}/test_resources/spherical_harmonics/imag_part.txt
 target_include_directories(test_sph_harm PUBLIC ${linkdir})
 target_link_libraries(test_sph_harm ${LINKS})
 
+add_executable(test_spline test_spline.f90)
+target_include_directories(test_spline PUBLIC ${linkdir})
+target_link_libraries(test_spline ${LINKS})
+
 # Enable testing
 include(CTest)
 add_test(NAME test_crystal COMMAND test_crystal)
@@ -37,3 +41,4 @@ add_test(NAME test_quadrature_lebedev COMMAND test_quadrature_lebedev)
 add_test(NAME test_dielectric_average_iso COMMAND test_dielectric_average_iso)
 add_test(NAME test_inverse COMMAND test_inverse)
 add_test(NAME test_sph_harm COMMAND test_sph_harm)
+add_test(NAME test_spline COMMAND test_spline)
