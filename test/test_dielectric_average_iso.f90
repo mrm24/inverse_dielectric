@@ -138,7 +138,7 @@ contains
         integer :: fin, iom, niom
         integer :: ii, jj
 
-        open(file=fname, newunit=fin)
+        open(file=fname, newunit=fin,  status='old', action='read')
         read(fin,*) data_shape
 
         select rank(data)

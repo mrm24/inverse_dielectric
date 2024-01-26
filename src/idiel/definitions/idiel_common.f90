@@ -47,7 +47,9 @@ contains
         ! Spherical harmonics
         complex(r64), allocatable :: ylm(:,:)
         ! Some cutoff values to create the radial mesh for the 2D case
-        real(r64) :: xlim, xcut, rmax, dx1, dx2
+        real(r64) :: rmax, dx
+        ! The reciprocal vectors
+        real(r64) :: a(3), b(3)
 
         ! Initialize the crystal structure
         call this%cell%initialize(lattice, redpos, elements)
@@ -72,7 +74,10 @@ contains
             call compute_angular_mesh_gauss_legendre(size_mesh_2d_fine , this%ang, this%weights_fine, xyz)
 
             ! Add the area factor to the weights 
-            this%weights_fine = this%weights_fine / this%cell%area_r_12
+            a = this%cell%rlattice(1,:) / this%nq(1)
+            b = this%cell%rlattice(2,:) / this%nq(2)
+            this%weights_fine = this%weights_fine / & 
+                sqrt( (a(2)*b(3) - a(3)*b(2))**2 +  (a(3)*b(1) - a(1)*b(3))**2 + (a(1)*b(2) - a(2)*b(1))**2 )
 
             ! Save the large phi mesh
             allocate(this%phi, source=this%ang(:,2))
@@ -87,23 +92,11 @@ contains
             call this%cell%get_kmax_subcell_bz(this%nq, xyz, this%rmax2d)
 
             ! Init the radial mesh (this mesh is intended to provide good treatment of the queue)
-            rmax = maxval(this%rmax2d)
-            xlim = 0.005_r64
-            xcut = -log(xlim) / this%rcut
-            if (xcut <= 0.5_r64 * rmax ) then  
-                dx1  = (1.0_r64 - exp(-xcut)) / (nr/2 - 1)
-                dx2  = (rmax - xcut) / (nr / 2)
-                do ii = 1, nr / 2
-                    this%radii(ii) = -log(-(ii - 1) * dx1 + 1)
-                    this%radii(ii + nr/2) = xcut + ii * dx2
-                end do 
-            else
-                xcut = rmax
-                dx1  = (1.0_r64 - exp(-xcut)) / (nr - 1)
-                do ii = 1, nr
-                    this%radii(ii) = -log(-(ii - 1) * dx1 + 1)
-                end do
-            end if 
+            rmax = 1.02_r64 * maxval(this%rmax2d)
+            dx = rmax / (nr - 1)
+            do ii = 1, nr
+                this%radii(ii) = (ii - 1) * dx
+            end do
 
             do ii = 1, nr
                 this%vr(:,ii) = fourpi * (1.0_r64 - exp(-this%rcut * this%radii(ii)))
@@ -113,7 +106,7 @@ contains
             deallocate(this%ang, xyz)
             call compute_angular_mesh_gauss_legendre(size_mesh_2d_coarse, this%ang, this%weights, xyz)
             allocate(this%xyz, source=transpose(cmplx(xyz,0.0,r64)))
-            
+            this%quadrature_npoints = size(xyz, 1)
             ! Compute circular basis in the coarse mesh
             call circ_harm(lmax, this%ang(:,2), this%blm_coarse)
 

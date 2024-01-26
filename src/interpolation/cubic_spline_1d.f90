@@ -90,11 +90,12 @@ contains
         real(r64),    intent(in)             :: x(:)
         complex(r64), intent(in)             :: y(:)
 
-        integer(i64) :: n ! number of splines
-        integer(i64) :: i ! Index
+        integer(i64) :: n    ! number of splines
+        integer(i64) :: i, j ! Index
         complex(r64), allocatable :: a(:), b(:), c(:), d(:) ! The splines factors d*x**3 + c*x**2 + b*x + a
-        real(r64), allocatable :: h(:) ! The step size
-        complex(r64), allocatable :: alpha(:), l(:), mu(:), z(:)
+        real(r64), allocatable    :: h(:) ! The step size
+        real(r64), allocatable    :: l(:), mu(:)
+        complex(r64), allocatable :: alpha(:), z(:)
 
         ! Given a set of coordinates C with size n+1 the number of splines will be n:
         n = size(y) - 1_i64
@@ -124,7 +125,7 @@ contains
         z(1)  = zzero
         ! Iterate to fill l,mu,z:
         do i = 2, n
-            l(i) = 2 * (x(i + 1) - x(i - 1)) - h(i - 1) * mu(i - 1)
+            l(i) = 2.0_r64 * (x(i + 1) - x(i - 1)) - h(i - 1) * mu(i - 1)
             mu(i) = h(i) / l(i)
             z(i) = (alpha(i) - h(i - 1) * z(i - 1)) / l(i)
         end do
@@ -148,7 +149,6 @@ contains
             this%splines(4, i) = d(i)
             this%splines(5, i) = x(i)
             this%integrals(i)  = this%cubic_poly_integral(a(i), b(i), c(i), d(i), x(i), x(i), x(i+1))
-            write(*,*) i, this%cubic_poly_integral(a(i), b(i), c(i), d(i), x(i), x(i), x(i+1))
         end do
 
     end subroutine init_cubic_spline_t

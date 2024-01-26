@@ -20,7 +20,7 @@
 !> This module contains the subroutines that build up vectors and blocks using linear algebra
 module idiel_linalg
 
-    use idiel_constants, only: i32, i64, r64, zzero, zone
+    use idiel_constants, only: i32, i64, r64, zzero, zone, fourpi
     use iso_c_binding
 #ifdef USE_GPU
     use magma2
@@ -51,13 +51,11 @@ contains
         integer(i32) :: info, lwork, nb, n
         integer(i32), allocatable :: ipiv(:)
         complex(r64), allocatable :: work(:)
-        real(r64) :: times(7) = 0.0_r64
 
 #if !defined(USE_GPU)
         ! External
         external :: zgetri, zgetrf
 #endif  
-        call cpu_time(times(1))
         ! Some constants
         n = size(A,1)
         ! Allocate
@@ -76,7 +74,6 @@ contains
         call ref_A%allocate_gpu(inverse_A)
         call ref_A%transfer_cpu_gpu(inverse_A, world)
         call ref_work%allocate_gpu(work)
-        call cpu_time(times(2))
         ! Perform here the inversion (memory overflow is possible)
 #ifdef USE_GPU
         call magma_zgetrf_gpu(ref_A%rows(), ref_A%rows(), ref_A%gpu_ptr(), ref_A%rows(), ipiv, info)
@@ -96,8 +93,6 @@ contains
         call world%syncronize()
         call ref_A%destroy()
         call ref_work%destroy()
-
-        write(*,*) times(2:6) - times(1:5)
 
     end subroutine inverse_complex_LU
 
@@ -372,27 +367,27 @@ contains
             allocate(bg(3,nb))
             call ref_bg%allocate_gpu(bg)
 #ifdef USE_GPU
-            call magma_zgemm(MagmaNoTrans, MagmaNoTrans, nb, 3, nb, -zone, ref_Binv%gpu_ptr(), &
+            call magma_zgemm(MagmaNoTrans, MagmaNoTrans, nb, 3, nb, cmplx(1.0_r64/sqrt(fourpi), 0.0_r64, r64), ref_Binv%gpu_ptr(), &
                             nb, ref_wingL%gpu_ptr(), nb, zzero, ref_ag%gpu_ptr(), nb, world%get_queue())
-            call magma_zgemm(MagmaTrans, MagmaNoTrans, 3, nb, nb, -zone, ref_wingU%gpu_ptr(), &
+            call magma_zgemm(MagmaTrans, MagmaNoTrans, 3, nb, nb, cmplx(1.0_r64/sqrt(fourpi), 0.0_r64, r64), ref_wingU%gpu_ptr(), &
                             nb, ref_Binv%gpu_ptr(), nb, zzero, ref_bg%gpu_ptr(), 3, world%get_queue())                
             call magma_zgemm(MagmaTrans, MagmaNoTrans, 3, 3, nb, -zone, ref_wingU%gpu_ptr(), &
-                            nb, ref_ag%gpu_ptr(), nb, -zone, ref_A%gpu_ptr(), 3, world%get_queue())
+                            nb, ref_ag%gpu_ptr(), nb, cmplx(1.0_r64/fourpi, 0.0_r64, r64), ref_A%gpu_ptr(), 3, world%get_queue())
 #else   
-            call zgemm('n', 'n', nb,  3, nb,  -zone, ref_Binv%gpu_ptr(),  nb, ref_wingL%gpu_ptr(),nb, zzero, ref_ag%gpu_ptr(), nb)
-            call zgemm('t', 'n',  3, nb, nb,  -zone, ref_wingU%gpu_ptr(), nb, ref_Binv%gpu_ptr(), nb, zzero, ref_bg%gpu_ptr(), 3)
-            call zgemm('t', 'n',  3,  3, nb,  -zone, ref_wingU%gpu_ptr(), nb, ref_ag%gpu_ptr(),    nb, -zone,  ref_A%gpu_ptr(), 3)
+            call zgemm('n', 'n', nb,  3, nb,  cmplx(1.0_r64/sqrt(fourpi), 0.0_r64, r64), ref_Binv%gpu_ptr(),  nb, ref_wingL%gpu_ptr(),nb, zzero, ref_ag%gpu_ptr(), nb)
+            call zgemm('t', 'n',  3, nb, nb,  cmplx(1.0_r64/sqrt(fourpi), 0.0_r64, r64), ref_wingU%gpu_ptr(), nb, ref_Binv%gpu_ptr(), nb, zzero, ref_bg%gpu_ptr(), 3)
+            call zgemm('t', 'n',  3,  3, nb,  -zone, ref_wingU%gpu_ptr(), nb, ref_ag%gpu_ptr(),    nb,  cmplx(1.0_r64/fourpi, 0.0_r64, r64),  ref_A%gpu_ptr(), 3)
 #endif      
             call ref_bg%transfer_gpu_cpu(bg, world)
         else
 #ifdef USE_GPU
-                call magma_zgemm(MagmaNoTrans, MagmaNoTrans, nb, 3, nb, -zone, ref_Binv%gpu_ptr(), &
+                call magma_zgemm(MagmaNoTrans, MagmaNoTrans, nb, 3, nb, cmplx(1.0_r64/sqrt(fourpi), 0.0_r64, r64), ref_Binv%gpu_ptr(), &
                                 nb, ref_wingL%gpu_ptr(), nb, zzero, ref_ag%gpu_ptr(), nb, world%get_queue())
                 call magma_zgemm(MagmaConjTrans, MagmaNoTrans, 3, 3, nb, -zone, ref_wingL%gpu_ptr(), &
-                                nb, ref_ag%gpu_ptr(), nb, -zone, ref_A%gpu_ptr(), 3, world%get_queue())
+                                nb, ref_ag%gpu_ptr(), nb, cmplx(1.0_r64/fourpi, 0.0_r64, r64), ref_A%gpu_ptr(), 3, world%get_queue())
 #else   
-                call zgemm('n', 'n', nb, 3, nb, -zone, ref_Binv%gpu_ptr(),  nb, ref_wingL%gpu_ptr(), nb, zzero, ref_ag%gpu_ptr(), nb)
-                call zgemm('c', 'n',  3, 3, nb, -zone, ref_wingL%gpu_ptr(), nb, ref_ag%gpu_ptr(),     nb, -zone,  ref_A%gpu_ptr(), 3)
+                call zgemm('n', 'n', nb, 3, nb, cmplx(1.0_r64/sqrt(fourpi), 0.0_r64, r64), ref_Binv%gpu_ptr(),  nb, ref_wingL%gpu_ptr(), nb, zzero, ref_ag%gpu_ptr(), nb)
+                call zgemm('c', 'n',  3, 3, nb, -zone, ref_wingL%gpu_ptr(), nb, ref_ag%gpu_ptr(),     nb, cmplx(1.0_r64/fourpi, 0.0_r64, r64),  ref_A%gpu_ptr(), 3)
 #endif     
         end if
 
@@ -457,9 +452,5 @@ contains
         !$omp end parallel
 
     end function compute_qAq
-    
-
-
-    
 
 end module idiel_linalg

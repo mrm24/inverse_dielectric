@@ -13,7 +13,7 @@
 ! permissions and limitations under the License.
 
 !> @file
-!> Tests the circular expansion of a function similar to the head component
+!> Tests the circular expansion and quadrature
 program test_circular_expansion
 
     use idiel_constants, only: r64, i64, twopi, pi, fourpi, zzero
@@ -27,7 +27,9 @@ program test_circular_expansion
     real(r64),    parameter :: tolerance = 1.0e-12_r64
     real(r64), allocatable :: rphi(:,:), w(:), xyz(:,:)
     complex(r64), allocatable :: blm(:,:)
-    real(r64) :: integral
+    complex(r64), allocatable :: f2expand(:), fexact(:), fint(:)
+    complex(r64) :: clm(2*lmax+1)
+    real(r64) :: integral, rdiff
     integer(i64) :: i
 
 
@@ -37,7 +39,7 @@ program test_circular_expansion
     call compute_angular_mesh_gauss_legendre(msize, rphi, w, xyz)
 
     ! We compute the circular harmonics up to 22
-    call circ_harm(2*msize, rphi(:,2), blm)
+    call circ_harm(msize, rphi(:,2), blm)
 
     ! Check that the quadrature integrates the circular harmonics
     integral = real(sum(w * blm(:,1)))
@@ -48,7 +50,7 @@ program test_circular_expansion
         stop 1
     end if
 
-    do i = 2, 41
+    do i = 2, 2*lmax+1
         integral = real(sum(w * blm(:,i)))
         if ( integral <= tolerance) then
             write(*,*)  '[TEST : idiel_circular_harmonics and idiel_circle_quadrature: PASSED]'
@@ -58,54 +60,52 @@ program test_circular_expansion
         end if
     end do
 
+    write(*,*)  '[TEST : circ_harm_expansion]'
+    f2expand = f1(xyz)
+    call circ_harm_expansion(10_i64, f2expand, w, blm, clm)
+    deallocate(rphi, w, xyz, blm)
+    
+    call compute_angular_mesh_gauss_legendre(10*msize, rphi, w, xyz)
+    call circ_harm(msize, rphi(:,2), blm)
+    fexact = f1(xyz)
+    allocate(fint, mold=fexact)
+    fint = zzero
+    
+    ! Compute the expansion
+    do i = 1, 2*lmax+1
+        fint(:) = fint(:) + clm(i) * blm(:,i) 
+    end do
+
+    ! Compute the function
+    do i = 1, 10*msize
+        rdiff = abs(real(fint(i))-real(fexact(i))) / abs(real(fexact(i)))
+        if ( rdiff <= tolerance) then
+            write(*,*)  '[TEST : circ_harm_expansion: PASSED]'
+        else   
+            write(*,*)  '[TEST : circ_harm_expansion: FAILED]'
+            stop 1
+        end if
+    end do 
+
     stop 0
 
+contains
+
+    pure function f1(r)
+        !> Mesh in which to compute
+        real(r64), intent(in)  :: r(:,:)
+        !> Result
+        complex(r64), allocatable :: f1(:)
+        !> Elements
+        real(r64), allocatable :: x(:), y(:)
+
+        x = r(:,1)
+        y = r(:,2)
+        
+        allocate(f1(size(r,1)))
+
+        f1 = cmplx(1.0_r64 + x + y**2 + y * x**2 + x**4 + y**5 + (x*y)**3, 0.0_r64, r64)
+
+    end function f1
+
 end program test_circular_expansion
-
-! contains 
-! Check the quadrature coefficients
-! do i = 1, nr/2
-!     radii(i) = -log(-(i - 1) * dr1 + 1)
-!     radii(i + nr/2) = xcut + i * dr2
-! end do
-! head = calculate_headf(radii,rphi(:,2))
-! ! Test the expansion
-! allocate(clm(2*lmax+1,nr))
-! do i = 1, nr
-!     call circ_harm_expansion(lmax, head(:,i), w, blm(:,1:2*lmax+1), clm(:,i))
-!     write(*,*) i, radii(i), real(head(1,i)), real(clm(1,i)), real(clm(5,i))
-! end do
-! function calculate_headf(r,ang) result(h)
-!     !> Radius
-!     real(r64), intent(in) :: r(:)
-!     !> Angles
-!     real(r64), intent(in) :: ang(:)
-
-!     complex(r64) :: Axx, Ayy, vrii
-!     integer(i64) :: ii, jj, nrad, nang
-!     complex(r64), allocatable :: qAq(:), vr(:), h(:,:)
-
-!     nrad = size(r)
-!     nang = size(ang) 
-
-!     Axx = cmplx(1.0_r64,0.0_r64,r64)
-!     Ayy = cmplx(3.0_r64,0.0_r64,r64)
-
-!     allocate(vr(nrad))
-!     vr = fourpi * (1.0_r64 - exp(-rcut*r))
-
-!     allocate(qAq(nang))
-        
-!     qAq = cos(ang)**2 * Axx + sin(ang)**2 * Ayy
-
-!     allocate(h(nang,nrad))
-        
-!     h(:,1) =  - (fourpi * rcut)**2 * qAq(:)
-
-!     do ii = 2, nrad
-!         do jj = 1, nang
-!             h(jj,ii) =  - (vr(ii) / r(ii))**2 * qAq(jj) / ( 1 + vr(ii) *  qAq(jj))
-!         end do 
-!     end do 
-        
-! end function calculate_headf

@@ -197,6 +197,11 @@ contains
         
         ! agymmetrize the elements of the macroscopic dielectric matrix and update it
         A   = this%symmetry%symmetryze_complex_tensor(A) 
+        write(*,*) 'A'
+        write(*,*) real(A(1,:))
+        write(*,*) real(A(2,:))
+        write(*,*) real(A(3,:))
+        write(*,*) 'end A'
         call ref_A%transfer_cpu_gpu(A, this%world)
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -227,29 +232,27 @@ contains
         allocate(this%idiel_wingU(nbasis), source=zzero)
         allocate(this%idiel_body, source = this%Binv)
         
-        write(*,*) "Computing head" 
         this%idiel_head = head_2d(this%blm_coarse, this%weights, this%blm_fine, this%weights_fine, &
                                   this%radii, this%rmax2d, this%rcut, qAq, this%vr)
 
-        ! Here we compute the body 
-        !$omp parallel shared(this, wingL_f, nbasis) private(ii, jj, wLwU_f)
-        !$omp do schedule(dynamic) !!collapse(2)
-        do ii = 1, nbasis
-            write(*,*) ii, nbasis
-            do jj = 1, nbasis
-                wLwU_f(:) = wingL_f(:, jj) * conjg(wingL_f(:, ii))
-                this%idiel_body(jj,ii) = body_2d(this%blm_coarse, this%weights, this%blm_fine, this%weights_fine, &
-                                              this%radii, this%rmax2d, this%rcut, qAq, wLwU_f, this%vr)
-            end do
-        end do 
-        !$omp end do
-        !$omp end parallel
+        ! ! Here we compute the body 
+        ! !$omp parallel shared(this, wingL_f, nbasis) private(ii, jj, wLwU_f)
+        ! !$omp do schedule(dynamic) collapse(2)
+        ! do ii = 1, nbasis
+        !     do jj = 1, nbasis
+        !         wLwU_f(:) = wingL_f(:, jj) * conjg(wingL_f(:, ii))
+        !         this%idiel_body(jj,ii) = body_2d(this%blm_coarse, this%weights, this%blm_fine, this%weights_fine, &
+        !                                       this%radii, this%rmax2d, this%rcut, qAq, wLwU_f, this%vr)
+        !     end do
+        ! end do 
+        ! !$omp end do
+        ! !$omp end parallel
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !            Clean              !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         deallocate(qAq, wingL_f, wLwU_f)
-        stop 0
+        
     end subroutine compute_anisotropic_avg_scrcoulomb_2d_hermitian
 
     !> bghis function computes the screened Coulomb head contribution
@@ -292,11 +295,10 @@ contains
 
         do ii = 2, size(w_head_f,2)
             w_head_f(:, ii) =  - (w_head_f(:,ii) / r(ii))**2 * qAq(:) / ( 1.0_r64 + w_head_f(:,ii) *  qAq(:))
-        end do 
+        end do
 
         ! Expand the head component into Fourier
         do ii = 1, size(w_head_f, 2)
-            write(*,*) 'Expanding', ii, size(w_head_f, 2) 
             call circ_harm_expansion(lmax, w_head_f(:,ii), wc, blm_coarse, clm_head(:,ii))
         end do
 
@@ -305,7 +307,7 @@ contains
         ! to obtain the rmax(phi) integral
         r_integral = zzero
         do ii = 1, ncir
-            if (maxval(abs(clm_head(ii,:))) < 1.0e-10_r64) cycle
+            if ( maxval(abs(clm_head(ii,:))) < 1.0e-7_r64) cycle
             allocate(cs)
             call cs%initialize(r, r * clm_head(ii,:))
             do jj = 1, size_mesh_2d_fine
@@ -316,10 +318,13 @@ contains
 
         ! Compute the integral
         w_head = zzero
-        do jj = 1, ncir
-            write(*,*) 'Integral', ii, ncir
+        do ii = 1, ncir
             w_head = w_head + sum(wf(:) * blm_fine(:,ii) * r_integral(:,ii))
         end do
+        
+        write(*,*) 'whead', w_head
+
+        stop 0
 
     end function head_2d
 
@@ -375,7 +380,7 @@ contains
         ! to obtain the rmax(phi) integral
         r_integral = zzero
         do ii = 1, ncir
-            if (maxval(abs(clm_body(ii,:))) < 1.0e-10_r64) cycle
+            if (maxval(abs(clm_body(ii,:))) < 1.0e-8_r64) cycle
             allocate(cs)
             call cs%initialize(r, r * clm_body(ii,:))
             do jj = 1, size_mesh_2d_fine
