@@ -25,8 +25,11 @@ module idiel_cubic_spline
         real(r64), private, allocatable :: x(:) 
         !> The splines (a,b,c,d,xj)
         complex(r64), private, allocatable :: splines(:,:)
+        !> The integrate of a fragment
+        complex(r64), private, allocatable :: integrals(:)
     contains
-        procedure, public :: initialize=>init_cubic_spline_t, interpolate, integrate, derivative
+        procedure, public  :: initialize=>init_cubic_spline_t, interpolate, integrate, derivative
+        procedure, private :: cubic_poly_integral
         final :: clean
     end type
 
@@ -38,12 +41,14 @@ contains
 
         type(cubic_spline_t), intent(inout) :: this
 
-        if (allocated(this%x)) deallocate(this%x)
-        if (allocated(this%splines)) deallocate(this%splines)
+        if (allocated(this%x))         deallocate(this%x)
+        if (allocated(this%splines))   deallocate(this%splines)
+        if (allocated(this%integrals)) deallocate(this%integrals)
 
     end subroutine clean
 
     !> Returns an index pointing to the first element in the array such that element < value using binary search
+    !> Adapted from std c++ library routine. 
     !> @param[in] array - the array to find the lower bound of (it must be sorted in ascending order)
     !> @param[in] value - the value to compare
     !> @return answer   - the index such that array(i) < value 
@@ -134,18 +139,49 @@ contains
         end do
 
         allocate(this%splines(5, n))
+        allocate(this%integrals(n))
         allocate(this%x(n), source=x(2:))
         do i = 1, n 
-            this%splines(1, i) = a(i);
-            this%splines(2, i) = b(i);
-            this%splines(3, i) = c(i);
-            this%splines(4, i) = d(i);
-            this%splines(5, i) = x(i);
+            this%splines(1, i) = a(i)
+            this%splines(2, i) = b(i)
+            this%splines(3, i) = c(i)
+            this%splines(4, i) = d(i)
+            this%splines(5, i) = x(i)
+            this%integrals(i)  = this%cubic_poly_integral(a(i), b(i), c(i), d(i), x(i), x(i), x(i+1))
+            write(*,*) i, this%cubic_poly_integral(a(i), b(i), c(i), d(i), x(i), x(i), x(i+1))
         end do
 
     end subroutine init_cubic_spline_t
 
-    !> This function interpolates 
+    !> This function computes the cubic polynonmial integral
+    !> @param[in] this - the interpolator
+    !> @param[in] a - a from the cubic polynomial
+    !> @param[in] b - a from the cubic polynomial
+    !> @param[in] c - a from the cubic polynomial
+    !> @param[in] d - a from the cubic polynomial
+    !> @param[in] x0 - x0 from the cubic polynomial
+    !> @param[in] xa - lower limit of the integral
+    !> @param[in] xb - upper limit of the integral
+    !> @result    integral - the integral between a and b
+    pure function cubic_poly_integral(this, a, b, c, d, x0, xa, xb) result(integral)
+
+        class(cubic_spline_t),  intent(in) :: this
+        complex(r64), intent(in)           :: a
+        complex(r64), intent(in)           :: b
+        complex(r64), intent(in)           :: c
+        complex(r64), intent(in)           :: d
+        real(r64), intent(in)              :: x0
+        real(r64), intent(in)              :: xa
+        real(r64), intent(in)              :: xb
+
+        complex(r64) :: integral
+
+        integral = a * xb - b * x0 * xb + b / 2_r64 * xb**2 - c / 3.0_r64 * (x0 - xb)**3 + d / 4.0_r64 * (xb - x0)**4 - &
+                   a * xa + b * x0 * xa - b / 2_r64 * xa**2 + c / 3.0_r64 * (x0 - xa)**3 - d / 4.0_r64 * (xa - x0)**4
+
+    end function cubic_poly_integral
+
+    !> This function interpolates
     !> @param[in] this - the interpolator 
     !> @param[in] new_x - the x at which the data should be interpolated
     !> @result interpolated_y - the interpolated data
@@ -159,12 +195,12 @@ contains
         real(r64) :: dx 
 
         integer(i64) :: i
-
+#ifdef DEBUG
         ! Check if within interpolation range
         if (new_x < real(this%splines(5,1)) .or. new_x > real(this%x(size(this%x)))) then
             error stop "cubic_spline_t%interpolate: x is out of the interpolator range"
         end if
-
+#endif
         i = lower_bound(this%x, new_x)
 
         sp(1:5) => this%splines(1:5,i)
@@ -181,7 +217,7 @@ contains
     !> @param[in] this - the interpolator from which to compute the integral
     !> @param[in] low  - the low limit of the integral
     !> @param[in] up   - the upper limit of the integral
-    pure function integrate(this, low, up) result(integral)
+     function integrate(this, low, up) result(integral)
         
         class(cubic_spline_t), intent(in) :: this
         real(r64),             intent(in) :: low 
@@ -190,9 +226,10 @@ contains
         complex(r64) :: integral
 
         integer(i64) :: i, i0, i1
-        real(r64)    :: xa, xb
+        real(r64)    :: x0
         complex(r64) :: a, b, c, d
 
+#ifdef DEBUG
         ! Check that order of integral limits is correct
         if ( up < low ) then
             error stop "cubic_spline_t%integrate: the integration limits are incorrect"
@@ -202,6 +239,7 @@ contains
         if (low < real(this%splines(5,1)) .or. up > real(this%x(size(this%x)))) then
             error stop "cubic_spline_t%integrate: some limits are out the interpolator range"
         end if
+#endif
 
         ! Get where the blocks are locate
         i0 = lower_bound(this%x, low)
@@ -210,68 +248,37 @@ contains
         ! Init integral value
         integral = zzero
 
-        ! Add here the middle block ranges
-        do i = i0 + 1, i1 - 1 
-            a  = this%splines(1,i)
-            b  = this%splines(2,i)
-            c  = this%splines(3,i)
-            d  = this%splines(4,i)
-            xa = this%splines(5,i)
-            xb = this%x(i)
-            integral = integral &
-                       -12.0_r64 * a * (xa - xb) & 
-                       -3.0_r64  * xa**4 * d &    
-                       -4.0_r64  * xa**3 * c &
-                       -6.0_r64  * xa**2 * b &
-                       + xb**2 * (6.0_r64 * b + xb * (3.0_r64 * xb * d + 4.0_r64 * c))
-        end do
+        ! Add here the middle block ranges (we simply sum from precomputed integrals of each full piece)
+        integral = sum(this%integrals(i0+1:i1-1))
 
         ! Process starting and ending blocks 
         ! If start and end in the same block
         if (i0 == i1) then
-            a  = this%splines(1,i)
-            b  = this%splines(2,i)
-            c  = this%splines(3,i)
-            d  = this%splines(4,i)
-            xa = up
-            xb = low
-            integral = integral &
-                       -12.0_r64 * a * (xa - xb) & 
-                       -3.0_r64  * xa**4 * d &    
-                       -4.0_r64  * xa**3 * c &
-                       -6.0_r64  * xa**2 * b &
-                       + xb**2 * (6.0_r64 * b + xb * (3.0_r64 * xb * d + 4.0_r64 * c))
-        else 
+            a  = this%splines(1,i0)
+            b  = this%splines(2,i0)
+            c  = this%splines(3,i0)
+            d  = this%splines(4,i0)
+            x0 = real(this%splines(5,i0))
+            integral = integral + this%cubic_poly_integral(a, b, c, d, x0, low, up)
+        else
             ! Otherwise we need to treat each of them separately
-            a  = this%splines(1,i)
-            b  = this%splines(2,i)
-            c  = this%splines(3,i)
-            d  = this%splines(4,i)
-            xa = this%splines(5,i)
-            xb = low
-            integral = integral &
-                       -12.0_r64 * a * (xa - xb) & 
-                       -3.0_r64  * xa**4 * d &    
-                       -4.0_r64  * xa**3 * c &
-                       -6.0_r64  * xa**2 * b &
-                       + xb**2 * (6.0_r64 * b + xb * (3.0_r64 * xb * d + 4.0_r64 * c))
+            ! Left end
+            a  = this%splines(1,i0)
+            b  = this%splines(2,i0)
+            c  = this%splines(3,i0)
+            d  = this%splines(4,i0)
+            x0 = real(this%splines(5,i0))
+            integral = integral + this%cubic_poly_integral(a, b, c, d, x0, low, this%x(i0))
 
-            a  = this%splines(1,i)
-            b  = this%splines(2,i)
-            c  = this%splines(3,i)
-            d  = this%splines(4,i)
-            xa = up
-            xb = this%x(i)
-            integral = integral &
-                       -12.0_r64 * a * (xa - xb) & 
-                       -3.0_r64  * xa**4 * d &    
-                       -4.0_r64  * xa**3 * c &
-                       -6.0_r64  * xa**2 * b &
-                       + xb**2 * (6.0_r64 * b + xb * (3.0_r64 * xb * d + 4.0_r64 * c))
-        
+            ! Right end
+            a  = this%splines(1,i1)
+            b  = this%splines(2,i1)
+            c  = this%splines(3,i1)
+            d  = this%splines(4,i1)
+            x0 = real(this%splines(5,i1))
+            integral = integral + this%cubic_poly_integral(a, b, c, d, x0, x0, up)
+
         end if
-
-        integral = integral / 12.0_r64
 
     end function integrate
 
@@ -285,6 +292,7 @@ contains
         real(r64), intent(in)                     :: x
 
         complex(r64) :: dydx
+        real(r64)    :: dx
         complex(r64), pointer :: sp(:)
 
         integer(i64) :: i
@@ -295,7 +303,9 @@ contains
 
         sp(1:5) => this%splines(1:5,i)
 
-        dydx = sp(2) + 2.0_r64 * sp(2) * x + 3.0_r64 * sp(3) * x**2
+        dx = x - real(sp(5), r64)
+
+        dydx =  sp(2)  + 2.0_r64 * sp(3) * dx + 3.0_r64 * sp(4) * dx**2
 
         nullify(sp) 
 
@@ -303,70 +313,3 @@ contains
 
 end module idiel_cubic_spline
 
-! subroutine init_cubic_spline_t(this, x, y)
-
-!     class(cubic_spline_t), intent(inout) :: this
-!     real(r64),    intent(in)             :: x(:)
-!     complex(r64), intent(in)             :: y(:)
-
-!     complex(r64), allocatable :: a(:), b(:), c(:), d(:) ! The splines factors d*x**3 + c*x**2 + b*x + a
-!     real(r64), allocatable    :: h(:) ! The step size
-!     complex(r64), allocatable :: z(:), l(:), mu(:), alpha(:)
-
-!     integer(i64) :: n ! number of splines
-!     integer(i64) :: i, j ! Indexes
-    
-!     n = size(x) - 1_i64
-!     allocate(a(n+1), b(n), d(n), h(n), alpha(n), c(n+1), l(n+1), mu(n+1), z(n+1))
-
-!     ! Initialize array a
-!     do i = 1, n + 1
-!         a(i) = y(i)
-!     end do
-
-!     ! Calculate array h
-!     do i = 1, n
-!         h(i) = x(i + 1) - x(i)
-!     end do
-
-!     ! Calculate array alpha
-!     do i = 2, n
-!         alpha(i) = 3.0_r64 / h(i) * (a(i + 1) - a(i)) - 3.0_r64 / h(i - 1) * (a(i) - a(i - 1))
-!     end do
-
-!     ! Initialize arrays l, mu, and z
-!     l(1) = 1.0_r64
-!     mu(1) = 0.0_r64
-!     z(1) = 0.0_r64
-
-!     ! Iterate to fill l, mu, z
-!     do i = 2, n
-!         l(i) = 2.0_r64 * (x(i + 1) - x(i - 1)) - h(i - 1) * mu(i - 1)
-!         mu(i) = h(i) / l(i)
-!         z(i) = (alpha(i) - h(i - 1) * z(i - 1)) / l(i)
-!     end do
-
-!     ! Set values for last elements of l, z, c
-!     l(n + 1) = 1.0_r64
-!     z(n + 1) = 0.0_r64
-!     c(n + 1) = 0.0_r64
-
-!     ! Iterate backward to calculate c, b, and d
-!     do j = n, 1, -1
-!         c(j) = z(j) - mu(j) * c(j + 1)
-!         b(j) = (a(j + 1) - a(j)) / h(j) - h(j) * (c(j + 1) + 2.0_r64 * c(j)) / 3.0_r64
-!         d(j) = (c(j + 1) - c(j)) / (3.0_r64 * h(j))
-!     end do
-
-!     ! Fill output_set array
-!     allocate(this%x(n), source=x(2:))
-!     allocate(this%splines(5, n))
-!     do i = 1, n
-!         this%splines(1, i) = a(i);
-!         this%splines(2, i) = b(i);
-!         this%splines(3, i) = c(i);
-!         this%splines(4, i) = d(i);
-!         this%splines(5, i) = x(i);
-!     end do
-
-! end subroutine init_cubic_spline_t

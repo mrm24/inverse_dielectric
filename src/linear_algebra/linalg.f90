@@ -13,11 +13,11 @@
 ! permissions and limitations under the License.
 
 !> @file
-!> This file contain subroutines of linear algebra using MAGMA (GPU) or LAPACK (CPU) like library
+!> This file contain subroutines containing linear algebra using MAGMA (GPU) or LAPACK (CPU) like library
 !> the routines are specifically written down case by case so the GPU sending and retrieving 
 !> is minimized
 
-!> This module contains the subroutines for the linear algebra
+!> This module contains the subroutines that build up vectors and blocks using linear algebra
 module idiel_linalg
 
     use idiel_constants, only: i32, i64, r64, zzero, zone
@@ -112,7 +112,7 @@ contains
     !> @param[in] wingU    - the upper wing
     !> @param[out] T       - the auxiliary vector related to upper wing
     !> @param[out] ref_T   - the algebra handler to T
-    subroutine compute_auxiliary_and_macroscopic(Binv, wingL, S, ref_S, L, ref_L, world, wingU, T, ref_T)
+    subroutine compute_auxiliary_and_macroscopic_3d(Binv, wingL, S, ref_S, L, ref_L, world, wingU, T, ref_T)
         
         complex(r64), intent(inout)                      :: Binv(:,:)
         complex(r64), intent(inout)                      :: wingL(:,:)
@@ -188,22 +188,22 @@ contains
         call ref_wingU%destroy()
         call ref_wingL%destroy()
 
-    end subroutine compute_auxiliary_and_macroscopic
+    end subroutine compute_auxiliary_and_macroscopic_3d
 
-    !> It computes q^T \cdot L \cdot q
-    !> @param[in] L     - macroscopic dielectric matrix
-    !> @param[in] q     - the object q
-    !> @param[in] ref_q - the linear algebra object containing q
-    !> @param[in] world - the linalg_world_t handler 
-    !> @returns qLq_inv
-    function compute_inverse_head(ref_L, q, ref_q, world) result(qLq_inv)
+    !> It computes 1 / q^T \cdot L \cdot q 
+    !> @param[in] L      - macroscopic dielectric matrix
+    !> @param[in] q      - the object q
+    !> @param[in] ref_q  - the linear algebra object containing q
+    !> @param[in] world  - the linalg_world_t handler 
+    !> @returns invqLq
+    function compute_inverse_head(ref_L, q, ref_q, world) result(invqLq)
 
         type(linalg_obj_t),   intent(inout)   :: ref_L
         complex(r64),         intent(in)      :: q(:,:)
         type(linalg_obj_t),   intent(inout)   :: ref_q
         type(linalg_world_t), intent(inout)   :: world
 
-        complex(r64), allocatable :: qLq_inv(:)
+        complex(r64), allocatable :: invqLq(:)
 
         complex(r64), allocatable :: Lq(:,:)
         integer(i32) :: nr 
@@ -230,15 +230,16 @@ contains
         call world%syncronize()
         call ref_Lq%destroy()
 
-        allocate(qLq_inv(size(q,2)))
-
-        !$omp parallel shared(qLq_inv, Lq, q) private(i)
+        allocate(invqLq(size(q,2)))
+        
+        !$omp parallel shared(invqLq, Lq, q) private(i)
         !$omp do
         do i = 1, size(q,2)
-            qLq_inv(i) = 1.0_r64 / dot_product(q(:,i),Lq(:,i))
+                invqLq(i) = 1.0_r64 / dot_product(q(:,i),Lq(:,i))
         end do
         !$omp end do
         !$omp end parallel
+        
 
     end function compute_inverse_head
 
@@ -279,8 +280,6 @@ contains
 
     end function compute_inverse_wingL
 
-
-
     !> It computes Tq term of \frac{ \mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})}{\mathbf{\hat{q} L \hat{q}}}
     !> @param[in] ref_q - the linear algebra object containing q
     !> @param[in] ref_S - the linear algebra object containing T
@@ -316,5 +315,151 @@ contains
         call ref_qT%destroy()
 
     end function compute_inverse_wingU
+
+    !> It computes the auxiliary S auxiliary vector and the macroscopic dielectric matrix
+    !> @param[in] Binv     - the inverse of the body
+    !> @param[in] wingL    - the lower wing
+    !> @param[out] S       - the auxiliary vector related to lower wing
+    !> @param[out] ref_S   - the algebra handler to S
+    !> @param[inout] L     - the macroscopic dielectric ternsor, on entry contains the head
+    !> @param[out]   ref_L - the linear algebra handler to L
+    !> @param[inout] world - the linear algebra manager   
+    !> @param[in] wingU    - the upper wing
+    !> @param[out] T       - the auxiliary vector related to upper wing
+    !> @param[out] ref_T   - the algebra handler to T
+    subroutine compute_auxiliary_and_macroscopic_2d(Binv, wingL, ag, ref_ag, A, ref_A, world, wingU, bg, ref_bg)
+        
+        complex(r64), intent(inout)                      :: Binv(:,:)
+        complex(r64), intent(inout)                      :: wingL(:,:)
+        complex(r64), allocatable, intent(out)           :: ag(:,:)
+        type(linalg_obj_t), intent(out)                  :: ref_ag
+        complex(r64), intent(inout)                      :: A(:,:)
+        type(linalg_obj_t), intent(out)                  :: ref_A
+        type(linalg_world_t), intent(inout)              :: world
+        complex(r64), optional, intent(inout)            :: wingU(:,:)
+        complex(r64), optional, allocatable, intent(out) :: bg(:,:)
+        type(linalg_obj_t), optional, intent(out)        :: ref_bg
+
+        type(linalg_obj_t) :: ref_Binv
+        type(linalg_obj_t) :: ref_wingL
+        type(linalg_obj_t) :: ref_wingU
+
+        integer(i32) :: nb, i, j 
+
+#if !defined(USE_GPU)
+        ! External
+        external :: zgemm
+#endif 
+
+        nb = size(Binv,1)
+
+        allocate(ag(nb,3))
+        
+        ! Allocate and transfer to the GPU/CPU
+        call ref_Binv%allocate_gpu(Binv)
+        call ref_Binv%transfer_cpu_gpu(Binv, world)
+        call ref_wingL%allocate_gpu(wingL)
+        call ref_wingL%transfer_cpu_gpu(wingL, world)
+
+        call ref_A%allocate_gpu(A)
+        call ref_A%transfer_cpu_gpu(A, world)
+        call ref_ag%allocate_gpu(ag)
+
+        ! For Hermitian case there are less operations
+        if (present(wingU)) then
+            call ref_wingU%allocate_gpu(wingU)
+            call ref_wingU%transfer_cpu_gpu(wingU, world)
+            allocate(bg(3,nb))
+            call ref_bg%allocate_gpu(bg)
+#ifdef USE_GPU
+            call magma_zgemm(MagmaNoTrans, MagmaNoTrans, nb, 3, nb, -zone, ref_Binv%gpu_ptr(), &
+                            nb, ref_wingL%gpu_ptr(), nb, zzero, ref_ag%gpu_ptr(), nb, world%get_queue())
+            call magma_zgemm(MagmaTrans, MagmaNoTrans, 3, nb, nb, -zone, ref_wingU%gpu_ptr(), &
+                            nb, ref_Binv%gpu_ptr(), nb, zzero, ref_bg%gpu_ptr(), 3, world%get_queue())                
+            call magma_zgemm(MagmaTrans, MagmaNoTrans, 3, 3, nb, -zone, ref_wingU%gpu_ptr(), &
+                            nb, ref_ag%gpu_ptr(), nb, -zone, ref_A%gpu_ptr(), 3, world%get_queue())
+#else   
+            call zgemm('n', 'n', nb,  3, nb,  -zone, ref_Binv%gpu_ptr(),  nb, ref_wingL%gpu_ptr(),nb, zzero, ref_ag%gpu_ptr(), nb)
+            call zgemm('t', 'n',  3, nb, nb,  -zone, ref_wingU%gpu_ptr(), nb, ref_Binv%gpu_ptr(), nb, zzero, ref_bg%gpu_ptr(), 3)
+            call zgemm('t', 'n',  3,  3, nb,  -zone, ref_wingU%gpu_ptr(), nb, ref_ag%gpu_ptr(),    nb, -zone,  ref_A%gpu_ptr(), 3)
+#endif      
+            call ref_bg%transfer_gpu_cpu(bg, world)
+        else
+#ifdef USE_GPU
+                call magma_zgemm(MagmaNoTrans, MagmaNoTrans, nb, 3, nb, -zone, ref_Binv%gpu_ptr(), &
+                                nb, ref_wingL%gpu_ptr(), nb, zzero, ref_ag%gpu_ptr(), nb, world%get_queue())
+                call magma_zgemm(MagmaConjTrans, MagmaNoTrans, 3, 3, nb, -zone, ref_wingL%gpu_ptr(), &
+                                nb, ref_ag%gpu_ptr(), nb, -zone, ref_A%gpu_ptr(), 3, world%get_queue())
+#else   
+                call zgemm('n', 'n', nb, 3, nb, -zone, ref_Binv%gpu_ptr(),  nb, ref_wingL%gpu_ptr(), nb, zzero, ref_ag%gpu_ptr(), nb)
+                call zgemm('c', 'n',  3, 3, nb, -zone, ref_wingL%gpu_ptr(), nb, ref_ag%gpu_ptr(),     nb, -zone,  ref_A%gpu_ptr(), 3)
+#endif     
+        end if
+
+        call ref_ag%transfer_gpu_cpu(ag, world)
+        call ref_A%transfer_gpu_cpu(A, world)
+        call world%syncronize()
+        call ref_Binv%destroy()
+        call ref_wingU%destroy()
+        call ref_wingL%destroy()
+
+    end subroutine compute_auxiliary_and_macroscopic_2d
+
+
+    !> It computes q^T \cdot A \cdot q 
+    !> @param[in] A      - A tensor
+    !> @param[in] q      - the object q
+    !> @param[in] ref_q  - the linear algebra object containing q
+    !> @param[in] world  - the linalg_world_t handler 
+    !> @returns qLq
+    function compute_qAq(ref_A, q, ref_q, world) result(qAq)
+
+        type(linalg_obj_t),   intent(inout)   :: ref_A
+        complex(r64),         intent(in)      :: q(:,:)
+        type(linalg_obj_t),   intent(inout)   :: ref_q
+        type(linalg_world_t), intent(inout)   :: world
+
+        complex(r64), allocatable :: qAq(:)
+
+        complex(r64), allocatable :: Aq(:,:)
+        integer(i32) :: nr 
+        type(linalg_obj_t)        :: ref_Aq
+        integer(i64) :: i
+
+#if !defined(USE_GPU)
+        ! External
+        external :: zgemm
+#endif 
+
+        nr = size(q,2)
+        allocate(Aq, mold=q)
+        call ref_Aq%allocate_gpu(Aq)
+
+#ifdef USE_GPU
+        call magma_zgemm(MagmaNoTrans, MagmaNoTrans, 3, nr, 3, zone, ref_A%gpu_ptr(), & 
+                         3, ref_q%gpu_ptr(), 3, zzero, ref_Aq%gpu_ptr(), 3, world%get_queue())
+#else   
+        call zgemm('n', 'n', 3, nr, 3, zone, ref_A%gpu_ptr(), & 
+                   3, ref_q%gpu_ptr(), 3, zzero, ref_Aq%gpu_ptr(), 3)
+#endif  
+        call ref_Aq%transfer_gpu_cpu(Aq, world)
+        call world%syncronize()
+        call ref_Aq%destroy()
+
+        allocate(qAq(size(q,2)))
+
+        !$omp parallel shared(qAq, Aq, q) private(i)
+        !$omp do
+        do i = 1, size(q,2)
+                qAq(i) = dot_product(q(:,i),Aq(:,i))
+        end do
+        !$omp end do
+        !$omp end parallel
+
+    end function compute_qAq
+    
+
+
+    
 
 end module idiel_linalg

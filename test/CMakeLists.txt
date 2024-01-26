@@ -34,6 +34,14 @@ add_executable(test_spline test_spline.f90)
 target_include_directories(test_spline PUBLIC ${linkdir})
 target_link_libraries(test_spline ${LINKS})
 
+add_executable(test_circular_expansion test_circular_expansion.f90)
+target_include_directories(test_circular_expansion PUBLIC ${linkdir})
+target_link_libraries(test_circular_expansion ${LINKS})
+
+add_executable(test_2d test_2d.f90)
+target_include_directories(test_2d PUBLIC ${linkdir})
+target_link_libraries(test_2d ${LINKS})
+
 # Enable testing
 include(CTest)
 add_test(NAME test_crystal COMMAND test_crystal)
@@ -42,3 +50,5 @@ add_test(NAME test_dielectric_average_iso COMMAND test_dielectric_average_iso)
 add_test(NAME test_inverse COMMAND test_inverse)
 add_test(NAME test_sph_harm COMMAND test_sph_harm)
 add_test(NAME test_spline COMMAND test_spline)
+add_test(NAME test_circular_expansion COMMAND test_circular_expansion)
+add_test(NAME test_2d COMMAND test2d)

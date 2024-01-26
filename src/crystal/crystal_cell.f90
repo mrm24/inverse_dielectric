@@ -33,7 +33,13 @@ module idiel_crystal_cell
         real(r64) :: rlattice(3,3) 
         !>  The lattice volume
         real(r64) :: vuc
-        !>  The number of atoms in the unit cell_
+        !>  Area between b1xb2 vectors (reciprocal)
+        real(r64) :: area_r_12
+        !>  Area between b1xb3 vectors (reciprocal)
+        real(r64) :: area_r_13
+        !>  Area between b2xb3 vectors (reciprocal)
+        real(r64) :: area_r_23
+        !>  The number of atoms in the unit cell
         integer(i64) :: natoms
         !>  The reduced positions (3,natoms),  this in Fortran is already compatible with what expected from spglib
         real(r64), allocatable :: redpos(:,:) 
@@ -87,11 +93,15 @@ contains
         ! Compute the volume
         this%vuc = dot_product(a,cross(b,c))
 
-        !Compute the reciprocal lattice
+        !Compute the reciprocal lattice, volumes, and related information
         ap = twopi * cross(b,c) / this%vuc
         bp = twopi * cross(c,a) / this%vuc
         cp = twopi * cross(a,b) / this%vuc
         
+        this%area_r_12 = norm2(cross(ap,bp))
+        this%area_r_13 = norm2(cross(ap,cp))
+        this%area_r_23 = norm2(cross(bp,cp))
+
         this%vuc = abs(this%vuc)
 
         this%rlattice(1,:) = ap(:)

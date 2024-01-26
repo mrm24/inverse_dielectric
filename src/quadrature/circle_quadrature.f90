@@ -99,13 +99,13 @@ contains
     end subroutine compute_gauss_legendre_f90
 
     !> Compute an angular mesh Gauss-Legendre for the angle
-    !> @param[in]   order     - the max order to integrate (relates to the mesh_size as max_order=2*mesh_size-1)
+    !> @param[in]   mesh_size - the mesh size
     !> @param[out]  rphi      - the angles (r,phi)
     !> @param[out]  w         - weights
     !> @param[out]  xyz       - the mesh in cartesian coordinates
-    subroutine compute_angular_mesh_gauss_legendre(order, rphi, w, xyz)
+    subroutine compute_angular_mesh_gauss_legendre(mesh_size, rphi, w, xyz)
         
-        integer(i64), intent(in)            :: order
+        integer(i64), intent(in)            :: mesh_size
         real(r64), allocatable, intent(out) :: rphi(:,:)
         real(r64), allocatable, intent(out) :: w(:)
         real(r64), allocatable, intent(out) :: xyz(:,:)
@@ -113,14 +113,8 @@ contains
         ! Phi mesh
         real(r64), allocatable :: x_phi(:)
 
-        ! Mesh size
-        integer(i64) :: mesh_size
-
         ! Idx
         integer(i64) :: i, idx 
-
-        ! Get mesh size
-        mesh_size = ceiling((order + 1.0) / 2.0)
 
         ! Build theta mesh
         call compute_gauss_legendre_f90(mesh_size, 0.0_r64, twopi, x_phi, w)

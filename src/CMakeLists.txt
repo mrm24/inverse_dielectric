@@ -18,8 +18,8 @@ add_subdirectory(quadrature)
 # Linear algebra
 add_subdirectory(linear_algebra)
 
-# The dielectric average itself
-add_subdirectory(dielectric)
+# The IDieL object itself
+add_subdirectory(idiel)
 
 message(STATUS "FILES: ${SRC}")
 set(MOD_DIR "${CMAKE_BINARY_DIR}/include")

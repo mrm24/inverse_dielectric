@@ -17,7 +17,7 @@
 !>
 module idiel_constants
     
-    use iso_fortran_env, only: real64, int32, int64
+    use iso_fortran_env, only: real64, real128, int32, int64
     
     implicit none
     
@@ -25,6 +25,8 @@ module idiel_constants
     
     !> Real double precision
     integer, parameter :: r64 = real64
+    !> Real long double precision
+    integer, parameter :: r128 = real128
     !> Integer single precision
     integer, parameter :: i32 = int32
     !> Integer double precision
