@@ -44,7 +44,7 @@ module idiel
     !> Number of circular harmonics
     integer(i64), parameter :: ncir = (1 + 2*lmax)
     !> Number of radial points for 2D integrals
-    integer(i64), parameter :: nr   = 300_i64 
+    integer(i64), parameter :: nr   = 151_i64 
     !> Number of points for small 2D circular (i.e. Fourier) expansion
     integer(i64), parameter :: size_mesh_2d_coarse = 55_i64
     !> Number of points for the big 2D circular (i.e. Fourier) expansion

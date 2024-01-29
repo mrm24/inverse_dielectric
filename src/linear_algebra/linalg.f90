@@ -350,12 +350,20 @@ contains
 
         allocate(ag(nb,3))
         
+        ! Set arrays to the ones required by the formalism
+        do i = 1, 3
+            A(i,i) = zone - A(i,i)
+        end do
+
+        wingL = -cmplx(1.0_r64/sqrt(fourpi), 0.0_r64, r64) * wingL
+        A     = -cmplx(1.0_r64/fourpi, 0.0_r64, r64) * A
+        if (present(wingU)) wingU =  -cmplx(1.0_r64/sqrt(fourpi), 0.0_r64, r64) * wingU
+
         ! Allocate and transfer to the GPU/CPU
         call ref_Binv%allocate_gpu(Binv)
         call ref_Binv%transfer_cpu_gpu(Binv, world)
         call ref_wingL%allocate_gpu(wingL)
         call ref_wingL%transfer_cpu_gpu(wingL, world)
-
         call ref_A%allocate_gpu(A)
         call ref_A%transfer_cpu_gpu(A, world)
         call ref_ag%allocate_gpu(ag)
@@ -367,27 +375,27 @@ contains
             allocate(bg(3,nb))
             call ref_bg%allocate_gpu(bg)
 #ifdef USE_GPU
-            call magma_zgemm(MagmaNoTrans, MagmaNoTrans, nb, 3, nb, cmplx(1.0_r64/sqrt(fourpi), 0.0_r64, r64), ref_Binv%gpu_ptr(), &
+            call magma_zgemm(MagmaNoTrans, MagmaNoTrans, nb, 3, nb, -zone, ref_Binv%gpu_ptr(), &
                             nb, ref_wingL%gpu_ptr(), nb, zzero, ref_ag%gpu_ptr(), nb, world%get_queue())
-            call magma_zgemm(MagmaTrans, MagmaNoTrans, 3, nb, nb, cmplx(1.0_r64/sqrt(fourpi), 0.0_r64, r64), ref_wingU%gpu_ptr(), &
+            call magma_zgemm(MagmaTrans, MagmaNoTrans, 3, nb, nb, -zone, ref_wingU%gpu_ptr(), &
                             nb, ref_Binv%gpu_ptr(), nb, zzero, ref_bg%gpu_ptr(), 3, world%get_queue())                
             call magma_zgemm(MagmaTrans, MagmaNoTrans, 3, 3, nb, -zone, ref_wingU%gpu_ptr(), &
-                            nb, ref_ag%gpu_ptr(), nb, cmplx(1.0_r64/fourpi, 0.0_r64, r64), ref_A%gpu_ptr(), 3, world%get_queue())
+                            nb, ref_ag%gpu_ptr(), nb, zone, ref_A%gpu_ptr(), 3, world%get_queue())
 #else   
-            call zgemm('n', 'n', nb,  3, nb,  cmplx(1.0_r64/sqrt(fourpi), 0.0_r64, r64), ref_Binv%gpu_ptr(),  nb, ref_wingL%gpu_ptr(),nb, zzero, ref_ag%gpu_ptr(), nb)
-            call zgemm('t', 'n',  3, nb, nb,  cmplx(1.0_r64/sqrt(fourpi), 0.0_r64, r64), ref_wingU%gpu_ptr(), nb, ref_Binv%gpu_ptr(), nb, zzero, ref_bg%gpu_ptr(), 3)
-            call zgemm('t', 'n',  3,  3, nb,  -zone, ref_wingU%gpu_ptr(), nb, ref_ag%gpu_ptr(),    nb,  cmplx(1.0_r64/fourpi, 0.0_r64, r64),  ref_A%gpu_ptr(), 3)
+            call zgemm('n', 'n', nb,  3, nb,  -zone, ref_Binv%gpu_ptr(),  nb, ref_wingL%gpu_ptr(),nb, zzero, ref_ag%gpu_ptr(), nb)
+            call zgemm('t', 'n',  3, nb, nb,  -zone, ref_wingU%gpu_ptr(), nb, ref_Binv%gpu_ptr(), nb, zzero, ref_bg%gpu_ptr(), 3)
+            call zgemm('t', 'n',  3,  3, nb,  -zone, ref_wingU%gpu_ptr(), nb, ref_ag%gpu_ptr(),   nb, zone,  ref_A%gpu_ptr(), 3)
 #endif      
             call ref_bg%transfer_gpu_cpu(bg, world)
         else
 #ifdef USE_GPU
-                call magma_zgemm(MagmaNoTrans, MagmaNoTrans, nb, 3, nb, cmplx(1.0_r64/sqrt(fourpi), 0.0_r64, r64), ref_Binv%gpu_ptr(), &
+                call magma_zgemm(MagmaNoTrans, MagmaNoTrans, nb, 3, nb, -zone, ref_Binv%gpu_ptr(), &
                                 nb, ref_wingL%gpu_ptr(), nb, zzero, ref_ag%gpu_ptr(), nb, world%get_queue())
                 call magma_zgemm(MagmaConjTrans, MagmaNoTrans, 3, 3, nb, -zone, ref_wingL%gpu_ptr(), &
-                                nb, ref_ag%gpu_ptr(), nb, cmplx(1.0_r64/fourpi, 0.0_r64, r64), ref_A%gpu_ptr(), 3, world%get_queue())
+                                nb, ref_ag%gpu_ptr(), nb, zone, ref_A%gpu_ptr(), 3, world%get_queue())
 #else   
-                call zgemm('n', 'n', nb, 3, nb, cmplx(1.0_r64/sqrt(fourpi), 0.0_r64, r64), ref_Binv%gpu_ptr(),  nb, ref_wingL%gpu_ptr(), nb, zzero, ref_ag%gpu_ptr(), nb)
-                call zgemm('c', 'n',  3, 3, nb, -zone, ref_wingL%gpu_ptr(), nb, ref_ag%gpu_ptr(),     nb, cmplx(1.0_r64/fourpi, 0.0_r64, r64),  ref_A%gpu_ptr(), 3)
+                call zgemm('n', 'n', nb, 3, nb, -zone, ref_Binv%gpu_ptr(),  nb, ref_wingL%gpu_ptr(), nb, zzero, ref_ag%gpu_ptr(), nb)
+                call zgemm('c', 'n',  3, 3, nb, -zone, ref_wingL%gpu_ptr(), nb, ref_ag%gpu_ptr(),     nb, zone,  ref_A%gpu_ptr(), 3)
 #endif     
         end if
 

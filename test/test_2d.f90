@@ -42,11 +42,9 @@ program test_2d
     complex(r64), allocatable :: wingU(:,:,:), body(:,:,:)
 
     ! Reference data to compare
-    real(r64) :: head_ref(12) = [ 6.442031104885004E-002, 0.132222402626860, 0.316390106319300, 0.516127938510703, &
-                                  0.645769722906067, 0.707300869613546, 0.733254256631726, 0.785227466265463, &
-                                  0.864527818748701, 0.941940576487719, 0.987846211386285, 1.00132129472395 ]
+    real(r64) :: head_ref(4) = [ -0.27165343E+03_r64, -0.97552958E+02_r64, -0.49406608E+02_r64, -0.46006706E+01_r64]
     real(r64) :: rdiff
-    real(r64), parameter    :: tolerance = 1.0e+7_r64
+    real(r64), parameter    :: tolerance = 0.05_r64
 
     ! Computation object
     type(idiel_t) :: inv_diel
@@ -67,8 +65,8 @@ program test_2d
     ! Reduced positions
     allocate(redpos(3,natoms))
     redpos(:,1) = [0.00_r64, 0.00_r64, 0.00_r64]
-    redpos(:,2) = [0.8213672_r64 , 0.57735027_r64,  0.14764992_r64]
-    redpos(:,3) = [0.8213672_r64 , 0.57735027_r64, -0.14764992_r64]
+    redpos(:,2) = [2.0_r64/3.0_r64 , 2.0_r64/3.0_r64,  0.14764992_r64]
+    redpos(:,3) = [2.0_r64/3.0_r64 , 2.0_r64/3.0_r64, -0.14764992_r64]
 
     ! Init common objects
     call inv_diel%init_common(lattice, redpos, types, ngrid, 2_i64)
@@ -78,6 +76,8 @@ program test_2d
     call load_from_file('wings.2d.dat', wingL, wingU)
     call load_from_file('body.2d.dat',  body)
 
+    write(*,*) sum(abs(wingL-conjg(wingU)))
+
     ! Do the average
     write(*,*) '[TEST: idiel_t (2d)]'
     do iom = 1, size(head,3)
@@ -86,37 +86,17 @@ program test_2d
         ! Load the data to the worker
         call inv_diel%set_dielectric_blocks(head(:,:,iom), wingL(:,:,iom), wingU(:,:,iom))
         ! Compute the average
-        call inv_diel%compute_anisotropic_avg_scrcoulomb_2d(.true.)
-        write(*,*) iom, inv_diel%idiel_head
+        call inv_diel%compute_anisotropic_avg_scrcoulomb_2d(.false.)
 
         ! Check the head
-        ! rdiff = abs(inv_diel%idiel_head - head_ref(iom))/head_ref(iom)
-        ! write(*,'(A,I2,A,e20.13)')  '  * Regression (HEAD,',iom,') result (relative difference): ', rdiff
-        ! if ( rdiff .lt. tolerance) then
-        !     write(*,*)  '[TEST: idiel_t (2d) (HEAD,',iom,'): PASSED]'
-        ! else
-        !     write(*,*)  '[TEST: idiel_t (2d) (HEAD,',iom,'): FAILED]'
-        !     stop 1
-        ! end if
-
-        ! ! Check that the wings are zzero (though they are by construction)
-        ! rdiff = sum(abs(inv_diel%idiel_wingL))
-        ! write(*,'(A,I3,A, e20.13)')  '  * Regression (WING L,',iom,') result (relative difference): ', rdiff
-        ! if ( rdiff .lt. tolerance) then
-        !     write(*,*)  '[TEST: idiel_t (2d) (WING L,',iom,'): PASSED]'
-        ! else
-        !     write(*,*)  '[TEST: idiel_t (2d) (WING L,',iom,'): FAILED]'
-        !     stop 1
-        ! end if
-
-        ! rdiff = sum(abs(inv_diel%idiel_wingU))
-        ! write(*,'(A,I3,A, e20.13)')  '  * Regression (WING U,',iom,') result (relative difference): ', rdiff
-        ! if ( rdiff .lt. tolerance) then
-        !     write(*,*)  '[TEST: idiel_t (2d) (WING U,',iom,'): PASSED]'
-        ! else
-        !     write(*,*)  '[TEST: idiel_t (2d) (WING U,',iom,'): FAILED]'
-        !     stop 1
-        ! end if
+        rdiff = abs(inv_diel%idiel_head - head_ref(iom))/abs(head_ref(iom))
+        write(*,'(A,I2,A,e20.13)')  '  * Regression (HEAD,',iom,') result (relative difference): ', rdiff
+        if ( rdiff .lt. tolerance) then
+             write(*,*)  '[TEST: idiel_t (2d) (HEAD,',iom,'): PASSED]'
+        else
+             write(*,*)  '[TEST: idiel_t (2d) (HEAD,',iom,'): FAILED]'
+             stop 1
+        end if
 
     end do
 

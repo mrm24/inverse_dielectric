@@ -39,10 +39,7 @@ target_include_directories(test_circular_expansion PUBLIC ${linkdir})
 target_link_libraries(test_circular_expansion ${LINKS})
 
 add_executable(test_2d test_2d.f90)
-execute_process( COMMAND ${CMAKE_COMMAND} -E tar xzf ${PROJECT_SOURCE_DIR}/test_resources/dielectric/head.2d.dat.tar.gz  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-execute_process( COMMAND ${CMAKE_COMMAND} -E tar xzf ${PROJECT_SOURCE_DIR}/test_resources/dielectric/wings.2d.dat.tar.gz WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-execute_process( COMMAND ${CMAKE_COMMAND} -E tar xzf ${PROJECT_SOURCE_DIR}/test_resources/dielectric/body.2d.dat.tar.gz  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-execute_process( COMMAND ${CMAKE_COMMAND} -E tar xzf ${PROJECT_SOURCE_DIR}/test_resources/dielectric/w00.2d.dat.tar.gz   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+execute_process( COMMAND ${CMAKE_COMMAND} -E tar xzf ${PROJECT_SOURCE_DIR}/test_resources/dielectric/2d.tar.gz  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 target_include_directories(test_2d PUBLIC ${linkdir})
 target_link_libraries(test_2d ${LINKS})
 

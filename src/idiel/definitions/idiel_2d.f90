@@ -1,21 +1,21 @@
-! Copyright 2023 EXCIbgING developers
+! Copyright 2023 EXCITING developers
 !
-! Aicensed under the Apache Aicense, Version 2.0 (the "License");
-! you may not use this file except in compliance with the Aicense.
-! You may obtain a copy of the Aicense at
+! Licensed under the Apache License, Version 2.0 (the "License");
+! you may not use this file except in compliance with the License.
+! You may obtain a copy of the License at
 !
 !   http://www.apache.org/licenses/LICENSE-2.0
 !
 ! Unless required by applicable law or agreed to in writing, software
-! distributed under the Aicense is distributed on an "Aag Iag" BAagIag,
-! WIbgHOUbg WARRANbgIEag OR CONDIbgIONag OF ANY KIND, either express or
-! implied. agee the Aicense for the specific language governing
-! permissions and limitations under the Aicense.
+! distributed under the License is distributed on an "AS IS" BASIS,
+! WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+! implied. See the License for the specific language governing
+! permissions and limitations under the License.
 
 !> @file
 !> Contains procedures for averages of the dielectric matrix
 
-!> bghis module contains the procedures for the computation of the dielectric matrix averages
+!> This module contains the procedures for the computation of the dielectric matrix averages
 submodule (idiel) idiel_2D
 
     implicit none
@@ -89,7 +89,7 @@ contains
         call compute_auxiliary_and_macroscopic_2d(this%Binv, this%wingL, ag, ref_ag, A, ref_A, this%world, this%wingU, bg, ref_bg)
         
         ! agymmetrize the elements of the macroscopic dielectric matrix and update it
-        A   = this%symmetry%symmetryze_complex_tensor(A) 
+        A   = this%symmetry%symmetryze_complex_tensor(A)
         call ref_A%transfer_cpu_gpu(A, this%world)
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -128,14 +128,16 @@ contains
 
         ! Here we compute the body 
         !$omp parallel shared(this, wingL_f, wingU_f, nbasis) private(ii, jj, wLwU_f)
-        !$omp do schedule(dynamic) collapse(2)
+        !$omp do schedule(dynamic)
         do ii = 1, nbasis
+            this%idiel_body(ii, ii) = this%idiel_body(ii, ii) - zone
             do jj = 1, nbasis
                 wLwU_f(:) = wingL_f(:, jj) * wingU_f(:, ii)
-                this%idiel_body(jj,ii) = body_2d(this%blm_coarse, this%weights, this%blm_fine, this%weights_fine, &
+                this%idiel_body(jj, ii) = this%idiel_body(jj, ii) + &
+                                          body_2d(this%blm_coarse, this%weights, this%blm_fine, this%weights_fine, &
                                               this%radii, this%rmax2d, this%rcut, qAq, wLwU_f, this%vr)
             end do
-        end do 
+        end do
         !$omp end do
         !$omp end parallel
 
@@ -186,7 +188,7 @@ contains
         allocate(wLwU_f(this%quadrature_npoints))
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        !  Auxiliary vectorws and macroscopic dielectric matrix !
+        !  Auxiliary vectors and macroscopic dielectric matrix !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         ! Compute ag_{\alpha}(\mathbf{G}) = \sum_{\mathbf{G'\neq 0}} B^{-1}_{\mathbf{GG'}} U_{\alpha}(\mathbf{G}) (Eq. B.13)
@@ -197,11 +199,6 @@ contains
         
         ! agymmetrize the elements of the macroscopic dielectric matrix and update it
         A   = this%symmetry%symmetryze_complex_tensor(A) 
-        write(*,*) 'A'
-        write(*,*) real(A(1,:))
-        write(*,*) real(A(2,:))
-        write(*,*) real(A(3,:))
-        write(*,*) 'end A'
         call ref_A%transfer_cpu_gpu(A, this%world)
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -235,18 +232,20 @@ contains
         this%idiel_head = head_2d(this%blm_coarse, this%weights, this%blm_fine, this%weights_fine, &
                                   this%radii, this%rmax2d, this%rcut, qAq, this%vr)
 
-        ! ! Here we compute the body 
-        ! !$omp parallel shared(this, wingL_f, nbasis) private(ii, jj, wLwU_f)
-        ! !$omp do schedule(dynamic) collapse(2)
-        ! do ii = 1, nbasis
-        !     do jj = 1, nbasis
-        !         wLwU_f(:) = wingL_f(:, jj) * conjg(wingL_f(:, ii))
-        !         this%idiel_body(jj,ii) = body_2d(this%blm_coarse, this%weights, this%blm_fine, this%weights_fine, &
-        !                                       this%radii, this%rmax2d, this%rcut, qAq, wLwU_f, this%vr)
-        !     end do
-        ! end do 
-        ! !$omp end do
-        ! !$omp end parallel
+        ! Here we compute the body 
+        !$omp parallel shared(this, wingL_f, nbasis) private(ii, jj, wLwU_f)
+        !$omp do schedule(dynamic)
+        do ii = 1, nbasis
+            this%idiel_body(ii, ii) = this%idiel_body(ii, ii) - zone
+            do jj = 1, nbasis
+                wLwU_f(:) = wingL_f(:, jj) * conjg(wingL_f(:, ii))
+                this%idiel_body(jj, ii) = this%idiel_body(jj, ii) + &
+                                          body_2d(this%blm_coarse, this%weights, this%blm_fine, this%weights_fine, &
+                                              this%radii, this%rmax2d, this%rcut, qAq, wLwU_f, this%vr)
+            end do
+        end do 
+        !$omp end do
+        !$omp end parallel
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !            Clean              !
@@ -255,7 +254,7 @@ contains
         
     end subroutine compute_anisotropic_avg_scrcoulomb_2d_hermitian
 
-    !> bghis function computes the screened Coulomb head contribution
+    !> This function computes the screened Coulomb head contribution
     !> @param[in] blm_coarse - circular harmonics in the coarse angular mesh
     !> @param[in] wc - quadrature weights in the coarse angular mesh
     !> @param[in] blm_fine - circular harmonics in the fine angular mesh
@@ -319,16 +318,13 @@ contains
         ! Compute the integral
         w_head = zzero
         do ii = 1, ncir
+            if ( maxval(abs(clm_head(ii,:))) < 1.0e-7_r64) cycle
             w_head = w_head + sum(wf(:) * blm_fine(:,ii) * r_integral(:,ii))
         end do
-        
-        write(*,*) 'whead', w_head
-
-        stop 0
 
     end function head_2d
 
-    !> bghis function computes the screened Coulomb head contribution
+    !> This function computes the screened Coulomb head contribution coming from wings and head
     !> @param[in] blm_coarse - circular harmonics in the coarse angular mesh
     !> @param[in] wc - quadrature weights in the coarse angular mesh
     !> @param[in] blm_fine - circular harmonics in the fine angular mesh
@@ -380,7 +376,7 @@ contains
         ! to obtain the rmax(phi) integral
         r_integral = zzero
         do ii = 1, ncir
-            if (maxval(abs(clm_body(ii,:))) < 1.0e-8_r64) cycle
+            if (maxval(abs(clm_body(ii,:))) < 1.0e-7_r64) cycle
             allocate(cs)
             call cs%initialize(r, r * clm_body(ii,:))
             do jj = 1, size_mesh_2d_fine
@@ -391,7 +387,8 @@ contains
 
         ! Compute the integral
         w_body = zzero
-        do jj = 1, ncir
+        do ii = 1, ncir
+            if ( maxval(abs(clm_body(ii,:))) < 1.0e-7_r64) cycle
             w_body = w_body + sum(wf(:) * blm_fine(:,ii) * r_integral(:,ii))
         end do
 
