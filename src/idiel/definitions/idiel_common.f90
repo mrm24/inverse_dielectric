@@ -230,10 +230,18 @@ contains
 
         class(idiel_t), intent(inout), target :: this
         complex(r64), intent(in) :: body(:,:)
-
+        
+        ! If we have GPU and this was not inited we start the service
         if (.not. this%world%is_queue_set()) call this%world%init()
-
-        call inverse_complex_LU(body, this%Binv_data, this%world)        
+        
+        ! Clean 
+        if (associated(this%Binv)) nullify(this%Binv)
+        if (allocated(this%Binv_data)) deallocate(this%Binv_data)
+        
+        ! Compute
+        call inverse_complex_LU(body, this%Binv_data, this%world)    
+        
+        ! Associate vector    
         this%Binv => this%Binv_data
 
     end subroutine invert_body
