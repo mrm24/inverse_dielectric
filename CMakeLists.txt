@@ -7,7 +7,7 @@ option(INTERFACES "Python bindings" OFF)
 # Check GPU support
 if(GPU)
     project(inverse_dielectric_library Fortran CUDA CXX)
-    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD 14)
     set(CMAKE_CXX_STANDARD_REQUIRED on)
     set(CMAKE_CXX_COMPILER "icpc")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3 -fPIC -qopenmp")
@@ -28,7 +28,7 @@ if(GPU)
     message(STATUS "magma library path : ${MAGMA_DIR}")
 else()
     project(inverse_dielectric_library Fortran CXX)
-    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD 14)
     set(CMAKE_CXX_STANDARD_REQUIRED on)
     set(CMAKE_CXX_COMPILER "icpx")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3 -fPIC -qopenmp")
@@ -40,16 +40,37 @@ else()
     set(SRC_MAGMA_F90 "")
 endif(GPU)
 
+# Set BOOST library
+set(Boost_USE_STATIC_LIBS OFF) 
+set(Boost_USE_MULTITHREADED ON)  
+set(Boost_USE_STATIC_RUNTIME OFF) 
+find_package(Boost) 
+
+if(Boost_FOUND)
+    include_directories(${Boost_INCLUDE_DIRS})
+else()
+    message(STATUS "Using Boost_INCLUDE_DIRS variable")
+    set(Boost_INCLUDE_DIRS "None" CACHE PATH "Path to Boost include")
+    include_directories(${Boost_INCLUDE_DIRS})
+    message(STATUS "Boost path : ${Boost_INCLUDE_DIRS}")
+endif()
+
 # Find SPGLIB
-set(cmd1 "locate")
-set(cmd1_arg "libsymspg.so")
-set(cmd2 "head")
-set(cmd2_arg "-n 1")
-execute_process(COMMAND ${cmd1} ${cmd1_arg} COMMAND ${cmd2} ${cmd2_arg} 
-  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-  RESULT_VARIABLE spg_result
-  OUTPUT_VARIABLE spg_lib OUTPUT_STRIP_TRAILING_WHITESPACE)
-set(spg_lib "${spg_lib}")
+#set(cmd1 "locate")
+#set(cmd1_arg "libsymspg.so")
+#set(cmd2 "head")
+#set(cmd2_arg "-n 1")
+#execute_process(COMMAND ${cmd1} ${cmd1_arg} COMMAND ${cmd2} ${cmd2_arg} 
+#  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+#  RESULT_VARIABLE spg_result
+#  OUTPUT_VARIABLE spg_lib OUTPUT_STRIP_TRAILING_WHITESPACE)
+#message(STATUS ${spg_result})
+#set(spg_lib "${spg_lib}")
+#message(STATUS "SPGLIB found : ${spg_lib}")
+
+set(SPGLIBDIR "None" CACHE PATH "Path to spglib")
+set(CMAKE_PREFIX_PATH ${SPGLIBDIR})
+find_library(spg_lib NAMES spg spglib libsymspg symspg PATHS ${SPGLIBDIR} REQUIRED)
 message(STATUS "SPGLIB found : ${spg_lib}")
 
 # Create INSTALL DIRECTORY

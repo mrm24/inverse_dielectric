@@ -28,6 +28,7 @@ set(CMAKE_Fortran_MODULE_DIRECTORY ${MOD_DIR})
 set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -module ${MOD_DIR}")
 message(STATUS "MODULES dir : ${MOD_DIR}")
 add_library(inverse_dielectric_objects OBJECT ${SRC})
+message(STATUS "Boost path : ${Boost_INCLUDE_DIRS}")
 add_library(inverse_dielectric SHARED $<TARGET_OBJECTS:inverse_dielectric_objects>)
 
 # Add symbols to the static library so we only need to link against it and not its dependencies
