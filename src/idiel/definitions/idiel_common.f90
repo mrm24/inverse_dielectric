@@ -62,7 +62,7 @@ contains
 
         ! Process dimensionality
         if (present(dim)) this%dim = dim
-
+        
         select case(this%dim)
         
         case(2) ! 2D case
