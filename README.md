@@ -3,7 +3,8 @@
 **IDieL**(**I**nverse **Diel**ectric **L**ibrary) is a modern Fortran library providing a common framework for GW codes, specifically for the most common operations involving the inverse dielectric function. The code is parallelized via multithreading (OPENMP) and GPUs (via MAGMA library). 
 
 **Supported operations:**
-* _Anisotropic averaging for **q**=**Γ**_: the library contains functions for the computation of the inverse dielectric function at **q**=**Γ** for 3D systems. This last by numerically computing the anisotropic average in a small region (i.e. a small version of the reciprocal cell) centered around  **Γ** using a 131<sup>st</sup>-order Lebedev grid. 
+* _Anisotropic averaging of ε<sup>-1</sup>(**q**→**0**) (3D)_: the library contains functions for the computation of the inverse dielectric function at **q**=**Γ** for 3D systems. This last by numerically computing the anisotropic average in a small region (i.e. a small version of the reciprocal cell) centered around  **Γ** using a 131<sup>st</sup>-order Lebedev grid.
+*_Anisotropic averaging for **q**=**Γ** (2D)_*:
 * _Body inversion_: the code provides functions for inverting the body of the dielectric matrix either using CPUs or GPUs.
 
 **Experimental:**
@@ -15,7 +16,7 @@ The programm can be easily installed using CMake (version >= 3.20).
 
 **Supported compilers and libraries versions**
 
-The library has been compiled and tested using: ifort 2021.3.0, icc 2021.3.0, pybind 2.11.1, Python 3.7.10, MAGMA 2.7.2, and spglib 2.1.0.
+The library has been compiled and tested using: ifort 2021.3.0, icc 2021.3.0, pybind 2.11.1, Python 3.7.10, (MAGMA 2.7.2), spglib 2.1.0, and boost 1.8.4
 
 **CMake Options:**
 

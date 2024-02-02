@@ -34,7 +34,8 @@ module idiel_sph_quadrature
     implicit none
     
     private 
-    public :: compute_angular_mesh_lebedev_131, compute_angular_mesh_lebedev_21
+    public :: compute_angular_mesh_lebedev_131, & 
+              compute_angular_mesh_lebedev_41, compute_angular_mesh_lebedev_21
 
 contains
 
@@ -116,6 +117,57 @@ contains
         w(:) = 4.0_r64 * pi * w(:)
 
     end subroutine compute_angular_mesh_lebedev_21
+
+    !> Compute an angular mesh using and weights using a Lebedev quadrature of order 41
+    !> @param[out]  ang  - the angles (theta,phi)
+    !> @param[out]  w    - weights
+    !> @param[out]  xyz  - the mesh in cartesian coordinates for unitary radius
+    subroutine compute_angular_mesh_lebedev_41(ang, w, xyz)
+
+        real(r64), allocatable, intent(out) :: ang(:,:)
+        real(r64), allocatable, intent(out) :: w(:)
+        real(r64), allocatable, intent(out) :: xyz(:,:)
+
+        ! Number of points
+        integer(i64) :: npoints = 590_i64
+        integer(i64) :: n = 1_i64
+
+        ! Allocate the space
+        if (allocated(xyz)) deallocate(xyz)
+        allocate(xyz(npoints,3))
+        if (allocated(w)) deallocate(w)
+        allocate(w(npoints))
+
+        ! Build the Lebedev mesh using the Lebedev-Laikov values
+        ! and octahedral points
+        call generate_a1(xyz, w, n, 0.3095121295306187e-3_r64)
+        call generate_a3(xyz, w, n, 0.1852379698597489e-2_r64)
+        call generate_bk(xyz, w, 0.7040954938227469_r64, n, 0.1871790639277744e-2_r64)
+        call generate_bk(xyz, w, 0.6807744066455243_r64, n, 0.1858812585438317e-2_r64)
+        call generate_bk(xyz, w, 0.6372546939258752_r64, n, 0.1852028828296213e-2_r64)
+        call generate_bk(xyz, w, 0.5044419707800358_r64, n, 0.1846715956151242e-2_r64)
+        call generate_bk(xyz, w, 0.4215761784010967_r64, n, 0.1818471778162769e-2_r64)
+        call generate_bk(xyz, w, 0.3317920736472123_r64, n, 0.1749564657281154e-2_r64)
+        call generate_bk(xyz, w, 0.2384736701421887_r64, n, 0.1617210647254411e-2_r64)
+        call generate_bk(xyz, w, 0.1459036449157763_r64, n, 0.1384737234851692e-2_r64)
+        call generate_bk(xyz, w, 0.6095034115507196e-1_r64, n, 0.9764331165051050e-3_r64)
+        call generate_ck(xyz, w, 0.6116843442009876_r64, n, 0.1857161196774078e-2_r64)
+        call generate_ck(xyz, w, 0.3964755348199858_r64, n, 0.1705153996395864e-2_r64)
+        call generate_ck(xyz, w, 0.1724782009907724_r64, n, 0.1300321685886048e-2_r64)
+        call generate_dk(xyz, w, 0.5610263808622060_r64,0.3518280927733519_r64, n, 0.1842866472905286e-2_r64)
+        call generate_dk(xyz, w, 0.4742392842551980_r64,0.2634716655937950_r64, n, 0.1802658934377451e-2_r64)
+        call generate_dk(xyz, w, 0.5984126497885380_r64,0.1816640840360209_r64, n, 0.1849830560443660e-2_r64)
+        call generate_dk(xyz, w, 0.3791035407695563_r64,0.1720795225656878_r64, n, 0.1713904507106709e-2_r64)
+        call generate_dk(xyz, w, 0.2778673190586244_r64,0.8213021581932511e-1_r64, n, 0.1555213603396808e-2_r64)
+        call generate_dk(xyz, w, 0.5033564271075117_r64,0.8999205842074875e-1_r64, n, 0.1802239128008525e-2_r64)
+
+        ! Obtain the spherical angular coordinates
+        ang = cartesian_2_spherical(xyz, 1.0_r64)
+
+        ! We finally include de 4*pi term in the weight
+        w(:) = 4.0_r64 * pi * w(:)
+
+    end subroutine compute_angular_mesh_lebedev_41
 
     !> Compute an angular mesh using and weights using a Lebedev quadrature of order 131
     !> @param[out]  ang  - the angles (theta,phi)

@@ -59,15 +59,15 @@ contains
         complex(r64), allocatable :: body_f(:)
 
         ! Harmonic expansion coefficients
-        complex(r64) :: clm_head(nsph)
-        complex(r64) :: clm_body(nsph) 
+        complex(r64) :: clm_head(nsph_pair)
+        complex(r64) :: clm_body(nsph_pair) 
         real(r64)    :: error 
 
         ! Basis size
         integer(i64) :: nbasis
         
         ! Dummy indexes
-        integer(i64) :: ii, jj
+        integer(i64) :: ii, jj, kk
 
         ! Get the basis size
         nbasis = size(this%Binv, 1)
@@ -92,7 +92,7 @@ contains
         call compute_auxiliary_and_macroscopic_3d(this%Binv, this%wingL, S, ref_S, L, ref_L, this%world)
         
         ! Symmetrize the elements of the macroscopic dielectric matrix and update it
-        L   = this%symmetry%symmetryze_complex_tensor(L) 
+        L   = this%symmetry%symmetryze_complex_tensor(L)
         call ref_L%transfer_cpu_gpu(L, this%world)
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -122,11 +122,11 @@ contains
         allocate(this%idiel_wingU(nbasis), source=zzero)
         allocate(this%idiel_body, source = this%Binv)
         
-        call sph_harm_expansion(lmax, head_f, this%weights, this%ylm, clm_head)
+        call sph_harm_expansion(nsph_pair, head_f, this%weights, this%ylm, clm_head)
         this%idiel_head  = sum(clm_head(:) * this%angular_integrals(:))
 
-        error = maxval(abs(clm_head(100:121)))
-        if (error > 1.0e-8_r64) then
+        error = maxval(abs(clm_head(nsph_pair-41:nsph_pair)))/abs(clm_head(1)) 
+        if (error > 1.0e-4_r64) then
             write(*,*) "Warning (compute_anisotropic_avg_hermitian) the expansion coefficient can be not large enough"
         end if
         
@@ -137,7 +137,7 @@ contains
         do ii = 1, nbasis
             do jj = 1, nbasis
                 body_f(:) = head_f(:) * wingL_f(:, jj) * conjg(wingL_f(:, ii))
-                call sph_harm_expansion(lmax, body_f, this%weights, this%ylm, clm_body)
+                call sph_harm_expansion(nsph_pair, body_f, this%weights, this%ylm, clm_body)
                 this%idiel_body(jj,ii) = this%idiel_body(jj,ii) + &
                     sum(clm_body(:) * this%angular_integrals(:))
             end do
@@ -174,8 +174,8 @@ contains
         complex(r64), allocatable :: body_f(:)
 
         ! Harmonic expansion coefficients
-        complex(r64) :: clm_head(nsph)
-        complex(r64) :: clm_body(nsph) 
+        complex(r64) :: clm_head(nsph_pair)
+        complex(r64) :: clm_body(nsph_pair) 
         real(r64) :: error
 
         ! Basis size
@@ -243,11 +243,11 @@ contains
         allocate(this%idiel_wingU(nbasis), source=zzero)
         allocate(this%idiel_body, source = this%Binv)
         
-        call sph_harm_expansion(lmax, head_f, this%weights, this%ylm, clm_head)
+        call sph_harm_expansion(nsph_pair, head_f, this%weights, this%ylm, clm_head)
         this%idiel_head  = sum(clm_head(:) * this%angular_integrals(:))
 
-        error = maxval(abs(clm_head(100:121)))
-        if (error > 1.0e-8_r64) then
+        error = maxval(abs(clm_head(nsph_pair-41:nsph_pair)))/abs(clm_head(1)) 
+        if (error > 1.0e-4_r64) then
             write(*,*) "Warning (compute_anisotropic_avg_general) the expansion coefficient can be not large enough"
         end if
         
@@ -258,7 +258,7 @@ contains
         do ii = 1, nbasis
             do jj = 1, nbasis
                 body_f(:) = head_f(:) * wingL_f(:, jj) * wingU_f(:, ii)
-                call sph_harm_expansion(lmax, body_f, this%weights, this%ylm, clm_body)
+                call sph_harm_expansion(nsph_pair, body_f, this%weights, this%ylm, clm_body)
                 this%idiel_body(jj,ii) = this%idiel_body(jj,ii) + &
                     sum(clm_body(:) * this%angular_integrals(:))
             end do

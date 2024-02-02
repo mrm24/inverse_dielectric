@@ -21,7 +21,7 @@ module idiel
     use idiel_constants, only: i64, r64, pi, twopi, fourpi, zzero, zone, iunit
     use idiel_crystal_cell, only: cell_t
     use idiel_crystal_symmetry, only: symmetry_t
-    use idiel_sph_quadrature, only: compute_angular_mesh_lebedev_131, compute_angular_mesh_lebedev_21
+    use idiel_sph_quadrature, only: compute_angular_mesh_lebedev_131, compute_angular_mesh_lebedev_41
     use idiel_spherical_harmonics, only: sph_harm, sph_harm_expansion
     use idiel_circle_quadrature, only: compute_angular_mesh_gauss_legendre
     use idiel_circular_harmonics, only: circ_harm, circ_harm_expansion
@@ -37,16 +37,18 @@ module idiel
     public idiel_t
 
 
-    !> Order of harmonic spherical/circular expansion
-    integer(i64), parameter :: lmax = 10_i64
+    !> Order of harmonic spherical/circular (Fourier) expansion
+    integer(i64), parameter :: lmax = 20_i64
     !> Number of spherical harmonics
     integer(i64), parameter :: nsph = (lmax + 1)**2
+    !> Number of pairs spherical harmonics
+    integer(i64), parameter :: nsph_pair = 231_i64
     !> Number of circular harmonics
     integer(i64), parameter :: ncir = (1 + 2*lmax)
     !> Number of radial points for 2D integrals
     integer(i64), parameter :: nr   = 151_i64 
     !> Number of points for small 2D circular (i.e. Fourier) expansion
-    integer(i64), parameter :: size_mesh_2d_coarse = 55_i64
+    integer(i64), parameter :: size_mesh_2d_coarse = 75_i64
     !> Number of points for the big 2D circular (i.e. Fourier) expansion
     integer(i64), parameter :: size_mesh_2d_fine   = 255_i64
 
@@ -116,7 +118,7 @@ module idiel
         procedure, private :: compute_anisotropic_avg_hermitian, compute_anisotropic_avg_general
         procedure, public  :: compute_anisotropic_avg_scrcoulomb_2d
         procedure, private :: compute_anisotropic_avg_scrcoulomb_2d_general, compute_anisotropic_avg_scrcoulomb_2d_hermitian
-        final :: clean
+        procedure, public  :: clean
     end type idiel_t
 
 interface
@@ -140,7 +142,7 @@ interface
     !> This nullify and deallocates the objects
     !> @param[in] this - idiel_t object
     module subroutine clean(this)
-        type(idiel_t), intent(inout) :: this
+        class(idiel_t), intent(inout) :: this
     end subroutine clean
 
     !> This subroutine inits pointers to a given value

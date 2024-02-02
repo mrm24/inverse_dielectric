@@ -18,7 +18,8 @@
 program test_quadrature_lebedev
     
     use idiel_constants, only: r64, i64, pi, twopi
-    use idiel_sph_quadrature, only: compute_angular_mesh_lebedev_131, compute_angular_mesh_lebedev_21
+    use idiel_sph_quadrature, only: compute_angular_mesh_lebedev_131, compute_angular_mesh_lebedev_41, &
+                                    compute_angular_mesh_lebedev_21
 
     implicit none
 
@@ -166,6 +167,71 @@ program test_quadrature_lebedev
     numerical_integral = sum(weights * f)
     rdiff = abs( numerical_integral - I5 ) / I5
     write(*,'(A, e20.13)')  '  * Regression Lebedev 21 (f5) result (relative difference): ', rdiff
+    if (rdiff .lt. tolerance) then
+        write(*,*)  '[TEST : compute_ang_lebedev f5: PASSED]'
+    else
+        write(*,*)  '[TEST : compute_ang_lebedev f5: FAILED]'
+        stop 1
+    end if
+
+    deallocate(xyz_mesh, weights, ang_mesh)
+
+    ! Compute the integral points and weights
+    call compute_angular_mesh_lebedev_41(ang_mesh, weights, xyz_mesh)
+
+    ! Compute integral 1 and check
+    f = f1(xyz_mesh)
+    numerical_integral = sum(weights * f)
+    rdiff = abs( numerical_integral - I1 ) / I1
+    write(*,'(A, e20.13)')  '  * Regression Lebedev 41 (f1) result (relative difference): ', rdiff
+    if (rdiff .lt. tolerance) then
+        write(*,*)  '[TEST : compute_ang_lebedev f1: PASSED]'
+    else
+        write(*,*)  '[TEST : compute_ang_lebedev f1: FAILED]'
+        stop 1
+    end if
+
+    !Compute integral 2 and check (this one has lower convergence for all quadratures, thus we reduce convergence criteria)
+    f = f2(xyz_mesh)
+    numerical_integral = sum(weights * f)
+    rdiff = abs( numerical_integral - I2 ) / I2
+    write(*,'(A, e20.13)')  '  * Regression Lebedev 41 (f2) result (relative difference): ', rdiff
+    if (rdiff .lt. 1.0e+7_r64 * tolerance) then
+        write(*,*)  '[TEST : compute_ang_lebedev f2: PASSED]'
+    else
+        write(*,*)  '[TEST : compute_ang_lebedev f2: FAILED]'
+        stop 1
+    end if
+
+    ! Compute integral 3 and check
+    f = f3(xyz_mesh)
+    numerical_integral = sum(weights * f)
+    rdiff = abs( numerical_integral - I3 ) / I3
+    write(*,'(A, e20.13)')  '  * Regression Lebedev 41 (f3) result (relative difference): ', rdiff
+    if (rdiff .lt. tolerance) then
+        write(*,*)  '[TEST : compute_ang_lebedev f3: PASSED]'
+    else
+        write(*,*)  '[TEST : compute_ang_lebedev f3: FAILED]'
+        stop 1
+    end if
+
+    ! Compute integral 4 and check
+    f = f4(xyz_mesh)
+    numerical_integral = sum(weights * f)
+    rdiff = abs( numerical_integral - I4 ) / I4
+    write(*,'(A, e20.13)')  '  * Regression Lebedev 41 (f4) result (relative difference): ', rdiff
+    if (rdiff .lt. tolerance) then
+        write(*,*)  '[TEST : compute_ang_lebedev f4: PASSED]'
+    else
+        write(*,*)  '[TEST : compute_ang_lebedev f4: FAILED]'
+        stop 1
+    end if
+
+    ! Compute integral 5 and check
+    f = f5(xyz_mesh)
+    numerical_integral = sum(weights * f)
+    rdiff = abs( numerical_integral - I5 ) / I5
+    write(*,'(A, e20.13)')  '  * Regression Lebedev 41 (f5) result (relative difference): ', rdiff
     if (rdiff .lt. tolerance) then
         write(*,*)  '[TEST : compute_ang_lebedev f5: PASSED]'
     else

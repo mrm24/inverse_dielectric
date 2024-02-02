@@ -32,7 +32,7 @@ contains
         integer(i64), intent(in), optional :: dim
 
         ! Locals
-        integer(i64) :: ii
+        integer(i64) :: ii, ll, mm
         real(r64) :: v_bz
         real(r64) :: rel_error
         real(r64), parameter :: onethird = 1.0_r64 / 3.0_r64
@@ -45,7 +45,7 @@ contains
         ! Geometric part of the integral at given point, note that is multiplied by the weight
         real(r64), allocatable :: kmax_f(:)
         ! Spherical harmonics
-        complex(r64), allocatable :: ylm(:,:)
+        complex(r64), allocatable :: ylm(:,:), ylm_pair(:,:)
         ! Some cutoff values to create the radial mesh for the 2D case
         real(r64) :: rmax, dx
         ! The reciprocal vectors
@@ -137,26 +137,51 @@ contains
             ! Precompute the angular part, we first need the spherical harmonics in the big mesh
             call sph_harm(lmax, this%ang, ylm)
 
-            allocate(this%angular_integrals(nsph))
+            allocate(ylm_pair(size(ylm,1),nsph_pair))
+            ylm_pair(:,1) = ylm(:,1)
+            ii = 2
+            do ll = 1, lmax
+                if ( modulo(ll, 2_i64) /= 0) cycle
+                do mm = -ll, ll
+                    ylm_pair(:,ii) = ylm(:,ll**2 + mm + ll + 1)
+                    ii = ii + 1
+                end do
+            end do
 
-            !$omp parallel shared(ylm, this, kmax_f) private(ii)
+            allocate(this%angular_integrals(nsph_pair))
+
+            !$omp parallel shared(ylm_pair, this, kmax_f) private(ii)
             !$omp do schedule(dynamic)
-            do ii = 1, nsph
-                this%angular_integrals(ii) = sum(ylm(:, ii) * kmax_f(:))
+            do ii = 1, nsph_pair
+                this%angular_integrals(ii) = sum(ylm_pair(:, ii) * kmax_f(:))
             end do 
             !$omp end do
             !$omp end parallel
 
             ! Set now to smaller mesh, as dielectric terms converge quite fast with l in comparison
             ! to the geometric part, and thus a smaller Lebedev order can be used
-            deallocate(this%ang, this%weights_fine, xyz)
+            deallocate(this%ang, this%weights_fine, xyz, ylm, ylm_pair)
             ! Recompute things in the small mesh
-            call compute_angular_mesh_lebedev_21(this%ang, this%weights, xyz)
+            call compute_angular_mesh_lebedev_41(this%ang, this%weights, xyz)
             allocate(this%xyz,source=transpose(cmplx(xyz,0.0,r64)))
             this%quadrature_npoints = size(xyz, 1)
 
-            ! Compute the spherical harmonics in the smaller mesh
-            call sph_harm(lmax, this%ang, this%ylm)
+            ! Compute the spherical harmonics in the smaller mesh (save only the pair values)
+            call sph_harm(lmax, this%ang, ylm)
+
+            allocate(this%ylm(size(ylm,1),nsph_pair))
+            this%ylm(:,1) = ylm(:,1)
+            ii = 2
+            do ll = 1, lmax
+                if ( modulo(ll, 2_i64) /= 0_i64) cycle
+                do mm = -ll, ll
+                    this%ylm(:, ii) = ylm(:,ll**2 + mm + ll + 1)
+                    ii = ii + 1
+                end do
+            end do
+
+            deallocate(ylm, xyz)
+
         case default
             error stop "Error(idiel_t%init_common): Error dimension should be either 3 or 2"
         end select 
@@ -172,28 +197,28 @@ contains
     !> @param[in] this - idiel_t object
     module subroutine clean(this)
 
-        type(idiel_t), intent(inout) :: this
+        class(idiel_t), intent(inout) :: this
 
-        if (associated(this%head))    nullify(this%head)
-        if (associated(this%wingL))   nullify(this%wingL)
-        if (associated(this%wingU))   nullify(this%wingU)
-        if (associated(this%Binv)) nullify(this%Binv)
-        if (allocated(this%Binv_data)) deallocate(this%Binv_data)
+        if (associated(this%head))        nullify(this%head)
+        if (associated(this%wingL))       nullify(this%wingL)
+        if (associated(this%wingU))       nullify(this%wingU)
+        if (associated(this%Binv))        nullify(this%Binv)
+        if (allocated(this%Binv_data))    deallocate(this%Binv_data)
         if (allocated(this%weights_fine)) deallocate(this%weights_fine)
-        if (allocated(this%weights)) deallocate(this%weights)
-        if (allocated(this%xyz)) deallocate(this%xyz)
-        if (allocated(this%ang)) deallocate(this%ang)
-        if (allocated(this%idiel_wingL)) deallocate(this%idiel_wingL)
-        if (allocated(this%idiel_wingU)) deallocate(this%idiel_wingU)
-        if (allocated(this%idiel_body))  deallocate(this%idiel_body)
+        if (allocated(this%weights))      deallocate(this%weights)
+        if (allocated(this%xyz))          deallocate(this%xyz)
+        if (allocated(this%ang))          deallocate(this%ang)
+        if (allocated(this%idiel_wingL))  deallocate(this%idiel_wingL)
+        if (allocated(this%idiel_wingU))  deallocate(this%idiel_wingU)
+        if (allocated(this%idiel_body))   deallocate(this%idiel_body)
         call this%ref_xyz%destroy()
         if (this%world%is_queue_set()) call this%world%finish()
 
         ! 2D stuff
-        if (allocated(this%phi)) deallocate(this%phi)
-        if (allocated(this%rmax2d))  deallocate(this%rmax2d)
+        if (allocated(this%phi))         deallocate(this%phi)
+        if (allocated(this%rmax2d))      deallocate(this%rmax2d)
         if (allocated(this%blm_coarse))  deallocate(this%blm_coarse)
-        if (allocated(this%blm_fine))  deallocate(this%blm_fine)
+        if (allocated(this%blm_fine))    deallocate(this%blm_fine)
         
         ! 3D stuff
         if (allocated(this%angular_integrals)) deallocate(this%angular_integrals)

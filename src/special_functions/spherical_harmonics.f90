@@ -116,34 +116,24 @@ contains
    
    end subroutine sph_harm
     
-   !> It expands the function f in terms of spherical harmonics (up to l = 10)
-   !> Notice that this function is intended to be used with a Lebedev grid of order 21 so the
-   !> expansion coefficients should be accurate up to l = 10
-   !> @param[in] lmax - the spherical expansion order
+   !> It expands the function f in terms of spherical harmonics 
+   !> Notice that this function is intended to be used with a Lebedev grid of order N so the
+   !> expansion coefficients should be accurate up to half of the order of the grid
+   !> @param[in] n    - number of spherical harmonics
    !> @param[in] f    - the function to expand
    !> @param[in] weights - the mesh points weights
    !> @param[in] ylm     - the spherical harmonics in the mesh
    !> @param[out] clm     - the expansion coefficients
-   subroutine sph_harm_expansion(lmax, f, weights, ylm, clm)
+   subroutine sph_harm_expansion(n, f, weights, ylm, clm)
 
-      integer(i64), intent(in)  :: lmax
+      integer(i64), intent(in)  :: n
       complex(r64), intent(in)  :: f(:)
       real(r64),    intent(in)  :: weights(:)
       complex(r64), intent(in)  :: ylm(:,:)
-      complex(r64), intent(out) :: clm((lmax+1)**2)
+      complex(r64), intent(out) :: clm(n)
 
-      integer(i64), parameter :: nr = 170_i64
       complex(r64), allocatable :: fw(:)
       external :: zgemv
-
-      ! Checks
-      if (lmax > 10) then
-         error stop "Error(sph_harm_expansion): maximum order of expansion is 10"
-      end if
-
-      if (size(f) /= nr .or. size(ylm,1) /= nr .or. size(weights) /= nr) then
-         error stop "Error(sph_harm_expansion): the expected mesh is for Lebedev grid of order 21"
-      end if
 
       ! Multiply the function with the weights so the matrix-vector products solves the integral for all the (l,m)
       allocate(fw, source=f)

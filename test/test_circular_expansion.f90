@@ -22,8 +22,8 @@ program test_circular_expansion
 
     implicit none
 
-    integer(i64), parameter :: msize = 55_i64
-    integer(i64), parameter :: lmax  = 10_i64
+    integer(i64), parameter :: msize = 75_i64
+    integer(i64), parameter :: lmax  = 20_i64
     real(r64),    parameter :: tolerance = 1.0e-12_r64
     real(r64), allocatable :: rphi(:,:), w(:), xyz(:,:)
     complex(r64), allocatable :: blm(:,:)

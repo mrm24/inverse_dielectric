@@ -58,9 +58,9 @@ contains
    
    end subroutine circ_harm
     
-   !> It expands the function f in terms of spherical harmonics (up to l = 10)
-   !> Notice that this function is intended to be used with a Gauss-Legendre grid of size 55 which integrates all harmonics up to 10
-   !> expansion coefficients should be accurate up to l = 10
+   !> It expands the function f in terms of spherical harmonics (up to l = 20)
+   !> Notice that this function is intended to be used with a Gauss-Legendre grid of size 20 which integrates all harmonics up to 10
+   !> expansion coefficients should be accurate up to l = 20
    !> @param[in] lmax     - the spherical expansion order
    !> @param[in] f        - the function to expand (the values for different radius are provided in the radii)
    !> @param[in] weights  - the mesh points weights
@@ -74,19 +74,8 @@ contains
       complex(r64), intent(in)   :: blm(:,:)
       complex(r64), intent(out)  :: clm(2*lmax+1)
 
-      integer(i64)              :: i
-      integer(i64), parameter   :: nr = 55_i64
       complex(r64), allocatable :: fw(:)
       external                  :: zgemv
-
-      ! Checks
-      if (lmax > 10) then
-         error stop "Error(circ_harm_expansion): maximum order of expansion is 10"
-      end if
-
-      if (size(f,1) /= nr .or. size(blm,1) /= nr .or. size(weights) /= nr) then
-         error stop "Error(circ_harm_expansion): the expected mesh is for Gauss-Legendre grid of order 21"
-      end if
 
       ! Multiply the function with the weights so the matrix-vector products solves the integral for all the (l,m)
       allocate(fw, source=f)
