@@ -22,7 +22,7 @@ submodule (idiel) idiel_3D
 
 contains
 
-    module subroutine compute_anisotropic_avg_inversedielectic_3d(this, hermitian)
+    module subroutine compute_anisotropic_avg_inversedielectric_3d(this, hermitian)
             
         class(idiel_t), intent(inout) :: this
         logical, intent(in)           :: hermitian
@@ -37,7 +37,7 @@ contains
             call this%compute_anisotropic_avg_general()
         end if
 
-    end subroutine compute_anisotropic_avg_inversedielectic_3d
+    end subroutine compute_anisotropic_avg_inversedielectric_3d
     
     module subroutine compute_anisotropic_avg_hermitian(this)
 

@@ -13,90 +13,164 @@
 // permissions and limitations under the License.
 
 /// @file
-/// This file contains a module for exposing the inverse_dielectric_t to C, and python
+/// This file contains a module for exposing the idiel_t to C++, and python
+/// Python bindings are created through pybind library
 
 #include <memory>
 #include <complex>
 #include <pybind11/pybind11.h>
 #include <pybind11/complex.h>
+#include <pybind11/numpy.h>
 
+
+/// Shortcut to the namespace
 namespace py = pybind11;
 
-/// External functions to call Fortran stuff
+/// Declaring type aliases
+using Complex = std::complex<double>;
+using NumpyComplexArray = py::array_t<Complex,py::array::f_style>;
+
+/// External functions to call Fortran functions
+/// The Fortran type is stored as a C pointer for purposes of this file
 extern "C" {
-    extern void allocate_inverse_dielectric_t(void** object_ptr);
-    extern void deallocate_inverse_dielectric_t(void** object_ptr);
-    extern void init_common(void** object_ptr, double* lattice, double* redpos, long int* elements, long nq[3]);
-    extern void set_dielectric_blocks(void** object_ptr, std::complex<double>* h, std::complex<double>* wl, std::complex<double>* wu, std::complex<double>* ib);
-    extern void compute_anisotropic_avg(void** object_ptr, bool hermitian);
-    extern void invert_body(void** object_ptr, std::complex<double>* body);
-    extern long int get_n_basis(void** object_ptr);
+    extern void allocate_idiel_t(void* object_ptr);
+    extern void deallocate_idiel_t(void* object_ptr);
+    extern void init_common(void* object_ptr, double* lattice, double* redpos, long int* elements, long int nq[3], long int dim);
+    extern void set_dielectric_blocks(void* object_ptr, Complex* h, Complex* wl, Complex* wu, Complex* ib);
+    extern void compute_anisotropic_avg_inversedielectric_3d(void* object_ptr, bool hermitian);
+    extern void compute_anisotropic_avg_scrcoulomb_2d(void* object_ptr, bool hermitian);
+    extern void invert_body(void* object_ptr, Complex* body);
+    extern long int get_n_basis(void* object_ptr);
+    extern void* head(void* object_ptr);
+    extern void* wingL(void* object_ptr);
+    extern void* wingU(void* object_ptr);
+    extern void* body(void* object_ptr);
 }
 
-class inverse_dielectric_cxx {
+/// Now we define a C++ class to manipulate the object
+class idiel_cxx {
 
 private:
-    void* inverse_dielectric_f90;
+    // This is a raw pointer containing the Fortran type
+    void* idiel_f90;
 
 public:
 
-    // Constructor
-    inverse_dielectric_cxx() {
-        allocate_inverse_dielectric_t(&inverse_dielectric_f90);
+    // Constructor: we need this call as Fortran to be manipulated pointers
+    // must be initialized by Fortran
+    idiel_cxx() {
+        allocate_idiel_t(idiel_f90);
     }
 
-    // Destructor
-    ~inverse_dielectric_cxx() {
-        deallocate_inverse_dielectric_t(&inverse_dielectric_f90);
+    // Destructor: Fortran clean-up
+    ~idiel_cxx() {
+        deallocate_idiel_t(idiel_f90);
     }
 
     // Declare copy and movement constructor deleted
-    inverse_dielectric_cxx(const inverse_dielectric_cxx& A) = delete;
-    inverse_dielectric_cxx(inverse_dielectric_cxx&& A)      = delete;
+    // This is necessary because of the raw pointer
+    idiel_cxx(const idiel_cxx& A) = delete;
+    idiel_cxx(idiel_cxx&& A)      = delete;
 
+    /// Only in case, this is called automatically in C++ when out-of-scope
+    /// So we call Fortran deallocation routines
     void destroy(){
-        deallocate_inverse_dielectric_t(&inverse_dielectric_f90);
+        deallocate_idiel_t(idiel_f90);
     }
 
-    void initialize(double* lattice, double* redpos, long* elements, long nq[3]) {
-        init_common(&inverse_dielectric_f90, lattice, redpos, elements, nq);
+    /// Initialize common elements, note that I make dim mandatory as it makes the interfacing easier
+    void initialize(double* lattice, double* redpos, long int* elements, long int nq[3], long int dim) {
+        init_common(idiel_f90, lattice, redpos, elements, nq, dim);
     }
 
-    void setDielectricBlocksFull(std::complex<double>* h, std::complex<double>* wl,
-                             std::complex<double>* wu, std::complex<double>* ib) {
-        set_dielectric_blocks(&inverse_dielectric_f90, h, wl, wu, ib);
+    /// We support both functions, C++ treat optional as two different functions
+    void setDielectricBlocksFull(Complex* h, Complex* wl,
+                             Complex* wu, Complex* ib) {
+        set_dielectric_blocks(idiel_f90, h, wl, wu, ib);
     }
 
-    void setDielectricBlocksPartial(std::complex<double>* h, std::complex<double>* wl,
-                             std::complex<double>* wu) {
-        set_dielectric_blocks(&inverse_dielectric_f90, h, wl, wu, nullptr);
+    /// We support both functions, C++ treat optional as two different functions
+    void setDielectricBlocksPartial(Complex* h, Complex* wl,
+                             Complex* wu) {
+        set_dielectric_blocks(idiel_f90, h, wl, wu, nullptr);
     }
 
-    void computeAnisotropicAvg(bool hermitian) {
-        compute_anisotropic_avg(&inverse_dielectric_f90, hermitian);
+    /// Computing the average (3D)
+    void ComputeAniAvgInvDielMat3D(bool hermitian) {
+        compute_anisotropic_avg_inversedielectric_3d(&idiel_f90, hermitian);
     }
 
-    void invertBody(std::complex<double>* body) {
-        invert_body(&inverse_dielectric_f90, body);
+    /// Compute the average (2D)
+    void ComputeAniAvgScrCoulomb2D(bool hermitian) {
+        compute_anisotropic_avg_scrcoulomb_2d(idiel_f90, hermitian);
     }
 
+    /// Invert body and save data to Fortran object
+    void invertBody(Complex* body) {
+        invert_body(idiel_f90, body);
+    }
+
+    /// Return the basis size
     long int getNBasis(){
-        get_n_basis(&inverse_dielectric_f90);
+        return get_n_basis(idiel_f90);
+    }
+
+    /// Return C-pointer head
+    void* get_head(){
+        return head(idiel_f90);
+    }
+
+    /// Return C-pointer wingL
+    void* get_wingL(){
+        return wingL(idiel_f90);
+    }
+
+    /// Return C-pointer wingU
+    void* get_wingU(){
+        return wingU(idiel_f90);
+    }
+
+    /// Return C-pointer body
+    void* get_body(){
+        return body(idiel_f90);
     }
 };
 
 
+/// This is how a C++ class translates to Python module
 PYBIND11_MODULE(InverseDielectric, m) {
 
     m.doc() = "Python bindings for InverseDielectric library";
 
-    py::class_<inverse_dielectric_cxx>(m, "InverseDielectric")
+    py::class_<idiel_cxx>(m, "IDielPython")
         .def(py::init<>())
-        .def("initialize", &inverse_dielectric_cxx::initialize)
-        .def("setDielectricBlocks", &inverse_dielectric_cxx::setDielectricBlocksFull)
-        .def("setDielectricBlocks", &inverse_dielectric_cxx::setDielectricBlocksPartial)
-        .def("computeAnisotropicAvg", &inverse_dielectric_cxx::computeAnisotropicAvg)
-        .def("invertBody", &inverse_dielectric_cxx::invertBody)
-        .def("getNBasis", &inverse_dielectric_cxx::getNBasis)
-        .def("destroy", &inverse_dielectric_cxx::destroy); 
+        .def("initialize", &idiel_cxx::initialize)
+        .def("setDielectricBlocksFull", &idiel_cxx::setDielectricBlocksFull)
+        .def("setDielectricBlocksPartial", &idiel_cxx::setDielectricBlocksPartial)
+        .def("ComputeAniAvgInvDielMat3D", &idiel_cxx::ComputeAniAvgInvDielMat3D)
+        .def("ComputeAniAvgScrCoulomb2D", &idiel_cxx::ComputeAniAvgScrCoulomb2D)
+        .def("invertBody", &idiel_cxx::invertBody)
+        .def("getNBasis", &idiel_cxx::getNBasis)
+        .def("destroy", &idiel_cxx::destroy)
+        .def("get_head", [](idiel_cxx &self)->Complex {
+            auto ptr = self.get_head();
+            return *(reinterpret_cast<Complex*>(ptr));
+        })
+        .def("get_wingL", [](idiel_cxx &self)->NumpyComplexArray {
+            auto n   = self.getNBasis();
+            auto ptr = self.get_wingL();
+            return NumpyComplexArray(n, reinterpret_cast<Complex*>(ptr));
+        })
+        .def("get_wingU", [](idiel_cxx &self)->NumpyComplexArray {
+            auto n   = self.getNBasis();
+            auto ptr = self.get_wingU();
+            return NumpyComplexArray(n, reinterpret_cast<Complex*>(ptr));
+        })
+        .def("get_body", [](idiel_cxx &self)->NumpyComplexArray {
+            auto n   = self.getNBasis();
+            auto ptr = self.get_body();
+            NumpyComplexArray body(n, reinterpret_cast<Complex*>(ptr));
+            body.reshape({n,n});
+            return body;
+        });
 };

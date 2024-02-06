@@ -2,7 +2,7 @@
 set(MOD_DIR "${CMAKE_BINARY_DIR}/include")
 set(linkdir ${MOD_DIR})
 
-set(LINKS inverse_dielectric)
+set(LINKS IDieL)
 
 add_executable(test_crystal test_crystal.f90)
 target_include_directories(test_crystal PUBLIC ${linkdir})

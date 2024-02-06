@@ -13,15 +13,15 @@
 ! permissions and limitations under the License.
 
 !> @file
-!> This file contains a module for exposing the inverse_dielectric_t to C
+!> This file contains a module for exposing the idiel_t to C
 !> 
 
-!> This module defines the subroutines for exposing the inverse_dielectric_t to C
-module idiel_inverse_dielectric_f90
+!> This module defines the subroutines for exposing the idiel_t to C
+module idiel_f90_C
 
     use iso_c_binding
     use idiel_constants, only: i64, r64
-    use idiel_inverse_dielectric, only: inverse_dielectric_t
+    use idiel, only: idiel_t
     
     implicit none
     
@@ -29,34 +29,39 @@ module idiel_inverse_dielectric_f90
     
 contains
     
-    !> Allocates inverse_dielectric_t
-    subroutine allocate_inverse_dielectric_t(object_ptr) bind(C)
+    !> Allocates idiel_t
+    subroutine allocate_idiel_t(object_ptr) bind(C)
         type(c_ptr), intent(out) :: object_ptr
-        type(inverse_dielectric_t), pointer :: object
+        type(idiel_t), pointer :: object
         allocate(object)
         object_ptr = C_loc(object)
-    end subroutine allocate_inverse_dielectric_t
+    end subroutine allocate_idiel_t
     
-    !> Deallocates the inverse_dielectric_t
-    subroutine deallocate_inverse_dielectric_t(object_ptr) bind(C)
+    !> Deallocates the idiel_t
+    subroutine deallocate_idiel_t(object_ptr) bind(C)
         type(c_ptr), intent(in) :: object_ptr
-        type(inverse_dielectric_t), pointer :: object
+        type(idiel_t), pointer :: object
         call C_F_pointer(object_ptr, object)
         deallocate(object)
-    end subroutine deallocate_inverse_dielectric_t
+    end subroutine deallocate_idiel_t
     
-    subroutine init_common(object_ptr, lattice,  redpos, elements, nq) bind(C)
-        type(c_ptr), intent(in)    :: object_ptr
-        real(r64), intent(in)      :: lattice(3,3)
-        real(r64), intent(in)      :: redpos(:,:) 
-        integer(r64), intent(in)   :: elements(:)
-        integer(i64), intent(in)   :: nq(3)
+    subroutine init_common(object_ptr, lattice,  redpos, elements, nq, dim) bind(C)
+        type(c_ptr), intent(in)            :: object_ptr
+        real(r64), intent(in)              :: lattice(3,3)
+        real(r64), intent(in)              :: redpos(:,:) 
+        integer(r64), intent(in)           :: elements(:)
+        integer(i64), intent(in)           :: nq(3)
+        integer(i64), intent(in), optional :: dim
         
-        type(inverse_dielectric_t), pointer :: object
+        type(idiel_t), pointer :: object
         call C_F_pointer(object_ptr, object)
         
-        call object%init_common(lattice, redpos, elements, nq)
-        
+        if (present(dim)) then
+            call object%init_common(lattice, redpos, elements, nq, dim)
+        else
+            call object%init_common(lattice, redpos, elements, nq)
+        end if 
+
     end subroutine init_common
     
     subroutine set_dielectric_blocks(object_ptr, h, wl, wu, ib) bind(C)
@@ -66,7 +71,7 @@ contains
         complex(r64), target, intent(in)                :: wu(:,:)
         complex(r64), target, optional, intent(in)      :: ib(:,:)
         
-        type(inverse_dielectric_t), pointer :: object
+        type(idiel_t), pointer :: object
         call C_F_pointer(object_ptr, object)
         
         if (present(ib)) then
@@ -77,22 +82,33 @@ contains
 
     end subroutine set_dielectric_blocks
 
-    subroutine compute_anisotropic_avg(object_ptr, hermitian) bind(C)
+    subroutine compute_anisotropic_avg_inversedielectric_3d(object_ptr, hermitian) bind(C)
         type(c_ptr), intent(in) :: object_ptr
         logical,     intent(in) :: hermitian
         
-        type(inverse_dielectric_t), pointer :: object
+        type(idiel_t), pointer :: object
         call C_F_pointer(object_ptr, object)
         
-        call object%compute_anisotropic_avg(hermitian)
+        call object%compute_anisotropic_avg_inversedielectric_3d(hermitian)
         
-    end subroutine compute_anisotropic_avg
+    end subroutine compute_anisotropic_avg_inversedielectric_3d
+
+    subroutine compute_anisotropic_avg_scrcoulomb_2d(object_ptr, hermitian) bind(C)
+        type(c_ptr), intent(in) :: object_ptr
+        logical,     intent(in) :: hermitian
+        
+        type(idiel_t), pointer :: object
+        call C_F_pointer(object_ptr, object)
+        
+        call object%compute_anisotropic_avg_scrcoulomb_2d(hermitian)
+        
+    end subroutine compute_anisotropic_avg_scrcoulomb_2d
     
     subroutine invert_body(object_ptr, body) bind(C)
         type(c_ptr), intent(in) :: object_ptr
         complex(r64), allocatable, intent(in) :: body(:,:)
         
-        type(inverse_dielectric_t), pointer :: object
+        type(idiel_t), pointer :: object
         call C_F_pointer(object_ptr, object)
 
         call object%invert_body(body)
@@ -103,11 +119,55 @@ contains
         type(c_ptr), intent(in) :: object_ptr
         integer(i64) :: nbasis
         
-        type(inverse_dielectric_t), pointer :: object
+        type(idiel_t), pointer :: object
         call C_F_pointer(object_ptr, object)
 
         nbasis = object%get_n_basis()
 
     end function get_n_basis
-    
-end module idiel_inverse_dielectric_f90
+
+    function head(object_ptr) result(ptr) bind(C)
+        type(c_ptr), intent(in) :: object_ptr
+        type(c_ptr) :: ptr
+
+        type(idiel_t), pointer :: object
+        
+        call C_F_pointer(object_ptr, object)
+        ptr = C_loc(object%idiel_head)
+
+    end function head
+
+    function wingL(object_ptr) result(ptr) bind(C)
+        type(c_ptr), intent(in) :: object_ptr
+        type(c_ptr) :: ptr
+
+        type(idiel_t), pointer :: object
+        
+        call C_F_pointer(object_ptr, object)
+        ptr = C_loc(object%idiel_wingL)
+
+    end function wingL
+
+    function wingU(object_ptr) result(ptr) bind(C)
+        type(c_ptr), intent(in) :: object_ptr
+        type(c_ptr) :: ptr
+
+        type(idiel_t), pointer :: object
+        
+        call C_F_pointer(object_ptr, object)
+        ptr = C_loc(object%idiel_wingU)
+
+    end function wingU
+
+    function body(object_ptr) result(ptr) bind(C)
+        type(c_ptr), intent(in) :: object_ptr
+        type(c_ptr) :: ptr
+
+        type(idiel_t), pointer :: object
+        
+        call C_F_pointer(object_ptr, object)
+        ptr = C_loc(object%idiel_body)
+
+    end function body
+
+end module idiel_f90_C

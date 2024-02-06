@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.20.0 FATAL_ERROR)
 
 #Some options
 option(GPU "GPU support" OFF)
+option(BENCHMARK "Generate the benchmark executables" OFF)
 option(INTERFACES "Python bindings" OFF)
 
 # Check GPU support
@@ -11,7 +12,7 @@ if(GPU)
     set(CMAKE_CXX_STANDARD_REQUIRED on)
     set(CMAKE_CXX_COMPILER "icpc")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3 -fPIC -qopenmp")
-    set(CMAKE_Fortran_COMPILER "ifx")
+    set(CMAKE_Fortran_COMPILER "ifort")
     set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O3 -fPIC \
                             -no-wrap-margin -fp-model source -qopenmp \
                             ")
@@ -32,7 +33,7 @@ else()
     set(CMAKE_CXX_STANDARD_REQUIRED on)
     set(CMAKE_CXX_COMPILER "icpx")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3 -fPIC -qopenmp")
-    set(CMAKE_Fortran_COMPILER "ifx")
+    set(CMAKE_Fortran_COMPILER "ifort")
     set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O3 -fPIC \
                             -no-wrap-margin -fp-model source -qopenmp \
                             ")
@@ -56,18 +57,6 @@ else()
 endif()
 
 # Find SPGLIB
-#set(cmd1 "locate")
-#set(cmd1_arg "libsymspg.so")
-#set(cmd2 "head")
-#set(cmd2_arg "-n 1")
-#execute_process(COMMAND ${cmd1} ${cmd1_arg} COMMAND ${cmd2} ${cmd2_arg} 
-#  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-#  RESULT_VARIABLE spg_result
-#  OUTPUT_VARIABLE spg_lib OUTPUT_STRIP_TRAILING_WHITESPACE)
-#message(STATUS ${spg_result})
-#set(spg_lib "${spg_lib}")
-#message(STATUS "SPGLIB found : ${spg_lib}")
-
 set(SPGLIBDIR "None" CACHE PATH "Path to spglib")
 set(CMAKE_PREFIX_PATH ${SPGLIBDIR})
 find_library(spg_lib NAMES spg spglib libsymspg symspg PATHS ${SPGLIBDIR} REQUIRED)
@@ -94,6 +83,11 @@ endif(INTERFACES)
 
 # Compile test
 add_subdirectory(test)
+
+# If selected compile benchmark programs
+if(BENCHMARK)
+  add_subdirectory(benchmark)
+endif(BENCHMARK)
 
 # Documentation we generate the configuration with Doxygen if possible.
 find_package(Doxygen)

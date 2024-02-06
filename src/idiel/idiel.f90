@@ -114,7 +114,7 @@ module idiel
         complex(r64), allocatable, private :: blm_fine(:,:)
     contains
         procedure, public  :: init_common, set_dielectric_blocks, invert_body, get_n_basis
-        procedure, public  :: compute_anisotropic_avg_inversedielectic_3d
+        procedure, public  :: compute_anisotropic_avg_inversedielectric_3d
         procedure, private :: compute_anisotropic_avg_hermitian, compute_anisotropic_avg_general
         procedure, public  :: compute_anisotropic_avg_scrcoulomb_2d
         procedure, private :: compute_anisotropic_avg_scrcoulomb_2d_general, compute_anisotropic_avg_scrcoulomb_2d_hermitian
@@ -162,10 +162,10 @@ interface
     !> This computes the average of the anisotropic inverse dielectric matrix around Gamma
     !> @param[in] this       - the current idiel_t object for which to compute the average
     !> @param[in] hermitian  - is the dielectric matrix hermitian
-    module subroutine compute_anisotropic_avg_inversedielectic_3d(this, hermitian)
+    module subroutine compute_anisotropic_avg_inversedielectric_3d(this, hermitian)
         class(idiel_t), intent(inout) :: this
         logical,           intent(in) :: hermitian
-    end subroutine compute_anisotropic_avg_inversedielectic_3d
+    end subroutine compute_anisotropic_avg_inversedielectric_3d
     
     !> This computes the average of the anisotropic inverse dielectric matrix around Gamma for Hermitian matrices (i.e. purely imaginary frequencies)
     !> @param[in] this       - the current idiel_t object for which to compute the average
