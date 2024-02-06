@@ -80,7 +80,7 @@ contains
         ! Allocate space
         allocate(head_f(this%quadrature_npoints))
         allocate(wingL_f(this%quadrature_npoints, nbasis))
-        allocate(body_f(this%quadrature_npoints))
+        
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !  Auxiliary vectorws and macroscopic dielectric matrix !
@@ -132,7 +132,8 @@ contains
         
         ! Here we compute the body 
         ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
-        !$omp parallel shared(this, head_f, wingL_f, nbasis) private(ii, jj, body_f)
+        !$omp parallel shared(this, head_f, wingL_f, nbasis) private(ii, jj, body_f, clm_body)
+        allocate(body_f(this%quadrature_npoints))
         !$omp do schedule(dynamic) collapse(2)
         do ii = 1, nbasis
             do jj = 1, nbasis
@@ -143,13 +144,14 @@ contains
             end do
         end do 
         !$omp end do
+        deallocate(body_f)
         !$omp end parallel
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !            Clean              !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-        deallocate(head_f, wingL_f, body_f)
+        deallocate(head_f, wingL_f)
 
     end subroutine compute_anisotropic_avg_hermitian
 
@@ -196,7 +198,7 @@ contains
         allocate(head_f(this%quadrature_npoints))
         allocate(wingL_f(this%quadrature_npoints, nbasis))
         allocate(wingU_f(this%quadrature_npoints, nbasis))
-        allocate(body_f(this%quadrature_npoints))
+        
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !  Auxiliary vectorws and macroscopic dielectric matrix !
@@ -253,7 +255,8 @@ contains
         
         ! Here we compute the body 
         ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
-        !$omp parallel shared(this, head_f, wingL_f, wingU_f, nbasis) private(ii, jj, body_f)
+        !$omp parallel shared(this, head_f, wingL_f, wingU_f, nbasis) private(ii, jj, body_f, clm_body)
+        allocate(body_f(this%quadrature_npoints))
         !$omp do schedule(dynamic) collapse(2)
         do ii = 1, nbasis
             do jj = 1, nbasis
@@ -264,13 +267,14 @@ contains
             end do
         end do 
         !$omp end do
+        deallocate(body_f)
         !$omp end parallel
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !            Clean              !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-        deallocate(head_f, wingL_f, wingU_f, body_f)
+        deallocate(head_f, wingL_f, wingU_f)
 
     end subroutine compute_anisotropic_avg_general
 

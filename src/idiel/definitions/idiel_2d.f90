@@ -76,7 +76,6 @@ contains
         ! Allocate space
         allocate(qAq(this%quadrature_npoints))
         allocate(wingL_f(this%quadrature_npoints, nbasis))
-        allocate(wLwU_f(this%quadrature_npoints))
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !  Auxiliary vectorws and macroscopic dielectric matrix !
@@ -128,6 +127,7 @@ contains
 
         ! Here we compute the body 
         !$omp parallel shared(this, wingL_f, wingU_f, nbasis) private(ii, jj, wLwU_f)
+        allocate(wLwU_f(this%quadrature_npoints))
         !$omp do schedule(dynamic)
         do ii = 1, nbasis
             this%idiel_body(ii, ii) = this%idiel_body(ii, ii) - zone
@@ -139,12 +139,13 @@ contains
             end do
         end do
         !$omp end do
+        deallocate(wLwU_f)
         !$omp end parallel
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !            Clean              !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        deallocate(qAq, wingL_f, wingU_f, wLwU_f)
+        deallocate(qAq, wingL_f, wingU_f)
 
     end subroutine compute_anisotropic_avg_scrcoulomb_2d_general
 
@@ -234,6 +235,7 @@ contains
 
         ! Here we compute the body 
         !$omp parallel shared(this, wingL_f, nbasis) private(ii, jj, wLwU_f)
+        allocate(wLwU_f(this%quadrature_npoints))
         !$omp do schedule(dynamic)
         do ii = 1, nbasis
             this%idiel_body(ii, ii) = this%idiel_body(ii, ii) - zone
@@ -245,12 +247,13 @@ contains
             end do
         end do 
         !$omp end do
+        deallocate(wLwU_f)
         !$omp end parallel
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !            Clean              !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        deallocate(qAq, wingL_f, wLwU_f)
+        deallocate(qAq, wingL_f)
         
     end subroutine compute_anisotropic_avg_scrcoulomb_2d_hermitian
 
