@@ -83,8 +83,8 @@ contains
         this%lattice  = lattice_
         allocate(this%redpos, source = redpos_)
         allocate(this%elements, source = elements_)
-        this%natoms   = size(this%redpos,2) 
-        
+        this%natoms   = size(this%redpos,2)
+
         ! The elements of the lattice
         a(:) = lattice_(1,:)
         b(:) = lattice_(2,:)
@@ -97,7 +97,7 @@ contains
         ap = twopi * cross(b,c) / this%vuc
         bp = twopi * cross(c,a) / this%vuc
         cp = twopi * cross(a,b) / this%vuc
-        
+
         this%area_r_12 = norm2(cross(ap,bp))
         this%area_r_13 = norm2(cross(ap,cp))
         this%area_r_23 = norm2(cross(bp,cp))

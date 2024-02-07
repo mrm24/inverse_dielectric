@@ -47,9 +47,7 @@ contains
         type(idiel_t), pointer     :: object
         
         call C_F_pointer(object_ptr, object)
-        write(*,*) 'Clean'
         call object%clean()
-        write(*,*) 'Nullify'
 
     end subroutine deallocate_idiel_t
     
@@ -63,6 +61,7 @@ contains
         integer(i64), intent(in), value  :: dim
         
         type(idiel_t), pointer :: object
+
         call C_F_pointer(object_ptr, object)
                 
         call object%init_common(lattice, redpos, elements, nq, dim)

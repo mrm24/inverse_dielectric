@@ -1,3 +1,6 @@
 module purge
-module load intel-oneapi
-cmake-last -DSPGLIBDIR=/users/sol/martirm/lib/ -DINTERFACES=ON -DPYBIND_CMAKE_DIR=~/.local/share/cmake/pybind11 -DBENCHMARK=ON ..
+module load oneAPI/compiler-rt
+module load oneAPI/ifort/latest
+module load oneAPI/tbb/latest
+module load oneAPI/mkl/latest
+cmake  -DINTERFACES=ON -DPYBIND_CMAKE_DIR=~/.local/share/cmake/pybind11 ..

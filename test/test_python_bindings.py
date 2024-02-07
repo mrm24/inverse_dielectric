@@ -31,29 +31,33 @@ import numpy as np
 def test_IDieL_python_wrappers():
     # Create an instance of IDieL
     print("[TEST: IDieLPy]")
-    IDieL_object = IDieLPy.IDieLPy()
-    
-    # Dimensionality
-    
-    # Initialize mesh data
-    ngrid = np.array([6, 6, 6], dtype=np.int64)
+    try:
+        IDieL_object = IDieLPy.IDieLPy()
 
-    # Initialize silicon crystal data
-    natoms = np.int64(2)
-    latpar = np.float64(0.513)
-    lattice = np.array([[0.2565, 0.2565, 0.0],
-                        [0.2565, 0.0, 0.2565],
-                        [0.0, 0.2565, 0.2565]], dtype=np.float64, order='F')
-    redpos = np.array([[0.00, 0.25], [0.00, 0.25], [0.00, 0.25]], dtype=np.float64, order='F')
-    types =  np.array([14, 14], dtype=np.int64)
+        # Initialize mesh data
+        ngrid = np.array([6, 6, 6], dtype=np.int64)
 
-    # Example usage
-    print("Initialize")
-    IDieL_object.initialize(lattice, natoms, redpos, types, ngrid, 3)
-    print("Initialize: Done")
+        # Initialize silicon crystal data
+        natoms = np.int64(2)
+        latpar = np.float64(0.513)
+        lattice = np.array([[0.2565, 0.2565, 0.0],
+                            [0.2565, 0.0, 0.2565],
+                            [0.0, 0.2565, 0.2565]], dtype=np.float64, order='F')
+        redpos = np.array([[0.00, 0.25], [0.00, 0.25], [0.00, 0.25]], dtype=np.float64, order='F')
+        types =  np.array([14, 14], dtype=np.int64)
 
-    # Destroy the instance
-    IDieL_object.destroy()
+        # Example usage
+        print("Initialize")
+        IDieL_object.initialize(lattice, natoms, redpos, types, ngrid, 3)
+        print("Initialize: Done")
+
+        # Destroy the instance
+        IDieL_object.destroy()
+
+        # Return sys exit 0 for CTest
+        sys.exit(0)
+    except:
+        sys.exit(1)
 
 if __name__ == "__main__":
     test_IDieL_python_wrappers()
