@@ -21,7 +21,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/complex.h>
 #include <pybind11/numpy.h>
-
+#include <iostream>
 
 /// Shortcut to the namespace
 namespace py = pybind11;
@@ -29,13 +29,16 @@ namespace py = pybind11;
 /// Declaring type aliases
 using Complex = std::complex<double>;
 using NumpyComplexArray = py::array_t<Complex,py::array::f_style>;
+using NumpyRealArray = py::array_t<double,py::array::f_style>;
+using NumpyIntArray = py::array_t<long int,py::array::f_style>;
+
 
 /// External functions to call Fortran functions
 /// The Fortran type is stored as a C pointer for purposes of this file
 extern "C" {
     extern void allocate_idiel_t(void* object_ptr);
     extern void deallocate_idiel_t(void* object_ptr);
-    extern void init_common(void* object_ptr, double* lattice, double* redpos, long int* elements, long int nq[3], long int dim);
+    extern void init_common(void* object_ptr, double* lattice, long int natoms, double* redpos, long int* elements, long int* nq, long int dim);
     extern void set_dielectric_blocks(void* object_ptr, Complex* h, Complex* wl, Complex* wu, Complex* ib);
     extern void compute_anisotropic_avg_inversedielectric_3d(void* object_ptr, bool hermitian);
     extern void compute_anisotropic_avg_scrcoulomb_2d(void* object_ptr, bool hermitian);
@@ -60,6 +63,7 @@ public:
     // Constructor: we need this call as Fortran to be manipulated pointers
     // must be initialized by Fortran
     idiel_cxx() {
+        std::cout << "Allocate" << std::endl;
         allocate_idiel_t(idiel_f90);
     }
 
@@ -80,13 +84,12 @@ public:
     }
 
     /// Initialize common elements, note that I make dim mandatory as it makes the interfacing easier
-    void initialize(double* lattice, double* redpos, long int* elements, long int nq[3], long int dim) {
-        init_common(idiel_f90, lattice, redpos, elements, nq, dim);
+    void initialize(double* lattice, long int natoms, double* redpos, long int* elements, long int* nq, long int dim) {
+        init_common(idiel_f90, lattice, natoms, redpos, elements, nq, dim);
     }
 
     /// We support both functions, C++ treat optional as two different functions
-    void setDielectricBlocksFull(Complex* h, Complex* wl,
-                             Complex* wu, Complex* ib) {
+    void setDielectricBlocksFull(Complex* h, Complex* wl, Complex* wu, Complex* ib) {
         set_dielectric_blocks(idiel_f90, h, wl, wu, ib);
     }
 
@@ -98,7 +101,7 @@ public:
 
     /// Computing the average (3D)
     void ComputeAniAvgInvDielMat3D(bool hermitian) {
-        compute_anisotropic_avg_inversedielectric_3d(&idiel_f90, hermitian);
+        compute_anisotropic_avg_inversedielectric_3d(idiel_f90, hermitian);
     }
 
     /// Compute the average (2D)
@@ -145,33 +148,46 @@ PYBIND11_MODULE(IDieLPy, m) {
 
     py::class_<idiel_cxx>(m, "IDieLPy")
         .def(py::init<>())
-        .def("initialize", &idiel_cxx::initialize)
-        .def("setDielectricBlocksFull", &idiel_cxx::setDielectricBlocksFull)
-        .def("setDielectricBlocksPartial", &idiel_cxx::setDielectricBlocksPartial)
-        .def("ComputeAniAvgInvDielMat3D", &idiel_cxx::ComputeAniAvgInvDielMat3D)
-        .def("ComputeAniAvgScrCoulomb2D", &idiel_cxx::ComputeAniAvgScrCoulomb2D)
-        .def("invertBody", &idiel_cxx::invertBody)
-        .def("getNBasis", &idiel_cxx::getNBasis)
-        .def("destroy", &idiel_cxx::destroy)
-        .def("get_head", [](idiel_cxx &self)->Complex {
-            auto ptr = self.get_head();
-            return *(reinterpret_cast<Complex*>(ptr));
+        .def("initialize", [](idiel_cxx &self, NumpyRealArray& lattice, int natoms, NumpyRealArray& redpos, NumpyIntArray& elements, NumpyIntArray& nq, int dim){
+            auto lattice_ptr = lattice.mutable_unchecked<2>();
+            auto redpos_ptr = redpos.mutable_unchecked<2>();
+            auto elements_ptr = elements.mutable_unchecked<1>();
+            auto nq_ptr = nq.mutable_unchecked<1>();
+
+            // Get rid of constness
+            double* lattice_data = const_cast<double*>(lattice_ptr.data(0, 0));
+            double* redpos_data = const_cast<double*>(redpos_ptr.data(0, 0));
+            long int* elements_data = const_cast<long int*>(elements_ptr.data(0));
+            long int* nq_data = const_cast<long int*>(nq_ptr.data(0));
+
+            self.initialize(lattice_data, static_cast<long int>(natoms), redpos_data, elements_data, nq_data, static_cast<long int>(dim));
         })
-        .def("get_wingL", [](idiel_cxx &self)->NumpyComplexArray {
-            auto n   = self.getNBasis();
-            auto ptr = self.get_wingL();
-            return NumpyComplexArray(n, reinterpret_cast<Complex*>(ptr));
-        })
-        .def("get_wingU", [](idiel_cxx &self)->NumpyComplexArray {
-            auto n   = self.getNBasis();
-            auto ptr = self.get_wingU();
-            return NumpyComplexArray(n, reinterpret_cast<Complex*>(ptr));
-        })
-        .def("get_body", [](idiel_cxx &self)->NumpyComplexArray {
-            auto n   = self.getNBasis();
-            auto ptr = self.get_body();
-            NumpyComplexArray body(n, reinterpret_cast<Complex*>(ptr));
-            body.reshape({n,n});
-            return body;
-        });
+        // .def("setDielectricBlocksFull", &idiel_cxx::setDielectricBlocksFull)
+        // .def("setDielectricBlocksPartial", &idiel_cxx::setDielectricBlocksPartial)
+        // .def("ComputeAniAvgInvDielMat3D", &idiel_cxx::ComputeAniAvgInvDielMat3D)
+        // .def("ComputeAniAvgScrCoulomb2D", &idiel_cxx::ComputeAniAvgScrCoulomb2D)
+        // .def("invertBody", &idiel_cxx::invertBody)
+        // .def("getNBasis", &idiel_cxx::getNBasis)
+        // .def("get_head", [](idiel_cxx &self)->Complex {
+        //     auto ptr = self.get_head();
+        //     return *(reinterpret_cast<Complex*>(ptr));
+        // })
+        // .def("get_wingL", [](idiel_cxx &self)->NumpyComplexArray {
+        //     auto n   = self.getNBasis();
+        //     auto ptr = self.get_wingL();
+        //     return NumpyComplexArray(n, reinterpret_cast<Complex*>(ptr));
+        // })
+        // .def("get_wingU", [](idiel_cxx &self)->NumpyComplexArray {
+        //     auto n   = self.getNBasis();
+        //     auto ptr = self.get_wingU();
+        //     return NumpyComplexArray(n, reinterpret_cast<Complex*>(ptr));
+        // })
+        // .def("get_body", [](idiel_cxx &self)->NumpyComplexArray {
+        //     auto n   = self.getNBasis();
+        //     auto ptr = self.get_body();
+        //     NumpyComplexArray body(n, reinterpret_cast<Complex*>(ptr));
+        //     body.reshape({n,n});
+        //     return body;
+        // })
+        .def("destroy", &idiel_cxx::destroy);
 };

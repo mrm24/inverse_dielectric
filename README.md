@@ -23,7 +23,7 @@ The programm can be easily installed using CMake (version >= 3.20).
 
 **CMake Options:**
 
-* _Boost_INCLUDE_DIRS_: Directory where the boost headers are located. If not specified it will look in the standard paths.
+*_Boost_INCLUDE_DIRS_: Directory where the boost headers are located. If not specified it will look in the standard paths.
 * _SPGLIBDIR_: Directory where spglib library is found. If not specified it look in the standard paths.
 * _GPU_: Set to ON to allow for GPU acceleration
 * _MAGMA_DIR_: If _GPU_ is ON, this option provides the path to MAGMA directory (install it with make)

@@ -35,39 +35,42 @@ contains
     subroutine allocate_idiel_t(object_ptr) bind(C)
         type(c_ptr), intent(out) :: object_ptr
         type(idiel_t), pointer :: object
+        
         allocate(object)
         object_ptr = C_loc(object)
+
     end subroutine allocate_idiel_t
     
     !> Deallocates the idiel_t
     subroutine deallocate_idiel_t(object_ptr) bind(C)
-        type(c_ptr), intent(in) :: object_ptr
-        type(idiel_t), pointer :: object
+        type(c_ptr), intent(inout) :: object_ptr
+        type(idiel_t), pointer     :: object
+        
         call C_F_pointer(object_ptr, object)
-        deallocate(object)
+        write(*,*) 'Clean'
+        call object%clean()
+        write(*,*) 'Nullify'
+
     end subroutine deallocate_idiel_t
     
-    subroutine init_common(object_ptr, lattice,  redpos, elements, nq, dim) bind(C)
-        type(c_ptr), intent(in)            :: object_ptr
-        real(r64), intent(in)              :: lattice(3,3)
-        real(r64), intent(in)              :: redpos(:,:) 
-        integer(r64), intent(in)           :: elements(:)
-        integer(i64), intent(in)           :: nq(3)
-        integer(i64), intent(in), optional :: dim
+    subroutine init_common(object_ptr, lattice, natoms, redpos, elements, nq, dim) bind(C)
+        type(c_ptr),  intent(inout)      :: object_ptr
+        real(r64),    intent(in)         :: lattice(3,3)
+        integer(i64), intent(in), value  :: natoms
+        real(r64),    intent(in)         :: redpos(3,natoms) 
+        integer(r64), intent(in)         :: elements(natoms)
+        integer(i64), intent(in)         :: nq(3)
+        integer(i64), intent(in), value  :: dim
         
         type(idiel_t), pointer :: object
         call C_F_pointer(object_ptr, object)
-        
-        if (present(dim)) then
-            call object%init_common(lattice, redpos, elements, nq, dim)
-        else
-            call object%init_common(lattice, redpos, elements, nq)
-        end if 
+                
+        call object%init_common(lattice, redpos, elements, nq, dim)
 
     end subroutine init_common
     
     subroutine set_dielectric_blocks(object_ptr, h, wl, wu, ib) bind(C)
-        type(c_ptr), intent(in) :: object_ptr
+        type(c_ptr), intent(inout) :: object_ptr
         complex(r64), target, intent(in)                :: h(:,:)
         complex(r64), target, intent(in)                :: wl(:,:)
         complex(r64), target, intent(in)                :: wu(:,:)
@@ -85,8 +88,8 @@ contains
     end subroutine set_dielectric_blocks
 
     subroutine compute_anisotropic_avg_inversedielectric_3d(object_ptr, hermitian) bind(C)
-        type(c_ptr), intent(in) :: object_ptr
-        logical,     intent(in) :: hermitian
+        type(c_ptr), intent(inout) :: object_ptr
+        logical,     intent(in)    :: hermitian
         
         type(idiel_t), pointer :: object
         call C_F_pointer(object_ptr, object)
@@ -96,8 +99,8 @@ contains
     end subroutine compute_anisotropic_avg_inversedielectric_3d
 
     subroutine compute_anisotropic_avg_scrcoulomb_2d(object_ptr, hermitian) bind(C)
-        type(c_ptr), intent(in) :: object_ptr
-        logical,     intent(in) :: hermitian
+        type(c_ptr), intent(inout) :: object_ptr
+        logical,     intent(in)    :: hermitian
         
         type(idiel_t), pointer :: object
         call C_F_pointer(object_ptr, object)
@@ -107,7 +110,7 @@ contains
     end subroutine compute_anisotropic_avg_scrcoulomb_2d
     
     subroutine invert_body(object_ptr, body) bind(C)
-        type(c_ptr), intent(in) :: object_ptr
+        type(c_ptr), intent(inout) :: object_ptr
         complex(r64), allocatable, intent(in) :: body(:,:)
         
         type(idiel_t), pointer :: object
@@ -118,7 +121,7 @@ contains
     end subroutine invert_body
 
     function get_n_basis(object_ptr) result(nbasis) bind(C)
-        type(c_ptr), intent(in) :: object_ptr
+        type(c_ptr), intent(inout) :: object_ptr
         integer(i64) :: nbasis
         
         type(idiel_t), pointer :: object
@@ -129,7 +132,7 @@ contains
     end function get_n_basis
 
     function head(object_ptr) result(ptr) bind(C)
-        type(c_ptr), intent(in) :: object_ptr
+        type(c_ptr), intent(inout) :: object_ptr
         type(c_ptr) :: ptr
 
         type(idiel_t), pointer :: object
@@ -140,7 +143,7 @@ contains
     end function head
 
     function wing_lower(object_ptr) result(ptr) bind(C)
-        type(c_ptr), intent(in) :: object_ptr
+        type(c_ptr), intent(inout) :: object_ptr
         type(c_ptr) :: ptr
 
         type(idiel_t), pointer :: object
@@ -151,7 +154,7 @@ contains
     end function wing_lower
 
     function wing_upper(object_ptr) result(ptr) bind(C)
-        type(c_ptr), intent(in) :: object_ptr
+        type(c_ptr), intent(inout) :: object_ptr
         type(c_ptr) :: ptr
 
         type(idiel_t), pointer :: object
@@ -162,7 +165,7 @@ contains
     end function wing_upper
 
     function body(object_ptr) result(ptr) bind(C)
-        type(c_ptr), intent(in) :: object_ptr
+        type(c_ptr), intent(inout) :: object_ptr
         type(c_ptr) :: ptr
 
         type(idiel_t), pointer :: object
