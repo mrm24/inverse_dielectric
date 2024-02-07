@@ -14,7 +14,7 @@
 
 /// @file
 /// This file contains a module for exposing the idiel_t to C++, and python
-/// Python bindings are created through pybind library
+/// Python bindings are created through pybind11 library
 
 #include <memory>
 #include <complex>
@@ -42,8 +42,8 @@ extern "C" {
     extern void invert_body(void* object_ptr, Complex* body);
     extern long int get_n_basis(void* object_ptr);
     extern void* head(void* object_ptr);
-    extern void* wingL(void* object_ptr);
-    extern void* wingU(void* object_ptr);
+    extern void* wing_lower(void* object_ptr);
+    extern void* wing_upper(void* object_ptr);
     extern void* body(void* object_ptr);
 }
 
@@ -52,6 +52,7 @@ class idiel_cxx {
 
 private:
     // This is a raw pointer containing the Fortran type
+    // TODO: Change to smart pointer (unique_ptr)
     void* idiel_f90;
 
 public:
@@ -122,12 +123,12 @@ public:
 
     /// Return C-pointer wingL
     void* get_wingL(){
-        return wingL(idiel_f90);
+        return wing_lower(idiel_f90);
     }
 
     /// Return C-pointer wingU
     void* get_wingU(){
-        return wingU(idiel_f90);
+        return wing_upper(idiel_f90);
     }
 
     /// Return C-pointer body
@@ -136,13 +137,13 @@ public:
     }
 };
 
-
 /// This is how a C++ class translates to Python module
-PYBIND11_MODULE(InverseDielectric, m) {
+/// TODO: Add documentation to the python module
+PYBIND11_MODULE(IDieLPy, m) {
 
-    m.doc() = "Python bindings for InverseDielectric library";
+    m.doc() = "Python bindings for IDieL";
 
-    py::class_<idiel_cxx>(m, "IDielPython")
+    py::class_<idiel_cxx>(m, "IDieLPy")
         .def(py::init<>())
         .def("initialize", &idiel_cxx::initialize)
         .def("setDielectricBlocksFull", &idiel_cxx::setDielectricBlocksFull)

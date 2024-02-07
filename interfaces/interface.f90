@@ -14,9 +14,11 @@
 
 !> @file
 !> This file contains a module for exposing the idiel_t to C
-!> 
+!> the aim is to create a C++ library and a Python module using the C interface
 
 !> This module defines the subroutines for exposing the idiel_t to C
+!> Notice that names should be lower case as the compiled functions will be named using lower case
+!> as of Fortran ISO interfacing with C
 module idiel_f90_C
 
     use iso_c_binding
@@ -137,34 +139,34 @@ contains
 
     end function head
 
-    function wingL(object_ptr) result(ptr) bind(C)
+    function wing_lower(object_ptr) result(ptr) bind(C)
         type(c_ptr), intent(in) :: object_ptr
         type(c_ptr) :: ptr
 
         type(idiel_t), pointer :: object
-        
+
         call C_F_pointer(object_ptr, object)
         ptr = C_loc(object%idiel_wingL)
 
-    end function wingL
+    end function wing_lower
 
-    function wingU(object_ptr) result(ptr) bind(C)
+    function wing_upper(object_ptr) result(ptr) bind(C)
         type(c_ptr), intent(in) :: object_ptr
         type(c_ptr) :: ptr
 
         type(idiel_t), pointer :: object
-        
+
         call C_F_pointer(object_ptr, object)
         ptr = C_loc(object%idiel_wingU)
 
-    end function wingU
+    end function wing_upper
 
     function body(object_ptr) result(ptr) bind(C)
         type(c_ptr), intent(in) :: object_ptr
         type(c_ptr) :: ptr
 
         type(idiel_t), pointer :: object
-        
+
         call C_F_pointer(object_ptr, object)
         ptr = C_loc(object%idiel_body)
 
