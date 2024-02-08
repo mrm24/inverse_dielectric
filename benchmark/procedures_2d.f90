@@ -64,10 +64,10 @@ program test_2d
     redpos(:,4) = [0.50000000000000_r64, 0.91940000000000_r64, 0.39660000000000_r64]
 
     ! Reading files
-    call load_from_file('head',  head)
-    call load_from_file('wingL', wingL)
-    call load_from_file('wingU', wingU)
-    call load_from_file('body',  body)
+    call load_from_file('diel2d/head',  head)
+    call load_from_file('diel2d/wingL', wingL)
+    call load_from_file('diel2d/wingU', wingU)
+    call load_from_file('diel2d/body',  body)
 
     !!!!!!!!!!!! Here it goes the main programm !!!!!!!!!!!!!!!!!!!
 

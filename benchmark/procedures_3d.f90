@@ -65,10 +65,10 @@ program procedures_3d
     redpos(:,4) = [0.1034_r64, 0.8966_r64, 0.9194_r64]
 
     ! Reading files
-    call load_from_file('head',  head)
-    call load_from_file('wingL', wingL)
-    call load_from_file('wingU', wingU)
-    call load_from_file('body',  body)
+    call load_from_file('diel3d/head',  head)
+    call load_from_file('diel3d/wingL', wingL)
+    call load_from_file('diel3d/wingU', wingU)
+    call load_from_file('diel3d/body',  body)
 
     !!!!!!!!!!!! Here it goes the main programm !!!!!!!!!!!!!!!!!!!
 

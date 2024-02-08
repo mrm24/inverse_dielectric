@@ -61,7 +61,6 @@ contains
         ! Harmonic expansion coefficients
         complex(r64) :: clm_head(nsph_pair)
         complex(r64) :: clm_body(nsph_pair) 
-        real(r64)    :: error 
 
         ! Basis size
         integer(i64) :: nbasis
@@ -124,11 +123,6 @@ contains
         
         call sph_harm_expansion(nsph_pair, head_f, this%weights, this%ylm, clm_head)
         this%idiel_head  = sum(clm_head(:) * this%angular_integrals(:))
-
-        error = maxval(abs(clm_head(nsph_pair-41:nsph_pair)))/abs(clm_head(1)) 
-        if (error > 1.0e-4_r64) then
-            write(*,*) "Warning (compute_anisotropic_avg_hermitian) the expansion coefficient can be not large enough"
-        end if
         
         ! Here we compute the body 
         ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
@@ -178,7 +172,6 @@ contains
         ! Harmonic expansion coefficients
         complex(r64) :: clm_head(nsph_pair)
         complex(r64) :: clm_body(nsph_pair) 
-        real(r64) :: error
 
         ! Basis size
         integer(i64) :: nbasis
@@ -247,11 +240,6 @@ contains
         
         call sph_harm_expansion(nsph_pair, head_f, this%weights, this%ylm, clm_head)
         this%idiel_head  = sum(clm_head(:) * this%angular_integrals(:))
-
-        error = maxval(abs(clm_head(nsph_pair-41:nsph_pair)))/abs(clm_head(1)) 
-        if (error > 1.0e-4_r64) then
-            write(*,*) "Warning (compute_anisotropic_avg_general) the expansion coefficient can be not large enough"
-        end if
         
         ! Here we compute the body 
         ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
