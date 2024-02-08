@@ -186,7 +186,6 @@ contains
         ! Allocate space
         allocate(qAq(this%quadrature_npoints))
         allocate(wingL_f(this%quadrature_npoints, nbasis))
-        allocate(wLwU_f(this%quadrature_npoints))
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !  Auxiliary vectors and macroscopic dielectric matrix !
