@@ -23,6 +23,8 @@ program test_inverse
 #else
     use idiel_cpu_magma_t, only: linalg_world_t
 #endif
+    
+    implicit none
 
     integer(i64), parameter :: n = 3000_i64
     complex(r64), allocatable :: A(:,:), inverse_A(:,:)
@@ -43,11 +45,11 @@ program test_inverse
     do i = 1, n
         write(*,*) 1.0_r64 / A(i,i), inverse_A(i,i)
         rdiff = abs(1.0_r64 / A(i,i) - inverse_A(i,i))/ abs(1.0_r64 / A(i,i))
-        write(*,'(A,I2,A, E16.7)')  '  * Regression (inverse,', i ,') result (relative difference): ', rdiff
+        write(*,'(A,I0,A, E16.7)')  '  * Regression (inverse,', i ,') result (relative difference): ', rdiff
         if ( rdiff .lt. tolerance) then
-            write(*,*)  '[TEST : inverse_complex_LU (inverse,', iom,'): PASSED]'
+            write(*,*)  '[TEST : inverse_complex_LU (inverse,', i,'): PASSED]'
         else
-            write(*,*)  '[TEST : inverse_complex_LU (inverse,', iom,'): FAILED]'
+            write(*,*)  '[TEST : inverse_complex_LU (inverse,', i,'): FAILED]'
             stop 1
         end if
     end do

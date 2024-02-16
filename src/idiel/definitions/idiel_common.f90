@@ -63,6 +63,9 @@ contains
         ! Process dimensionality
         if (present(dim)) this%dim = dim
         
+        ! Init algebra world
+        call this%world%init()
+
         select case(this%dim)
         
         case(2) ! 2D case
@@ -181,16 +184,10 @@ contains
             end do
 
             deallocate(ylm, xyz)
-
         case default
             error stop "Error(idiel_t%init_common): Error dimension should be either 3 or 2"
         end select 
-
-        ! Init algebra world
-        call this%world%init()
-        call this%ref_xyz%allocate_gpu(this%xyz)
-        call this%ref_xyz%transfer_cpu_gpu(this%xyz, this%world)
-
+        
     end subroutine init_common
 
     !> This nullify and deallocates the objects
@@ -211,7 +208,6 @@ contains
         if (allocated(this%idiel_wingL))  deallocate(this%idiel_wingL)
         if (allocated(this%idiel_wingU))  deallocate(this%idiel_wingU)
         if (allocated(this%idiel_body))   deallocate(this%idiel_body)
-        call this%ref_xyz%destroy()
         if (this%world%is_queue_set()) call this%world%finish()
 
         ! 2D stuff
@@ -264,7 +260,7 @@ contains
         if (allocated(this%Binv_data)) deallocate(this%Binv_data)
         
         ! Compute
-        call inverse_complex_LU(body, this%Binv_data, this%world)    
+        call inverse_complex_LU(body, this%Binv_data, this%world)
         
         ! Associate vector    
         this%Binv => this%Binv_data

@@ -47,11 +47,9 @@ contains
 
         ! Auxiliary vectors
         complex(r64), allocatable :: ag(:,:), bg(:,:)
-        type(linalg_obj_t) :: ref_ag, ref_bg
         
         ! Macroscopic dielectric matrix
         complex(r64), allocatable :: A(:,:)
-        type(linalg_obj_t) :: ref_A
 
         ! Function from which to compute the integral 
         complex(r64), allocatable :: qAq(:) 
@@ -78,37 +76,33 @@ contains
         allocate(wingL_f(this%quadrature_npoints, nbasis))
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        !  Auxiliary vectorws and macroscopic dielectric matrix !
+        !  Auxiliary vectors and macroscopic dielectric matrix !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         ! Compute ag_{\alpha}(\mathbf{G}) = \sum_{\mathbf{G'\neq 0}} B^{-1}_{\mathbf{GG'}} U_{\alpha}(\mathbf{G}) (Eq. B.13)
         ! it also computes in this case the term for the upper wing
         ! and the local field effects of the head (Eq. B.14) in 10.1016/j.cpc.2006.07.018
         allocate(A, source=this%head)
-        call compute_auxiliary_and_macroscopic_2d(this%Binv, this%wingL, ag, ref_ag, A, ref_A, this%world, this%wingU, bg, ref_bg)
+        call compute_auxiliary_and_A_2d_general(this%Binv, this%wingL, ag, this%wingU, bg, A, this%world)
         
         ! agymmetrize the elements of the macroscopic dielectric matrix and update it
         A   = this%symmetry%symmetryze_complex_tensor(A)
-        call ref_A%transfer_cpu_gpu(A, this%world)
+#ifdef USE_GPU
+        !$omp target update to(A)
+#endif
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !         Compute the functions  (angular part)         !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         ! HEAD: Compute \mathbf{\hat{q} A \hat{q}}  for the space grid
-        qAq(:)  =  compute_qAq(ref_A, this%xyz, this%ref_xyz, this%world)
-        call ref_A%destroy()
-        deallocate(A)
+        call compute_qAq(A, this%xyz, this%world, qAq)
 
         ! WINGag : Compute \frac{ \mathbf{\hat{q}} \cdot ag_{\alpha}(\mathbf{G})}{\mathbf{\hat{q} A \hat{q}}} and
         ! \frac{ \mathbf{\hat{q}} \cdot bg_{\alpha}(\mathbf{G})}{\mathbf{\hat{q} A \hat{q}}} 
         ! Note that there is head missing term to allow for the efficient computation of the body term
-        wingL_f =  compute_inverse_wingL(this%ref_xyz, ref_ag, this%world)
-        call ref_ag%destroy()
-        deallocate(ag)
-        wingU_f = compute_inverse_wingU(this%ref_xyz, ref_bg, this%world)
-        call ref_bg%destroy()
-        deallocate(bg)
+        call compute_inverse_wingL(this%xyz, ag, this%world, wingL_f)
+        call compute_inverse_wingU(this%xyz, bg, this%world, wingU_f)
         
         ! bghe body is directly computed as saving it to RAM is too intensive
 
@@ -126,21 +120,41 @@ contains
                                   this%radii, this%rmax2d, this%rcut, qAq, this%vr)
 
         ! Here we compute the body 
-        !$omp parallel shared(this, wingL_f, wingU_f, nbasis) private(ii, jj, wLwU_f)
+
+#ifdef  USE_GPU 
         allocate(wLwU_f(this%quadrature_npoints))
-        !$omp do schedule(dynamic)
+        !$omp target enter data map(to: this%idiel_body) map(alloc: wLwU_f)
+        !$omp target teams distribute parallel do shared(this, qAq, wingL_f, wingU_f, nbasis) private(ii, jj, wLwU_f)
         do ii = 1, nbasis
             this%idiel_body(ii, ii) = this%idiel_body(ii, ii) - zone
             do jj = 1, nbasis
-                wLwU_f(:) = wingL_f(:, jj) * wingU_f(:, ii)
+                wLwU_f(:) = wingL_f(:, jj) *  wingU_f(:, ii) 
                 this%idiel_body(jj, ii) = this%idiel_body(jj, ii) + &
                                           body_2d(this%blm_coarse, this%weights, this%blm_fine, this%weights_fine, &
                                               this%radii, this%rmax2d, this%rcut, qAq, wLwU_f, this%vr)
             end do
         end do
+        !$omp end target teams distribute parallel do
+        !$omp target update from(this%idiel_body)
+        !$omp target exit data map(delete: this%idiel_body, wLwU_f)
+        deallocate(wLwU_f)
+#else
+        !$omp parallel shared(this, qAq, wingL_f, wingU_f, nbasis) private(ii, jj, wLwU_f)
+        allocate(wLwU_f(this%quadrature_npoints))
+        !$omp do schedule(dynamic)
+        do ii = 1, nbasis
+            this%idiel_body(ii, ii) = this%idiel_body(ii, ii) - zone
+            do jj = 1, nbasis
+                wLwU_f(:) = wingL_f(:, jj) *  wingU_f(:, ii) 
+                this%idiel_body(jj, ii) = this%idiel_body(jj, ii) + &
+                                        body_2d(this%blm_coarse, this%weights, this%blm_fine, this%weights_fine, &
+                                            this%radii, this%rmax2d, this%rcut, qAq, wLwU_f, this%vr)
+            end do
+        end do 
         !$omp end do
         deallocate(wLwU_f)
         !$omp end parallel
+#endif
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !            Clean              !
@@ -158,11 +172,9 @@ contains
 
         ! Auxiliary vectors
         complex(r64), allocatable :: ag(:,:)
-        type(linalg_obj_t) :: ref_ag
         
         ! Macroscopic dielectric matrix
         complex(r64), allocatable :: A(:,:)
-        type(linalg_obj_t) :: ref_A
 
         ! Function from which to compute the integral 
         complex(r64), allocatable :: qAq(:) 
@@ -195,27 +207,25 @@ contains
         ! it also computes in this case the term for the upper wing
         ! and the local field effects of the head (Eq. B.14) in 10.1016/j.cpc.2006.07.018
         allocate(A, source=this%head)
-        call compute_auxiliary_and_macroscopic_2d(this%Binv, this%wingL, ag, ref_ag, A, ref_A, this%world)
+        call compute_auxiliary_and_A_2d_hermitian(this%Binv, this%wingL, ag, A, this%world)
         
         ! agymmetrize the elements of the macroscopic dielectric matrix and update it
-        A   = this%symmetry%symmetryze_complex_tensor(A) 
-        call ref_A%transfer_cpu_gpu(A, this%world)
+        A   = this%symmetry%symmetryze_complex_tensor(A)
+#ifdef USE_GPU
+        !$omp target update to(A)
+#endif
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !         Compute the functions  (angular part)         !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         ! HEAD: Compute \mathbf{\hat{q} A \hat{q}}  for the space grid
-        qAq(:)  =  compute_qAq(ref_A, this%xyz, this%ref_xyz, this%world)
-        call ref_A%destroy()
-        deallocate(A)
+        call compute_qAq(A, this%xyz, this%world, qAq)
 
         ! WINGag : Compute \frac{ \mathbf{\hat{q}} \cdot ag_{\alpha}(\mathbf{G})}{\mathbf{\hat{q} A \hat{q}}} and
         ! \frac{ \mathbf{\hat{q}} \cdot bg_{\alpha}(\mathbf{G})}{\mathbf{\hat{q} A \hat{q}}} 
         ! Note that there is head missing term to allow for the efficient computation of the body term
-        wingL_f =  compute_inverse_wingL(this%ref_xyz, ref_ag, this%world)
-        call ref_ag%destroy()
-        deallocate(ag)
+        call compute_inverse_wingL(this%xyz, ag, this%world, wingL_f)
         
         ! bghe body is directly computed as saving it to RAM is too intensive
 
@@ -231,11 +241,11 @@ contains
         
         this%idiel_head = head_2d(this%blm_coarse, this%weights, this%blm_fine, this%weights_fine, &
                                   this%radii, this%rmax2d, this%rcut, qAq, this%vr)
-
-        ! Here we compute the body 
-        !$omp parallel shared(this, wingL_f, nbasis) private(ii, jj, wLwU_f)
+        
+#ifdef  USE_GPU 
         allocate(wLwU_f(this%quadrature_npoints))
-        !$omp do schedule(dynamic)
+        !$omp target enter data map(to: this%idiel_body) map(alloc: wLwU_f)
+        !$omp target teams distribute parallel do shared(this, qAq, wingL_f, nbasis) private(ii, jj, wLwU_f)
         do ii = 1, nbasis
             this%idiel_body(ii, ii) = this%idiel_body(ii, ii) - zone
             do jj = 1, nbasis
@@ -244,10 +254,28 @@ contains
                                           body_2d(this%blm_coarse, this%weights, this%blm_fine, this%weights_fine, &
                                               this%radii, this%rmax2d, this%rcut, qAq, wLwU_f, this%vr)
             end do
+        end do
+        !$omp end target teams distribute parallel do
+        !$omp target update from(this%idiel_body)
+        !$omp target exit data map(delete: this%idiel_body, wLwU_f)
+        deallocate(wLwU_f)
+#else
+        !$omp parallel shared(this, qAq, wingL_f, nbasis) private(ii, jj, wLwU_f)
+        allocate(wLwU_f(this%quadrature_npoints))
+        !$omp do schedule(dynamic)
+        do ii = 1, nbasis
+            this%idiel_body(ii, ii) = this%idiel_body(ii, ii) - zone
+            do jj = 1, nbasis
+                wLwU_f(:) = wingL_f(:, jj) * conjg(wingL_f(:, ii))
+                this%idiel_body(jj, ii) = this%idiel_body(jj, ii) + &
+                                        body_2d(this%blm_coarse, this%weights, this%blm_fine, this%weights_fine, &
+                                            this%radii, this%rmax2d, this%rcut, qAq, wLwU_f, this%vr)
+            end do
         end do 
         !$omp end do
         deallocate(wLwU_f)
         !$omp end parallel
+#endif
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !            Clean              !
@@ -269,7 +297,7 @@ contains
     !> @returns   w_head - the head component of the 2D screened Coulomb potential
     function head_2d(blm_coarse, wc, blm_fine, wf, r, rmax, rcut, qAq, vr) result(w_head)
         
-        use idiel_cubic_spline, only: cubic_spline_t
+        use idiel_cubic_spline
 
         complex(r64), intent(in) :: blm_coarse(:,:)
         real(r64), intent(in)    :: wc(:)
@@ -284,8 +312,11 @@ contains
         complex(r64), allocatable         :: w_head_f(:,:)
         complex(r64)                      :: clm_head(ncir, nr)
         complex(r64)                      :: r_integral(size_mesh_2d_fine, ncir)
-        type(cubic_spline_t), allocatable :: cs
         integer(i64)                      :: ii, jj
+
+        !! Splines
+        real(r64), allocatable    :: x(:)
+        complex(r64), allocatable :: splines(:,:), integrals(:)
 
         complex(r64) :: w_head
 
@@ -309,12 +340,11 @@ contains
         r_integral = zzero
         do ii = 1, ncir
             if ( maxval(abs(clm_head(ii,:))) < 1.0e-7_r64) cycle
-            allocate(cs)
-            call cs%initialize(r, r * clm_head(ii,:))
+!             call init_cubic_spline_t(x, splines, integrals, r, r * clm_head(ii,:))
             do jj = 1, size_mesh_2d_fine
-                r_integral(jj, ii) = cs%integrate(0.0_r64, rmax(jj))
+!                 r_integral(jj, ii) = integrate(x, splines, integrals, 0.0_r64, rmax(jj))
             end do 
-            deallocate(cs)
+            deallocate(x, splines, integrals)
         end do
 
         ! Compute the integral
@@ -339,8 +369,8 @@ contains
     !> @param[in] vr   - the 1-exp(-rcut*r) for the radial mesh
     !> @returns   w_body - the correction body component of 2D screened Coulomb potential
     function body_2d(blm_coarse, wc, blm_fine, wf, r, rmax, rcut, qAq, wLwU, vr) result(w_body)
-        
-        use idiel_cubic_spline, only: cubic_spline_t
+
+        use idiel_cubic_spline
 
         complex(r64), intent(in) :: blm_coarse(:,:)
         real(r64), intent(in)    :: wc(:)
@@ -353,11 +383,18 @@ contains
         complex(r64), intent(in) :: qAq(:)
         complex(r64), intent(in) :: vr(:,:)
 
+#ifdef USE_GPU
+        !$omp declare target
+#endif
+
         complex(r64), allocatable         :: w_body_f(:,:)
         complex(r64)                      :: clm_body(ncir, nr)
         complex(r64)                      :: r_integral(size_mesh_2d_fine, ncir)
-        type(cubic_spline_t), allocatable :: cs
         integer(i64)                      :: ii, jj
+
+        !! Splines
+        real(r64), allocatable    :: x(:)
+        complex(r64), allocatable :: splines(:,:), integrals(:)
 
         complex(r64) :: w_body
 
@@ -376,15 +413,14 @@ contains
         ! Create interpolator for the Fourier components
         ! and integrate those as function of r multiplied by r 
         ! to obtain the rmax(phi) integral
-        r_integral = zzero
+        r_integral(:,:) = zzero
         do ii = 1, ncir
             if (maxval(abs(clm_body(ii,:))) < 1.0e-7_r64) cycle
-            allocate(cs)
-            call cs%initialize(r, r * clm_body(ii,:))
+!             call init_cubic_spline_t(x, splines, integrals, r, r * clm_body(ii,:))
             do jj = 1, size_mesh_2d_fine
-                r_integral(jj, ii) = cs%integrate(0.0_r64, rmax(jj))
+!                 r_integral(jj, ii) = integrate(x, splines, integrals, 0.0_r64, rmax(jj))
             end do 
-            deallocate(cs)
+!             deallocate(x, splines, integrals)
         end do
 
         ! Compute the integral

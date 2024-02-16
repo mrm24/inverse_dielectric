@@ -30,7 +30,9 @@ program test_spline_1d
     real(r64)    :: x(n), xdenser(10*n)
     integer(i64) ::  i
     real(r64) :: dx, dx2, diff, rdiff, ics, dcs
-    type(cubic_spline_t) :: cs
+    !! Splines
+    real(r64), allocatable    :: xlim(:)
+    complex(r64), allocatable :: splines(:,:), integrals(:)
 
     ! Print info
     write(*,*) '[TEST : cubic_spline_t]' 
@@ -42,7 +44,6 @@ program test_spline_1d
 
     do i = 1, n
         x(i) = (i - 1) * dx
-        write(*,*) x(i)
         y(i) = cmplx(cos(x(i))**2 * x(i) , 0.0, r64) 
     end do
 
@@ -51,24 +52,24 @@ program test_spline_1d
         yref(i) = cmplx(cos(xdenser(i))**2 * xdenser(i) , 0.0, r64) 
     end do
 
-    call cs%initialize(x, y)
+    call init_cubic_spline_t(xlim, splines, integrals, x, y)
     
-
     write(*,'(A, e20.13)')  '  * Compare vs exact function:  cubic_spline_t%interpolate'
     do i = 1, 9*n
-        yint = cs%interpolate(xdenser(i))
+        yint = interpolate(xlim, splines, xdenser(i))
         if (real(yref(i)) == 0) cycle
         diff = abs(real(yint)-real(yref(i)))
+        write(*,*)  xdenser(i), real(yref(i)), real(yint)
         if ( diff > tolerance) then
            write(*,*)  '[TEST : cubic_spline_t%interpolate: FAILED] , diff : ', diff
            stop 1
-        else 
+        else
            write(*,*)  '[TEST : cubic_spline_t%interpolate: PASSED] , diff : ', diff
-        end if 
+        end if
     end do
 
     write(*,'(A, e20.13)')  '  * Compare vs exact result:  cubic_spline_t%derivative'
-    dcs = real(cs%derivative(0.3_r64*pi))
+    dcs = real(derivative(xlim, splines,0.3_r64*pi))
     rdiff = abs(dcs - ana_derivative)/abs(ana_derivative)
     if ( rdiff > 100*rtolerance) then
         write(*,*)  '[TEST : cubic_spline_t%derivative: FAILED] , rdiff : ', rdiff
@@ -78,7 +79,7 @@ program test_spline_1d
      end if
 
     write(*,'(A, e20.13)')  '  * Compare vs exact result:  cubic_spline_t%integrate'
-    ics = real(cs%integrate(0.5_r64,pi))
+    ics = real(integrate(xlim, splines, integrals,0.5_r64,pi))
     rdiff = abs(ics - ana_integral)/abs(ana_integral)
     if ( rdiff > rtolerance) then
         write(*,*)  '[TEST : cubic_spline_t%integrate: FAILED] , rdiff : ', rdiff
@@ -86,5 +87,7 @@ program test_spline_1d
      else 
         write(*,*)  '[TEST : cubic_spline_t%integrate: PASSED] , rdiff : ', rdiff
      end if 
-    
+
+     stop 0
+
 end program test_spline_1d

@@ -74,15 +74,20 @@ contains
       complex(r64), intent(in)   :: blm(:,:)
       complex(r64), intent(out)  :: clm(2*lmax+1)
 
+#ifdef USE_GPU
+      !$omp declare target
+#endif  
       complex(r64), allocatable :: fw(:)
-      external                  :: zgemv
-
+      integer(i64) :: i
       ! Multiply the function with the weights so the matrix-vector products solves the integral for all the (l,m)
       allocate(fw, source=f)
       fw(:) = fw(:) * weights(:)
       ! This is a small calculation so it is done in the CPU (Notice that we use only T not H since blm imaginary part is zero)
       ! clm = blm**T \cdot f
-      call zgemv('T', size(blm,1), size(blm,2), zone, blm, size(blm,1), fw, 1, zzero, clm, 1)
+      ! We need to write it by hand (GPU not supporting matmul intrinscic)
+      do i = 1, size(clm)
+        clm(i) = sum(blm(:,i) * fw(:))
+      end do
 
    end subroutine circ_harm_expansion
 

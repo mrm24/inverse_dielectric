@@ -69,6 +69,7 @@ program test_2d
     redpos(:,3) = [2.0_r64/3.0_r64 , 2.0_r64/3.0_r64, -0.14764992_r64]
 
     ! Init common objects
+    write(*,*) 'Init'
     call inv_diel%init_common(lattice, redpos, types, ngrid, 2_i64)
 
     ! Read the dielectric data from previous G0W0 run
@@ -76,16 +77,17 @@ program test_2d
     call load_from_file('wings.2d.dat', wingL, wingU)
     call load_from_file('body.2d.dat',  body)
 
-    write(*,*) sum(abs(wingL-conjg(wingU)))
-
     ! Do the average
     write(*,*) '[TEST: idiel_t (2d)]'
     do iom = 1, size(head,3)
         ! Invert body
+        write(*,*) 'Invert'
         call inv_diel%invert_body(body(:,:,iom))
         ! Load the data to the worker
+        write(*,*) 'Set blocks'
         call inv_diel%set_dielectric_blocks(head(:,:,iom), wingL(:,:,iom), wingU(:,:,iom))
         ! Compute the average
+        write(*,*) 'Compute'
         call inv_diel%compute_anisotropic_avg_scrcoulomb_2d(.false.)
 
         ! Check the head

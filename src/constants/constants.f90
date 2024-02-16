@@ -41,7 +41,7 @@ module idiel_constants
     !> 1.0/3.0
     real(r64), parameter :: onethird = 1.0_r64 / 3.0_r64
     !> The Y_{0}^{0} spherical harmonic
-    complex(r64), parameter :: y00 = cmplx(0.5_r64 * sqrt(1.0/pi),  0.0_r64, kind=r64)
+    complex(r64), parameter :: y00 = (0.28209479177387814_r64,  0.0_r64)
     
     !> Imaginary unit
     complex(r64), parameter :: iunit = cmplx(0.0_r64, 1.0_r64, kind=r64)

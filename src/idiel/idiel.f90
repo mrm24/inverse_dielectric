@@ -26,9 +26,9 @@ module idiel
     use idiel_circle_quadrature, only: compute_angular_mesh_gauss_legendre
     use idiel_circular_harmonics, only: circ_harm, circ_harm_expansion
 #ifdef USE_GPU
-    use idiel_gpu_magma_t, only: linalg_world_t, linalg_obj_t
+    use idiel_gpu_magma_t, only: linalg_world_t
 #else
-    use idiel_cpu_magma_t, only: linalg_world_t, linalg_obj_t
+    use idiel_cpu_magma_t, only: linalg_world_t
 #endif
 
     implicit none
@@ -64,8 +64,6 @@ module idiel
         real(r64), allocatable, private :: ang(:,:) 
         !> Mesh points (Cartesian)
         complex(r64), allocatable, private :: xyz(:,:) 
-        !> Linear algebra handler of xyz
-        type(linalg_obj_t), private :: ref_xyz
         !> Weights for the integrals (fine mesh)
         real(r64), allocatable, private :: weights_fine(:)
         !> Weights for the integrals (coarse mesh)

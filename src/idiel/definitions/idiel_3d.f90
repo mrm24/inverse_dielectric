@@ -47,11 +47,9 @@ contains
 
         ! Auxiliary vectors
         complex(r64), allocatable :: S(:,:)
-        type(linalg_obj_t) :: ref_S
         
         ! Macroscopic dielectric matrix
         complex(r64), allocatable :: L(:,:)
-        type(linalg_obj_t) :: ref_L
 
         ! Function from which to compute the integral 
         complex(r64), allocatable :: head_f(:) 
@@ -59,14 +57,21 @@ contains
         complex(r64), allocatable :: body_f(:)
 
         ! Harmonic expansion coefficients
-        complex(r64) :: clm_head(nsph_pair)
-        complex(r64) :: clm_body(nsph_pair) 
+        complex(r64), allocatable :: clm_head(:)
+        complex(r64), allocatable :: clm_body(:)
 
         ! Basis size
         integer(i64) :: nbasis
         
         ! Dummy indexes
         integer(i64) :: ii, jj, kk
+
+        ! For device
+        integer(i64)              :: nr
+        complex(r64), allocatable :: ylm(:,:)
+        real(r64), allocatable    :: weights(:)
+        complex(r64), allocatable :: angular_integrals(:)
+        complex(r64), allocatable :: body(:,:)
 
         ! Get the basis size
         nbasis = size(this%Binv, 1)
@@ -76,39 +81,29 @@ contains
         if (allocated(this%idiel_wingU)) deallocate(this%idiel_wingU)
         if (allocated(this%idiel_body))  deallocate(this%idiel_body)
 
-        ! Allocate space
-        allocate(head_f(this%quadrature_npoints))
-        allocate(wingL_f(this%quadrature_npoints, nbasis))
-        
-
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        !  Auxiliary vectorws and macroscopic dielectric matrix !
+        !  Auxiliary vectors and macroscopic dielectric matrix !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         ! Compute S_{\alpha}(\mathbf{G}) = \sum_{\mathbf{G'\neq 0}} B^{-1}_{\mathbf{GG'}} U_{\alpha}(\mathbf{G}) (Eq. B.13)
         ! and the local field effects of the head (Eq. B.14) in 10.1016/j.cpc.2006.07.018
         allocate(L, source=this%head)
-        call compute_auxiliary_and_macroscopic_3d(this%Binv, this%wingL, S, ref_S, L, ref_L, this%world)
-        
+        call compute_auxiliary_and_macroscopic_3d_hermitian(this%Binv, this%wingL, S, L, this%world)
+
         ! Symmetrize the elements of the macroscopic dielectric matrix and update it
         L   = this%symmetry%symmetryze_complex_tensor(L)
-        call ref_L%transfer_cpu_gpu(L, this%world)
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !               Compute the functions                   !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         ! HEAD: Compute \frac{\omega(\Omega)}{\mathbf{\hat{q} L \hat{q}}}  for the space grid
-        head_f(:)  =  compute_inverse_head(ref_L, this%xyz, this%ref_xyz, this%world)
-        call ref_L%destroy()
-        deallocate(L)
+        call compute_inverse_head(L, this%xyz, this%world, head_f)
 
         ! WINGS : Compute \frac{ \mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})}{\mathbf{\hat{q} L \hat{q}}} and
         ! \frac{ \mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})}{\mathbf{\hat{q} L \hat{q}}} 
         ! Note that there is head missing term to allow for the efficient computation of the body term
-        wingL_f =  compute_inverse_wingL(this%ref_xyz, ref_S, this%world)
-        call ref_S%destroy()
-        deallocate(S)
+        call compute_inverse_wingL(this%xyz, S, this%world, wingL_f)
         
         ! The body is directly computed as saving it to RAM is too intensive
         ! Note that wings functions are odd functions and thus their integral is zero, so no more work is done regarding those.
@@ -116,18 +111,45 @@ contains
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !  Do the anisotropic averaging !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        
+
         allocate(this%idiel_wingL(nbasis), source=zzero)
         allocate(this%idiel_wingU(nbasis), source=zzero)
         allocate(this%idiel_body, source = this%Binv)
-        
+
+        allocate(clm_head(nsph_pair))
         call sph_harm_expansion(nsph_pair, head_f, this%weights, this%ylm, clm_head)
         this%idiel_head  = sum(clm_head(:) * this%angular_integrals(:))
-        
+        deallocate(clm_head)
         ! Here we compute the body 
         ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
+#ifdef USE_GPU
+        ! We need to move to temporaries so it can be easily decomposed into kernels
+        nr = this%quadrature_npoints
+        call move_alloc(this%idiel_body       , body              )
+        call move_alloc(this%ylm              , ylm               )
+        call move_alloc(this%weights          , weights           )
+        call move_alloc(this%angular_integrals, angular_integrals )
+        !$omp target enter data map(to: ylm, weights, angular_integrals, body)
+        !$omp target teams distribute parallel do collapse(2) map(to: wingL_f, head_f) private(ii, jj, body_f, clm_body)
+        do ii = 1, nbasis
+            do jj = 1, nbasis
+                allocate(body_f(size(head_f)), clm_body(nsph_pair))
+                body_f(:) = head_f(:) * wingL_f(:, jj) * conjg(wingL_f(:, ii))
+                call sph_harm_expansion(nsph_pair, body_f, weights, ylm, clm_body)
+                body(jj, ii) = body(jj, ii) + sum(clm_body(:) * angular_integrals(:))
+                deallocate(body_f, clm_body)
+            end do
+        end do
+        !$omp end target teams distribute parallel do
+        !$omp target update from(body)
+        !$omp target exit data map(delete: ylm, weights, angular_integrals, body)
+        call move_alloc(body             , this%idiel_body        )
+        call move_alloc(ylm              , this%ylm               )
+        call move_alloc(weights          , this%weights           )
+        call move_alloc(angular_integrals, this%angular_integrals )
+#else
         !$omp parallel shared(this, head_f, wingL_f, nbasis) private(ii, jj, body_f, clm_body)
-        allocate(body_f(this%quadrature_npoints))
+        allocate(body_f(this%quadrature_npoints), clm_body(nsph_pair))
         !$omp do schedule(dynamic) collapse(2)
         do ii = 1, nbasis
             do jj = 1, nbasis
@@ -138,8 +160,9 @@ contains
             end do
         end do 
         !$omp end do
-        deallocate(body_f)
+        deallocate(body_f, clm_body)
         !$omp end parallel
+#endif
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !            Clean              !
@@ -157,11 +180,9 @@ contains
 
         ! Auxiliary vectors
         complex(r64), allocatable :: S(:,:), T(:,:)
-        type(linalg_obj_t) :: ref_S, ref_T
         
         ! Macroscopic dielectric matrix
         complex(r64), allocatable :: L(:,:)
-        type(linalg_obj_t) :: ref_L
 
         ! Function from which to compute the integral 
         complex(r64), allocatable :: head_f(:) 
@@ -170,8 +191,8 @@ contains
         complex(r64), allocatable :: body_f(:)
 
         ! Harmonic expansion coefficients
-        complex(r64) :: clm_head(nsph_pair)
-        complex(r64) :: clm_body(nsph_pair) 
+        complex(r64), allocatable :: clm_head(:)
+        complex(r64), allocatable :: clm_body(:)
 
         ! Basis size
         integer(i64) :: nbasis
@@ -187,12 +208,6 @@ contains
         if (allocated(this%idiel_wingU)) deallocate(this%idiel_wingU)
         if (allocated(this%idiel_body))  deallocate(this%idiel_body)
 
-        ! Allocate space
-        allocate(head_f(this%quadrature_npoints))
-        allocate(wingL_f(this%quadrature_npoints, nbasis))
-        allocate(wingU_f(this%quadrature_npoints, nbasis))
-        
-
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !  Auxiliary vectorws and macroscopic dielectric matrix !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -201,30 +216,23 @@ contains
         ! it also computes in this case the term for the upper wing
         ! and the local field effects of the head (Eq. B.14) in 10.1016/j.cpc.2006.07.018
         allocate(L, source=this%head)
-        call compute_auxiliary_and_macroscopic_3d(this%Binv, this%wingL, S, ref_S, L, ref_L, this%world, this%wingU, T, ref_T)
+        call compute_auxiliary_and_macroscopic_3d_general(this%Binv, this%wingL, S, this%wingU, T, L, this%world)
         
         ! Symmetrize the elements of the macroscopic dielectric matrix and update it
         L   = this%symmetry%symmetryze_complex_tensor(L) 
-        call ref_L%transfer_cpu_gpu(L, this%world)
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !               Compute the functions                   !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         ! HEAD: Compute \frac{\omega(\Omega)}{\mathbf{\hat{q} L \hat{q}}}  for the space grid
-        head_f(:)  =  compute_inverse_head(ref_L, this%xyz, this%ref_xyz, this%world)
-        call ref_L%destroy()
-        deallocate(L)
+        call  compute_inverse_head(L, this%xyz, this%world, head_f)
 
         ! WINGS : Compute \frac{ \mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})}{\mathbf{\hat{q} L \hat{q}}} and
         ! \frac{ \mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})}{\mathbf{\hat{q} L \hat{q}}} 
         ! Note that there is head missing term to allow for the efficient computation of the body term
-        wingL_f =  compute_inverse_wingL(this%ref_xyz, ref_S, this%world)
-        call ref_S%destroy()
-        deallocate(S)
-        wingU_f = compute_inverse_wingU(this%ref_xyz, ref_T, this%world)
-        call ref_T%destroy()
-        deallocate(T)
+        call compute_inverse_wingL(this%xyz, S, this%world, wingL_f)
+        call compute_inverse_wingU(this%xyz, T, this%world, wingU_f)
         
         ! The body is directly computed as saving it to RAM is too intensive
 
@@ -237,14 +245,42 @@ contains
         allocate(this%idiel_wingL(nbasis), source=zzero)
         allocate(this%idiel_wingU(nbasis), source=zzero)
         allocate(this%idiel_body, source = this%Binv)
-        
+
+        allocate(clm_head(nsph_pair))
         call sph_harm_expansion(nsph_pair, head_f, this%weights, this%ylm, clm_head)
         this%idiel_head  = sum(clm_head(:) * this%angular_integrals(:))
-        
+        deallocate(clm_head)
+
         ! Here we compute the body 
         ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
+#ifdef USE_GPU
+        ! We need to move to temporaries so it can be easily decomposed into kernels
+        nr = this%quadrature_npoints
+        call move_alloc(this%idiel_body       , body              )
+        call move_alloc(this%ylm              , ylm               )
+        call move_alloc(this%weights          , weights           )
+        call move_alloc(this%angular_integrals, angular_integrals )
+        !$omp target enter data map(to: ylm, weights, angular_integrals, body)
+        !$omp target teams distribute parallel do collapse(2) map(to: wingL_f, wingU_f head_f) private(ii, jj, body_f, clm_body)
+        do ii = 1, nbasis
+            do jj = 1, nbasis
+                allocate(body_f(size(head_f)), clm_body(nsph_pair))
+                body_f(:) = head_f(:) * wingL_f(:, jj) * wingU_f(:, ii)
+                call sph_harm_expansion(nsph_pair, body_f, weights, ylm, clm_body)
+                body(jj, ii) = body(jj, ii) + sum(clm_body(:) * angular_integrals(:))
+                deallocate(body_f, clm_body)
+            end do
+        end do
+        !$omp end target teams distribute parallel do
+        !$omp target update from(body)
+        !$omp target exit data map(delete: ylm, weights, angular_integrals, body)
+        call move_alloc(body             , this%idiel_body        )
+        call move_alloc(ylm              , this%ylm               )
+        call move_alloc(weights          , this%weights           )
+        call move_alloc(angular_integrals, this%angular_integrals )
+#else
         !$omp parallel shared(this, head_f, wingL_f, wingU_f, nbasis) private(ii, jj, body_f, clm_body)
-        allocate(body_f(this%quadrature_npoints))
+        allocate(body_f(this%quadrature_npoints),  clm_body(nsph_pair))
         !$omp do schedule(dynamic) collapse(2)
         do ii = 1, nbasis
             do jj = 1, nbasis
@@ -255,8 +291,9 @@ contains
             end do
         end do 
         !$omp end do
-        deallocate(body_f)
+        deallocate(body_f,  clm_body)
         !$omp end parallel
+#endif
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !            Clean              !

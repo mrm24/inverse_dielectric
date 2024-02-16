@@ -25,38 +25,17 @@ module idiel_cpu_magma_t
     implicit none
 
     private
-    public  linalg_world_t, linalg_obj_t
+    public  linalg_world_t
 
     !> Type to handle the GPU Magma queue and world
     type linalg_world_t
         !> Device id taking care of control
-        integer :: device = 0
+        integer :: device = -1
         !> GPU queue
         type(C_ptr), private  :: queue    = C_null_ptr
     contains
-        procedure, public :: init, finish, is_queue_set, get_queue, syncronize
+        procedure, public :: init, finish, is_queue_set, get_queue, syncronize, get_device
     end type linalg_world_t
-
-
-    !> Type to handle matrices in the GPU, if GPU is not enanbled it handles normal matrices
-    type linalg_obj_t
-        !> The pointer of the object (matrix/vector) in the CPU (fake the GPU)
-        class(*), pointer, private :: dA => null()
-        !> Rows
-        integer, private :: n_rows    = -1
-        !> Cols
-        integer, private :: n_cols    = -1
-        !> Element size
-        integer, private :: kind_size = -1
-        !> Kind of the obj
-        character(len=:), allocatable, private :: kind
-        !> Rank of the element
-        integer, private :: rank = -1
-    contains
-        procedure, public :: allocate_gpu, transfer_cpu_gpu, transfer_gpu_cpu
-        procedure, public :: gpu_ptr, rows, cols, get_kind
-        procedure, public :: destroy 
-    end type linalg_obj_t
 
 contains
 
@@ -102,141 +81,12 @@ contains
         class(linalg_world_t), target, intent(in) :: this
     end subroutine syncronize
 
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !                   UTILS                             !
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-    !> This polymorphic function returns the size of this kind in bytes (as Intel does not have it)
-    !> @param[in] this - the element from which the sizeof is asked
-    !> @result kind_size - the size of the kind of this in bytes
-    pure function sizeof_this(this) result(kind_size)
-                
-        class(*), intent(in) :: this(..)
-        integer(i32) :: kind_size
-
-        kind_size = STORAGE_SIZE(this) / STORAGE_SIZE('1')
-
-    end function sizeof_this
-
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !                   GPU OBJECTS                       !
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-    !> This deallocates the object in the GPU 
-    !> @param[in] this - linalg_obj_t object to destroy
-    subroutine destroy(this)
-        
-        class(linalg_obj_t), intent(inout) :: this
-
-        if (associated(this%dA)) nullify(this%dA)
-        
-        this%n_rows    = -1
-        this%n_cols    = -1
-        this%kind_size = -1
-        this%rank      = -1
-
-    end subroutine destroy
-
-    !> This subroutine allocates the matrix in the GPU
-    !> @param[in] this - gpu_matrix object for which GPU memory is allocated
-    !> @param[in] A    - object to mold the allocation
-    subroutine allocate_gpu(this, A)
-        
-        class(linalg_obj_t), intent(inout)       :: this
-        class(*), target, contiguous, intent(in) :: A(..)
-
-        integer, parameter :: info = 0
-        integer(C_size_t)  :: nbytes
-
-        ! Select the rank of the object
-        select rank(A)
-            rank(1)
-                this%rank   = rank(A)
-                this%n_rows = size(A,1)
-                this%n_cols = 1 
-                this%dA => A(1)
-                select type(A)
-                    type is (real(r64))
-                        this%kind = 'r64'
-                    type is (complex(r64))
-                        this%kind = 'c64'
-                    class default
-                        error stop "linalg_obj_t%allocate: Error in kind, only real and complex (r64) are accepted"
-                end select
-
-            rank(2)
-                this%rank   = rank(A)
-                this%n_rows = size(A,1)
-                this%n_cols = size(A,2)
-                this%dA => A(1,1)
-                select type(A)
-                    type is (real(r64))
-                        this%kind = 'r64'
-                    type is (complex(r64))
-                        this%kind = 'c64'
-                    class default
-                        error stop "linalg_obj_t%allocate: Error in kind, only real and complex (r64) are accepted"
-                end select
-
-            rank default
-                error stop "linalg_obj_t%allocate: Error in rank, only 1 and 2 are accepted"
-        end select
-
-        ! Get some information of the kind size
-        this%kind_size = sizeof_this(A)
-
-        if (info /= 0) error stop "linalg_obj_t%allocate: Error in allocating CPU memory"
-
-    end subroutine allocate_gpu
-
-    !> This subroutine fills a GPU matrix (sync) [DUMMY]
-    !> @param[in] this - gpu_matrix object for which GPU memory is allocated
-    !> @param[in] A    - object to transfer to the GPU
-    !> @param[in] world  - linalg_world_t for GPU operations 
-    subroutine transfer_cpu_gpu(this, A, world)
-        class(linalg_obj_t), intent(inout)          :: this
-        type(*), contiguous, intent(inout), target  :: A(..)
-        type(linalg_world_t), intent(inout)         :: world
-    end subroutine transfer_cpu_gpu
-
-    !> This subroutine retrieve a GPU element to the CPU (sync) [DUMMY]
-    !> @param[in] this - gpu_matrix object for which GPU memory is allocated
-    !> @param[in] A    - object to which the element from the GPU would be transfered to
-    !> @param[in] world  - linalg_world_t for GPU operations 
-    subroutine transfer_gpu_cpu(this, A, world)
-        class(linalg_obj_t), intent(inout)          :: this
-        type(*), contiguous, intent(in), target     :: A(..)
-        type(linalg_world_t), intent(inout)         :: world
-    end subroutine transfer_gpu_cpu
-
-    !> This function retrieves the pointer to the GPU data
-    !> @param[in] this - the obj from which retrieve the pointer to GPU data
-    function gpu_ptr(this) result(answer)
-        class(linalg_obj_t), intent(in) :: this
-        class(*), pointer :: answer
-        answer => this%dA 
-    end function gpu_ptr
-
-    !> This function retrieves the number of rows
-    !> @param[in] this - the obj from which retrieve info
-    pure integer function rows(this)       
-        class(linalg_obj_t), intent(in) :: this
-        rows = this%n_rows
-    end function rows
-
-    !> This function retrieves the number of cols
-    !> @param[in] this - the obj from which retrieve info
-    pure integer function cols(this)       
-        class(linalg_obj_t), intent(in) :: this
-        cols = this%n_cols
-    end function cols
-
-    !> This function retrieves the kind of the object
-    !> @param[in] this - the obj from which retrieve info
-    pure function get_kind(this) result(answer)
-        class(linalg_obj_t), intent(in) :: this
-        character(len=:), allocatable :: answer
-        answer = this%kind
-    end function get_kind
+    !> This provides device id
+    !> @param[in] this - return the associated device id
+    pure function get_device(this) result(device)
+        class(linalg_world_t), intent(in) :: this
+        integer :: device
+        device = this%device
+    end function get_device
 
 end module idiel_cpu_magma_t

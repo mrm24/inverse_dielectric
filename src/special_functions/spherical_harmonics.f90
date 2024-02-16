@@ -25,7 +25,6 @@ module idiel_spherical_harmonics
    private
    public :: sph_harm, sph_harm_expansion
 
-
 contains 
     
    !>   Generates a sequence of spherical harmonics, including the Condon-Shortley
@@ -115,7 +114,7 @@ contains
       deallocate(sn, cs, dx, cumul, t1, x)
    
    end subroutine sph_harm
-    
+   
    !> It expands the function f in terms of spherical harmonics 
    !> Notice that this function is intended to be used with a Lebedev grid of order N so the
    !> expansion coefficients should be accurate up to half of the order of the grid
@@ -125,7 +124,9 @@ contains
    !> @param[in] ylm     - the spherical harmonics in the mesh
    !> @param[out] clm     - the expansion coefficients
    subroutine sph_harm_expansion(n, f, weights, ylm, clm)
-
+#ifdef USE_GPU
+      !$omp declare target
+#endif 
       integer(i64), intent(in)  :: n
       complex(r64), intent(in)  :: f(:)
       real(r64),    intent(in)  :: weights(:)
@@ -133,15 +134,19 @@ contains
       complex(r64), intent(out) :: clm(n)
 
       complex(r64), allocatable :: fw(:)
-      external :: zgemv
+      integer(i64) :: i, j
 
       ! Multiply the function with the weights so the matrix-vector products solves the integral for all the (l,m)
       allocate(fw, source=f)
       fw(:) = fw(:) * weights(:)
-      
-      ! This is a small calculation so it is done in the CPU  
+
+      ! This is a small calculation so it is done with a hand-made definition of matmul so the GPU kernel can be built
       ! clm = Ylm**H \cdot f
-      call zgemv('C', size(ylm,1), size(ylm,2), zone, ylm, size(ylm,1), fw, 1, zzero, clm, 1)
+      do i = 1, n
+          clm(i) = dot_product(ylm(:,i),fw(:))
+      end do
+
+      deallocate(fw)
 
    end subroutine sph_harm_expansion
 
