@@ -1,4 +1,4 @@
-! Copyright 2023 EXCITING developers
+! Copyright (C) 2020-2024 GreenX library
 !
 ! Licensed under the Apache License, Version 2.0 (the "License");
 ! you may not use this file except in compliance with the License.
@@ -73,7 +73,6 @@ contains
 
         ! Allocate space
         allocate(qAq(this%quadrature_npoints))
-        allocate(wingL_f(this%quadrature_npoints, nbasis))
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !  Auxiliary vectors and macroscopic dielectric matrix !
@@ -87,9 +86,6 @@ contains
         
         ! agymmetrize the elements of the macroscopic dielectric matrix and update it
         A   = this%symmetry%symmetryze_complex_tensor(A)
-#ifdef USE_GPU
-        !$omp target update to(A)
-#endif
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !         Compute the functions  (angular part)         !
@@ -120,8 +116,7 @@ contains
                                   this%radii, this%rmax2d, this%rcut, qAq, this%vr)
 
         ! Here we compute the body 
-
-#ifdef  USE_GPU 
+#if defined(USE_GPU) && defined(HAVEOMP5)
         allocate(wLwU_f(this%quadrature_npoints))
         !$omp target enter data map(to: this%idiel_body) map(alloc: wLwU_f)
         !$omp target teams distribute parallel do shared(this, qAq, wingL_f, wingU_f, nbasis) private(ii, jj, wLwU_f)
@@ -197,7 +192,6 @@ contains
 
         ! Allocate space
         allocate(qAq(this%quadrature_npoints))
-        allocate(wingL_f(this%quadrature_npoints, nbasis))
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !  Auxiliary vectors and macroscopic dielectric matrix !
@@ -211,9 +205,6 @@ contains
         
         ! agymmetrize the elements of the macroscopic dielectric matrix and update it
         A   = this%symmetry%symmetryze_complex_tensor(A)
-#ifdef USE_GPU
-        !$omp target update to(A)
-#endif
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !         Compute the functions  (angular part)         !
@@ -242,7 +233,7 @@ contains
         this%idiel_head = head_2d(this%blm_coarse, this%weights, this%blm_fine, this%weights_fine, &
                                   this%radii, this%rmax2d, this%rcut, qAq, this%vr)
         
-#ifdef  USE_GPU 
+#if defined(USE_GPU) && defined(HAVEOMP5)
         allocate(wLwU_f(this%quadrature_npoints))
         !$omp target enter data map(to: this%idiel_body) map(alloc: wLwU_f)
         !$omp target teams distribute parallel do shared(this, qAq, wingL_f, nbasis) private(ii, jj, wLwU_f)
@@ -340,9 +331,9 @@ contains
         r_integral = zzero
         do ii = 1, ncir
             if ( maxval(abs(clm_head(ii,:))) < 1.0e-7_r64) cycle
-!             call init_cubic_spline_t(x, splines, integrals, r, r * clm_head(ii,:))
+             call init_cubic_spline_t(x, splines, integrals, r, r * clm_head(ii,:))
             do jj = 1, size_mesh_2d_fine
-!                 r_integral(jj, ii) = integrate(x, splines, integrals, 0.0_r64, rmax(jj))
+                 r_integral(jj, ii) = integrate(x, splines, integrals, 0.0_r64, rmax(jj))
             end do 
             deallocate(x, splines, integrals)
         end do
@@ -383,9 +374,9 @@ contains
         complex(r64), intent(in) :: qAq(:)
         complex(r64), intent(in) :: vr(:,:)
 
-#ifdef USE_GPU
+#if defined(USE_GPU) && defined(HAVEOMP5)
         !$omp declare target
-#endif
+#endif  
 
         complex(r64), allocatable         :: w_body_f(:,:)
         complex(r64)                      :: clm_body(ncir, nr)
@@ -416,11 +407,11 @@ contains
         r_integral(:,:) = zzero
         do ii = 1, ncir
             if (maxval(abs(clm_body(ii,:))) < 1.0e-7_r64) cycle
-!             call init_cubic_spline_t(x, splines, integrals, r, r * clm_body(ii,:))
+             call init_cubic_spline_t(x, splines, integrals, r, r * clm_body(ii,:))
             do jj = 1, size_mesh_2d_fine
-!                 r_integral(jj, ii) = integrate(x, splines, integrals, 0.0_r64, rmax(jj))
+                 r_integral(jj, ii) = integrate(x, splines, integrals, 0.0_r64, rmax(jj))
             end do 
-!             deallocate(x, splines, integrals)
+             deallocate(x, splines, integrals)
         end do
 
         ! Compute the integral

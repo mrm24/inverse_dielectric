@@ -1,4 +1,4 @@
-! Copyright 2023 EXCITING developers
+! Copyright (C) 2020-2024 GreenX library
 !
 ! Licensed under the Apache License, Version 2.0 (the "License");
 ! you may not use this file except in compliance with the License.
@@ -24,16 +24,6 @@ module idiel_circle_quadrature
     
     private 
     public :: compute_angular_mesh_gauss_legendre
-
-interface
-    !> Interface to CXX boost implementation of gauss legendre quadrature (TODO: substitution by pure Fortran procedure)
-    subroutine compute_gauss_legendre_cxx(n, x, w) bind(C,name="double_compute_gauss_legendre")
-        import
-        integer(C_int), value  :: n
-        type(C_ptr), value     :: x
-        type(C_ptr), value     :: w
-    end subroutine compute_gauss_legendre_cxx
-end interface
 
 contains 
 
@@ -70,13 +60,62 @@ contains
 
     end function cartesian_2_polar
 
-    !> Compute the gauss legendre mesh
+    !> Gauss-Legendre quadrature using G. Rybicki approach in range [-1,1]
+    !> @param[in]   n - the number of points
+    !> @param[out]  x - the abscisa points
+    !> @param[out]  w - weights
+    subroutine gauss_legendre_internal(n, x, w)
+        
+        integer(i64), intent(in)  :: n
+        real(r64),    intent(out) :: x(:)
+        real(r64),    intent(out) :: w(:)
+
+        integer(i64) :: i, j
+        real(r64), parameter :: tol = 1.0e-13_r64
+        real(r64) :: root, root_old
+        real(r64) :: p1, p2, p3, pp
+
+        ! We exploit the symmetry of the quadrature
+        do i=1, (n+1)/2
+            
+            ! Use Newton's method 
+            root     = cos(pi*(i-0.25_r64)/(n+0.5_r64))
+            root_old = huge(root)
+
+            do while(abs(root-root_old) >= tol)
+
+                p1=1.0_r64
+                p2=0.0_r64
+            
+                do j = 1, n
+                    p3 = p2
+                    p2 = p1
+                    p1 = ((2.0_r64*j - 1.0_r64) * root * p2 - (j-1.0_r64) * p3) / j
+                end do
+                ! compute the derivative
+
+                pp = n * (p2 - root * p1)/(1.0_r64-root**2)
+                root_old = root
+                root  = root_old - p1 / pp
+
+            end do
+            
+            x(i)= -root
+            x(n+1-i)= root
+            w(i)= 2.0_r64 / ((1.0_r64 - root**2) * pp**2)
+            w(n+1-i) = w(i)
+        
+        end do
+
+    end subroutine gauss_legendre_internal
+
+    !> Compute the gauss legendre mesh for arbitrary range
     !> @param[in]   n - the number of points 
     !> @param[in]   a - the lower bound of the integral
     !> @param[in]   b - the upper bound of the integral
     !> @param[out]  x - the abscisa points
     !> @param[out]  w - weights
-    subroutine compute_gauss_legendre_f90(n, a, b, x, w)
+    subroutine compute_gauss_legendre(n, a, b, x, w)
 
         integer(i64), intent(in) :: n
         real(r64), intent(in) :: a
@@ -88,7 +127,7 @@ contains
          
         allocate(x(n),w(n))
 
-        call compute_gauss_legendre_cxx( int(n,C_int), C_loc(x), C_loc(w))
+        call gauss_legendre_internal(n, x, w)!int(n,C_int), C_loc(x), C_loc(w))
 
         ! Remap
         dx    = 0.5_r64 * ( b - a )
@@ -96,7 +135,7 @@ contains
         x(:)  = dx * x(:) + shift
         w(:)  = dx * w(:)
 
-    end subroutine compute_gauss_legendre_f90
+    end subroutine compute_gauss_legendre
 
     !> Compute an angular mesh Gauss-Legendre for the angle
     !> @param[in]   mesh_size - the mesh size
@@ -117,7 +156,7 @@ contains
         integer(i64) :: i, idx 
 
         ! Build theta mesh
-        call compute_gauss_legendre_f90(mesh_size, 0.0_r64, twopi, x_phi, w)
+        call compute_gauss_legendre(mesh_size, 0.0_r64, twopi, x_phi, w)
 
         allocate(rphi(mesh_size,2), source=1.0_r64)
 

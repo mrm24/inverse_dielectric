@@ -1,4 +1,4 @@
-! Copyright 2023 EXCITING developers
+! Copyright (C) 2020-2024 GreenX library
 !
 ! Licensed under the Apache License, Version 2.0 (the "License");
 ! you may not use this file except in compliance with the License.
@@ -22,14 +22,16 @@ submodule (idiel) idiel_common
 
 contains
 
-    module subroutine init_common(this, lattice, redpos, elements, nq, dim)
+    module subroutine init_common(this, lattice, redpos, elements, nq, dim, nsym, crot)
 
-        class(idiel_t), intent(inout) :: this
-        real(r64), intent(in)         :: lattice(3,3)
-        real(r64),  intent(in)        :: redpos(:,:) 
-        integer(r64),  intent(in)     :: elements(:)
-        integer(i64), intent(in)      :: nq(3)
+        class(idiel_t), intent(inout)      :: this
+        real(r64), intent(in)              :: lattice(3,3)
+        real(r64),  intent(in)             :: redpos(:,:)
+        integer(r64),  intent(in)          :: elements(:)
+        integer(i64), intent(in)           :: nq(3)
         integer(i64), intent(in), optional :: dim
+        integer(i64), intent(in), optional :: nsym
+        real(r64), intent(in), optional    :: crot(:,:,:)
 
         ! Locals
         integer(i64) :: ii, ll, mm
@@ -57,8 +59,18 @@ contains
         ! Init reciprocal mesh size
         this%nq = nq
 
-        ! Initialize the symmetry
-        call this%symmetry%initialize(this%cell)
+        ! Initialize the symmetry using the external code if not fallback to SPGLIB (if available otherwise we raise error)
+        if (present(nsym) .and. present(crot)) then
+            this%symmetry%nsym = nsym
+            allocate(this%symmetry%crot(3,3,nsym))
+            this%symmetry%crot = crot
+        else
+#ifdef USE_SPGLIB
+            call this%symmetry%initialize(this%cell)      
+#else 
+            error stop "Error(idiel_t%init_common): missing symmetry information"
+#endif  
+        endif
 
         ! Process dimensionality
         if (present(dim)) this%dim = dim

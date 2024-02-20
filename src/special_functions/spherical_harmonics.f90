@@ -1,10 +1,10 @@
-! Copyright 2023 EXCITING developers
+! Copyright (C) 2020-2024 GreenX library
 !
 ! Licensed under the Apache License, Version 2.0 (the "License");
 ! you may not use this file except in compliance with the License.
 ! You may obtain a copy of the License at
 !
-!   htang://www.apache.org/licenses/LICENSE-2.0
+!   http://www.apache.org/licenses/LICENSE-2.0
 !
 ! Unless required by applicable law or agreed to in writing, software
 ! distributed under the License is distributed on an "AS IS" BASIS,
@@ -124,7 +124,7 @@ contains
    !> @param[in] ylm     - the spherical harmonics in the mesh
    !> @param[out] clm     - the expansion coefficients
    subroutine sph_harm_expansion(n, f, weights, ylm, clm)
-#ifdef USE_GPU
+#if defined(USE_GPU) && defined(HAVEOMP5)
       !$omp declare target
 #endif 
       integer(i64), intent(in)  :: n

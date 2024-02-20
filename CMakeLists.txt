@@ -4,13 +4,18 @@ cmake_minimum_required(VERSION 3.20.0 FATAL_ERROR)
 option(GPU "GPU support" OFF)
 option(BENCHMARK "Generate the benchmark executables" OFF)
 option(INTERFACES "Python bindings" OFF)
+option(SPGLIB "Compile with spglib" ON)
+option(OMP5 "If OMP5 support is enabled it offload body corrections to the GPU : only gfortran >= 14.00 -- though it is slow" OFF)
 
 # Check GPU support
 if(GPU)
-  # This is only to automatically link GPU libraries
-  project(inverse_dielectric_library Fortran CXX)
-  # Setting MAGMA library
-  add_compile_definitions(USE_GPU)
+    # This is only to automatically link GPU libraries
+    project(inverse_dielectric_library Fortran CXX)
+    add_compile_definitions(USE_GPU)
+    if (OMP5)
+      add_compile_definitions(HAVEOMP5)
+    endif()
+    # Setting MAGMA library
     set(MAGMA_F90_DIR ${PROJECT_SOURCE_DIR}/external/magma)
     set(SRC_MAGMA_F90
            ${MAGMA_F90_DIR}/magma2.F90
@@ -22,9 +27,17 @@ if(GPU)
     set(MAGMA_DIR "None" CACHE PATH "Path to magma library")
     message(STATUS "magma library path : ${MAGMA_DIR}")
 else()
-  project(inverse_dielectric_library Fortran CXX)
-  set(MAGMA_F90_DIR "")
-  set(SRC_MAGMA_F90 "")
+    project(inverse_dielectric_library Fortran CXX)
+    set(MAGMA_F90_DIR "")
+    set(SRC_MAGMA_F90 "")
+endif()
+
+# Check compilers for GPU offloading using OMP5
+if(GPU AND OMP5)
+  if (NOT CMAKE_Fortran_COMPILER MATCHES "gfortran" AND 
+       CMAKE_Fortran_COMPILER_VERSION LESS 1400) 
+    message(FATAL_ERROR "GPU offload of loops is only supported by gfortran version >= 14")
+  endif()
 endif()
 
 # Select compilers
@@ -38,68 +51,43 @@ if(CMAKE_Fortran_COMPILER MATCHES "ifx")
                             ")
     # Set MKL as linear algebra library
     set(linalg_lib "mkl_intel_lp64 mkl_intel_thread mkl_core iomp5 pthread m dl")
-    if (GPU)
-	    message(FATAL_ERROR "GPU untested in Intel Compiler")
-    endif()
 elseif(CMAKE_Fortran_COMPILER MATCHES "gfortran")
     message(STATUS "GNU compilers")
     set(CMAKE_CXX_COMPILER "g++")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O2 -fPIC -fopenmp")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3 -fPIC -fopenmp")
     set(CMAKE_Fortran_COMPILER "gfortran")
-    if(GPU)
-      set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O2 -fPIC \
+    if(GPU AND OMP5)
+      set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O3 -fPIC \
                                 -ffree-line-length-512 -fopenmp \
                                 -foffload-options=-lgfortran -foffload-options=-lm")
     else()
-      set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O2 -fPIC \
-                                -ffree-line-length-512 -fdefault-real-8 -fopenmp \
+      set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O3 -fPIC \
+                                -ffree-line-length-512 -fopenmp \
                                 ")
-    endif(GPU)
+    endif()
     # Set OpenBLAS as linear algebra library
     set(linalg_lib "openblas")
 elseif(CMAKE_Fortran_COMPILER MATCHES "nvfortran")
     message(STATUS "NVIDIA compilers")
     set(CMAKE_CXX_COMPILER "nvc++")
     set(CMAKE_Fortran_COMPILER "nvfortran")
-    if(GPU)
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3 -fPIC -mp=gpu")
-      set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O3 -fPIC \
-                                -mp=gpu\
-                                ")
-    else()
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3 -fPIC -mp")
-      set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O3 -fPIC \
-                               -mp \
-                                ")
-    endif(GPU)
-    # Set OpenBLAS as linear algebra library
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3 -fPIC -mp")
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O3 -fPIC \
+                             -mp \
+                              ")
     set(linalg_lib "openblas")
 else()
     message(FATAL_ERROR "Compiler is not recognized: only GNU, Intel and NVIDIA compilers are officially supported")
 endif()
 
-
-
-# Set BOOST library
-set(Boost_USE_STATIC_LIBS OFF) 
-set(Boost_USE_MULTITHREADED ON)  
-set(Boost_USE_STATIC_RUNTIME OFF) 
-find_package(Boost) 
-
-if(Boost_FOUND)
-    include_directories(${Boost_INCLUDE_DIRS})
-else()
-    message(STATUS "Using Boost_INCLUDE_DIRS variable")
-    set(Boost_INCLUDE_DIRS "None" CACHE PATH "Path to Boost include")
-    include_directories(${Boost_INCLUDE_DIRS})
-    message(STATUS "Boost path : ${Boost_INCLUDE_DIRS}")
-endif()
-
 # Find SPGLIB
-set(SPGLIBDIR "None" CACHE PATH "Path to spglib")
-set(CMAKE_PREFIX_PATH ${SPGLIBDIR})
-find_library(spg_lib NAMES spg spglib libsymspg symspg PATHS ${SPGLIBDIR} REQUIRED)
-message(STATUS "SPGLIB found : ${spg_lib}")
+if (SPGLIB)
+  add_compile_definitions(USE_SPGLIB)
+  set(SPGLIBDIR "None" CACHE PATH "Path to spglib")
+  set(CMAKE_PREFIX_PATH ${SPGLIBDIR})
+  find_library(spg_lib NAMES spg spglib libsymspg symspg PATHS ${SPGLIBDIR} REQUIRED)
+  message(STATUS "SPGLIB found : ${spg_lib}")
+endif()
 
 # Create INSTALL DIRECTORY
 set(INSTALL_DIR "${PROJECT_SOURCE_DIR}/IDieL")

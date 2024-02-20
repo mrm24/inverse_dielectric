@@ -1,4 +1,4 @@
-! Copyright 2023 EXCITING developers
+! Copyright (C) 2020-2024 GreenX library
 !
 ! Licensed under the Apache License, Version 2.0 (the "License");
 ! you may not use this file except in compliance with the License.
@@ -49,6 +49,10 @@ program test_2d
     ! Computation object
     type(idiel_t) :: inv_diel
 
+    ! In case that no SPG we set only Identity (i.e. no symmetry)
+    integer(i64) :: nsym = 1
+    real(r64)    :: crot(3,3,1)
+
     ! Lattice vectors
     a(:) = [0.00000000_r64, 6.020289060_r64, 0.00000000_r64]
     b(:) = [5.213723260_r64, 3.010144530_r64, 0.00000000_r64]
@@ -70,7 +74,15 @@ program test_2d
 
     ! Init common objects
     write(*,*) 'Init'
+#ifdef USE_SPGLIB
     call inv_diel%init_common(lattice, redpos, types, ngrid, 2_i64)
+#else 
+    crot = 0.0_r64
+    crot(1,1,1) = 1.0_r64
+    crot(2,3,1) = 1.0_r64
+    crot(3,3,1) = 1.0_r64
+    call inv_diel%init_common(lattice, redpos, types, ngrid, 2_i64, nsym, crot)
+#endif
 
     ! Read the dielectric data from previous G0W0 run
     call load_from_file('head.2d.dat',  head)

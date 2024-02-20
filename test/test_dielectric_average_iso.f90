@@ -1,4 +1,4 @@
-! Copyright 2023 EXCITING developers
+! Copyright (C) 2020-2024 GreenX library
 !
 ! Licensed under the Apache License, Version 2.0 (the "License");
 ! you may not use this file except in compliance with the License.
@@ -37,6 +37,9 @@ program test_dielectric_average_iso
     real(r64) :: a(3), b(3), c(3), lattice(3,3)
     real(r64), allocatable :: redpos(:,:)
     integer(i64), allocatable :: types(:)
+    ! In case that no SPG we set only Identity (i.e. no symmetry)
+    integer(i64) :: nsym = 1
+    real(r64)    :: crot(3,3,1)
 
     ! Dielectric data
     complex(r64), allocatable :: head(:,:,:), wingL(:,:,:)
@@ -72,8 +75,15 @@ program test_dielectric_average_iso
     redpos(:,2) = [0.25_r64, 0.25_r64, 0.25_r64]
 
     ! Init common objects
+#ifdef USE_SPGLIB
     call inv_diel%init_common(lattice, redpos, types, ngrid)
-
+#else 
+    crot = 0.0_r64
+    crot(1,1,1) = 1.0_r64
+    crot(2,3,1) = 1.0_r64
+    crot(3,3,1) = 1.0_r64
+    call inv_diel%init_common(lattice, redpos, types, ngrid, nsym, crot)
+#endif
     ! Read the dielectric data from previous G0W0 run
     call load_from_file('head.dat', head)
     call load_from_file('wingL.dat', wingL)
@@ -91,12 +101,12 @@ program test_dielectric_average_iso
         ! Check the head
         rdiff = abs(inv_diel%idiel_head - head_ref(iom))/head_ref(iom)
         write(*,'(A,I2,A,e20.13)')  '  * Regression (HEAD,',iom,') result (relative difference): ', rdiff
-!         if ( rdiff .lt. tolerance) then
-!             write(*,*)  '[TEST : idiel_t (HEAD,',iom,'): PASSED]'
-!         else
-!             write(*,*)  '[TEST : idiel_t (HEAD,',iom,'): FAILED]'
-!             stop 1
-!         end if
+        if ( rdiff .lt. tolerance) then
+            write(*,*)  '[TEST : idiel_t (HEAD,',iom,'): PASSED]'
+        else
+            write(*,*)  '[TEST : idiel_t (HEAD,',iom,'): FAILED]'
+            stop 1
+        end if
 
         ! Check that the wings are zzero (though they are by construction)
         rdiff = sum(abs(inv_diel%idiel_wingL))

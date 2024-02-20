@@ -1,4 +1,4 @@
-! Copyright 2023 EXCITING developers
+! Copyright (C) 2020-2024 GreenX library
 !
 ! Licensed under the Apache License, Version 2.0 (the "License");
 ! you may not use this file except in compliance with the License.
@@ -28,9 +28,9 @@ contains
     !> @return answer   - the index such that array(i) < value 
     pure function lower_bound(array, value) result(answer)
 
-!#ifdef USE_GPU
-!        !$omp declare target
-!#endif
+#if defined(USE_GPU) && defined(HAVEOMP5)
+    !$omp declare target
+#endif  
 
         real(r64), intent(in) :: array(:)
         real(r64), intent(in) :: value 
@@ -65,9 +65,9 @@ contains
     !> @param[in]    y    - data that need to be interpolated
     subroutine init_cubic_spline_t(xlim, splines, integrals, x, y)
 
-!#ifdef USE_GPU
-!        !$omp declare target
-!#endif
+#if defined(USE_GPU) && defined(HAVEOMP5)
+        !$omp declare target
+#endif  
         real(r64),    allocatable, intent(inout)  :: xlim(:)
         complex(r64), allocatable, intent(inout)  :: splines(:,:)
         complex(r64), allocatable, intent(inout)  :: integrals(:)
@@ -150,9 +150,10 @@ contains
     !> @result    integral - the integral between a and b
     pure function cubic_poly_integral(a, b, c, d, x0, xa, xb) result(integral)
 
-!#ifdef USE_GPU
-!        !$omp declare target
-!#endif
+#if defined(USE_GPU) && defined(HAVEOMP5)
+    !$omp declare target
+#endif  
+
         complex(r64), intent(in)           :: a
         complex(r64), intent(in)           :: b
         complex(r64), intent(in)           :: c
@@ -173,10 +174,10 @@ contains
     !> @param[in] new_x - the x at which the data should be interpolated
     !> @result interpolated_y - the interpolated data
     pure function interpolate(xlim, splines, new_x) result(interpolated_y)
-        
-!#ifdef USE_GPU
-!        !$omp declare target
-!#endif
+
+#if defined(USE_GPU) && defined(HAVEOMP5)
+    !$omp declare target
+#endif  
         real(r64),    intent(in)  :: xlim(:)
         complex(r64), intent(in)  :: splines(:,:)
         real(r64),    intent(in)  :: new_x
@@ -202,10 +203,10 @@ contains
     !> @param[in] low  - the low limit of the integral
     !> @param[in] up   - the upper limit of the integral
     pure function integrate(xlim, splines, integrals, low, up) result(integral)
-
-!#ifdef USE_GPU
-!        !$omp declare target
-!#endif
+    
+#if defined(USE_GPU) && defined(HAVEOMP5)
+    !$omp declare target
+#endif  
         real(r64),    intent(in)          :: xlim(:)
         complex(r64), intent(in)          :: splines(:,:)
         complex(r64), intent(in)          :: integrals(:)
@@ -264,10 +265,10 @@ contains
     !> @param[in] x - the x at which the derivative should be interpolated
     !> @result dydx - the derivative at x
     pure function derivative(xlim, splines, x) result(dydx)
-        
-!#ifdef USE_GPU
-!        !$omp declare target
-!#endif
+
+#if defined(USE_GPU) && defined(HAVEOMP5)
+    !$omp declare target
+#endif  
 
         real(r64),    intent(in)  :: xlim(:)
         complex(r64), intent(in)  :: splines(:,:)

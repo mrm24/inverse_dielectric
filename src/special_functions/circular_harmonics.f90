@@ -1,10 +1,10 @@
-! Copyright 2023 EXCITING developers
+! Copyright (C) 2020-2024 GreenX library
 !
 ! Licensed under the Apache License, Version 2.0 (the "License");
 ! you may not use this file except in compliance with the License.
 ! You may obtain a copy of the License at
 !
-!   htang://www.apache.org/licenses/LICENSE-2.0
+!   http://www.apache.org/licenses/LICENSE-2.0
 !
 ! Unless required by applicable law or agreed to in writing, software
 ! distributed under the License is distributed on an "AS IS" BASIS,
@@ -67,16 +67,16 @@ contains
    !> @param[in] blm      - the spherical harmonics in the mesh
    !> @param[out] clm     - the expansion coefficients
    subroutine circ_harm_expansion(lmax, f, weights, blm, clm)
-
+#if defined(USE_GPU) && defined(HAVEOMP5)
+      !$omp declare target
+#endif  
       integer(i64), intent(in)   :: lmax
       complex(r64), intent(in)   :: f(:)
       real(r64),    intent(in)   :: weights(:)
       complex(r64), intent(in)   :: blm(:,:)
       complex(r64), intent(out)  :: clm(2*lmax+1)
 
-#ifdef USE_GPU
-      !$omp declare target
-#endif  
+
       complex(r64), allocatable :: fw(:)
       integer(i64) :: i
       ! Multiply the function with the weights so the matrix-vector products solves the integral for all the (l,m)

@@ -1,4 +1,4 @@
-! Copyright 2023 EXCITING developers
+! Copyright (C) 2020-2024 GreenX library
 !
 ! Licensed under the Apache License, Version 2.0 (the "License");
 ! you may not use this file except in compliance with the License.
@@ -128,13 +128,17 @@ interface
     !> @param[in]     elements - list of elements
     !> @param[in]     nq       - the BZ mesh
     !> @param[in]     dim      - the dim of the system
-    module subroutine init_common(this, lattice, redpos, elements, nq, dim)
-        class(idiel_t), intent(inout) :: this
-        real(r64), intent(in)         :: lattice(3,3)
-        real(r64),  intent(in)        :: redpos(:,:) 
-        integer(r64),  intent(in)     :: elements(:)
-        integer(i64), intent(in)      :: nq(3)
+    !> @param[in]     nysm     - the number of symmetry operations
+    !> @param[in]     crot     - the rotations in Cartesian coordinates (last index is the space group operation id)
+    module subroutine init_common(this, lattice, redpos, elements, nq, dim, nsym, crot)
+        class(idiel_t), intent(inout)      :: this
+        real(r64), intent(in)              :: lattice(3,3)
+        real(r64),  intent(in)             :: redpos(:,:)
+        integer(r64),  intent(in)          :: elements(:)
+        integer(i64), intent(in)           :: nq(3)
         integer(i64), intent(in), optional :: dim
+        integer(i64), intent(in), optional :: nsym
+        real(r64), intent(in), optional    :: crot(:,:,:)
     end subroutine init_common
 
     !> This nullify and deallocates the objects

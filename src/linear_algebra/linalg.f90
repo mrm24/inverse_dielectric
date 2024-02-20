@@ -1,4 +1,4 @@
-! Copyright 2023 Exciting developers
+! Copyright (C) 2020-2024 GreenX library
 !
 ! Licensed under the Apache License, Version 2.0 (the "License");
 ! you may not use this file except in compliance with the License.
@@ -211,7 +211,7 @@ contains
         complex(r64),    target, allocatable, intent(inout) :: L(:,:)
         complex(r64),    target, allocatable, intent(in)    :: q(:,:)
         type(linalg_world_t), intent(inout)                 :: world
-        complex(r64), allocatable, intent(inout)            :: invqLq(:)
+        complex(r64), allocatable, intent(out)              :: invqLq(:)
 
         complex(r64), target, allocatable :: Lq(:,:)
         integer(i32) :: nr 
@@ -219,6 +219,7 @@ contains
 
 #ifdef USE_GPU
         type(C_ptr) :: q_dptr, Lq_dptr, L_dptr 
+        integer     :: device
 #else
         ! External
         external :: zgemm
@@ -228,7 +229,11 @@ contains
         allocate(Lq, mold=q)
 
 #ifdef USE_GPU
-        !$omp target enter data map(to: q, L) map(alloc: Lq)
+
+        !$omp target enter data map(to: q)
+        !$omp target enter data map(to: L)
+        !$omp target enter data map(alloc: Lq)
+
         L_dptr   = omp_get_mapped_ptr(C_loc(L) , world%get_device())
         Lq_dptr  = omp_get_mapped_ptr(C_loc(Lq), world%get_device())
         q_dptr   = omp_get_mapped_ptr(C_loc(q) , world%get_device())
@@ -243,7 +248,7 @@ contains
         if (allocated(invqLq)) deallocate(invqLq)
         allocate(invqLq(size(q,2)))
 #ifdef USE_GPU 
-        !$omp target teams distribute parallel do private(i) shared(invqLq, Lq, q) map(tofrom: invqLq)
+        !$omp target teams distribute parallel do private(i) map(tofrom: invqLq)
         do i = 1, size(q,2)
                 invqLq(i) = 1.0_r64 / dot_product(q(:,i),Lq(:,i))
         end do
@@ -403,8 +408,8 @@ contains
         call magma_zgemm(MagmaTrans, MagmaNoTrans, 3, 3, nb, -zone, wingU_dptr, &
                     nb, ag_dptr, nb, zone, A_dptr, 3, world%get_queue())
         call world%syncronize()
-        !$omp target update from(A)
-        !$omp target exit data map(delete: Binv, wingU, wingL)
+        !$omp target update from(A, ag, bg)
+        !$omp target exit data map(delete: Binv, wingU, wingL, A, ag, bg)
 #else
         call zgemm('n', 'n', nb,  3, nb,  -zone, Binv,  nb, wingL, nb, zzero, ag, nb)
         call zgemm('t', 'n',  3, nb, nb,  -zone, wingU, nb, Binv, nb, zzero, bg, 3)
@@ -458,8 +463,8 @@ contains
         call magma_zgemm(MagmaConjTrans, MagmaNoTrans, 3, 3, nb, -zone, wingL_dptr, &
                         nb, ag_dptr, nb, zone, A_dptr, 3, world%get_queue())
         call world%syncronize()
-        !$omp target update from(A)
-        !$omp target exit data map(delete: Binv, wingL)
+        !$omp target update from(A, ag)
+        !$omp target exit data map(delete: Binv, wingL, A, ag)
 #else
         call zgemm('n', 'n', nb, 3, nb, -zone, Binv,  nb, wingL, nb, zzero, ag, nb)
         call zgemm('c', 'n',  3, 3, nb, -zone, wingL, nb, ag,     nb, zone,  A, 3)
@@ -495,6 +500,8 @@ contains
         allocate(Aq, mold=q)
 
 #ifdef USE_GPU
+        !$omp target enter data map(to: A)
+        !$omp target enter data map(to: q)
         !$omp target enter data map(alloc: Aq)
         A_dptr   = omp_get_mapped_ptr(C_loc(A) , world%get_device())
         Aq_dptr  = omp_get_mapped_ptr(C_loc(Aq), world%get_device())
@@ -508,14 +515,12 @@ contains
 
         allocate(qAq(size(q,2)))
 #ifdef USE_GPU 
-        !$omp target enter data map(alloc: qAq)
-        !$omp target teams distribute parallel do private(i) shared(qAq, Aq, q)
+        !$omp target teams distribute parallel do private(i) map(tofrom: qAq)
         do i = 1, size(q,2)
-                qAq(i) = dot_product(q(:,i),Aq(:,i)) 
+                qAq(i) = dot_product(q(:,i),Aq(:,i))
         end do
         !$omp end target teams distribute parallel do
-        !$omp target exit data map(delete: Aq, A)
-        !$omp target update from(qAq)
+        !$omp target exit data map(delete: Aq, A, q)
 #else       
         !$omp parallel shared(qAq, Aq, q) private(i)
         !$omp do

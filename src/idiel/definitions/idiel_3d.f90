@@ -1,4 +1,4 @@
-! Copyright 2023 EXCITING developers
+! Copyright (C) 2020-2024 GreenX library
 !
 ! Licensed under the Apache License, Version 2.0 (the "License");
 ! you may not use this file except in compliance with the License.
@@ -122,27 +122,28 @@ contains
         deallocate(clm_head)
         ! Here we compute the body 
         ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
-#ifdef USE_GPU
+#if defined(USE_GPU) && defined(HAVEOMP5)
         ! We need to move to temporaries so it can be easily decomposed into kernels
         nr = this%quadrature_npoints
         call move_alloc(this%idiel_body       , body              )
         call move_alloc(this%ylm              , ylm               )
         call move_alloc(this%weights          , weights           )
         call move_alloc(this%angular_integrals, angular_integrals )
-        !$omp target enter data map(to: ylm, weights, angular_integrals, body)
-        !$omp target teams distribute parallel do collapse(2) map(to: wingL_f, head_f) private(ii, jj, body_f, clm_body)
+        allocate(body_f(nr), clm_body(nsph_pair))
+        !$omp target enter data map(to: ylm, weights, angular_integrals)
+        !$omp target teams distribute map(tofrom: body) map(to: wingL_f, head_f) map(alloc: body_f, clm_body) private(ii, jj, body_f, clm_body)
         do ii = 1, nbasis
+            !$omp parallel do private(ii, jj, body_f, clm_body)
             do jj = 1, nbasis
-                allocate(body_f(size(head_f)), clm_body(nsph_pair))
                 body_f(:) = head_f(:) * wingL_f(:, jj) * conjg(wingL_f(:, ii))
                 call sph_harm_expansion(nsph_pair, body_f, weights, ylm, clm_body)
-                body(jj, ii) = body(jj, ii) + sum(clm_body(:) * angular_integrals(:))
-                deallocate(body_f, clm_body)
+                body(jj,ii) = body(jj,ii) + sum(clm_body(:) * angular_integrals(:))
             end do
+            !$omp end parallel do
         end do
-        !$omp end target teams distribute parallel do
-        !$omp target update from(body)
-        !$omp target exit data map(delete: ylm, weights, angular_integrals, body)
+        !$omp end target teams distribute
+        !$omp target exit data map(delete: ylm, weights, angular_integrals)
+        deallocate(body_f, clm_body)
         call move_alloc(body             , this%idiel_body        )
         call move_alloc(ylm              , this%ylm               )
         call move_alloc(weights          , this%weights           )
@@ -200,6 +201,13 @@ contains
         ! Dummy indexes
         integer(i64) :: ii, jj
 
+        ! For device
+        integer(i64)              :: nr
+        complex(r64), allocatable :: ylm(:,:)
+        real(r64), allocatable    :: weights(:)
+        complex(r64), allocatable :: angular_integrals(:)
+        complex(r64), allocatable :: body(:,:)
+
         ! Get the basis size
         nbasis = size(this%Binv, 1)
 
@@ -253,7 +261,7 @@ contains
 
         ! Here we compute the body 
         ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
-#ifdef USE_GPU
+#if defined(USE_GPU) && defined(HAVEOMP5)
         ! We need to move to temporaries so it can be easily decomposed into kernels
         nr = this%quadrature_npoints
         call move_alloc(this%idiel_body       , body              )
@@ -261,17 +269,21 @@ contains
         call move_alloc(this%weights          , weights           )
         call move_alloc(this%angular_integrals, angular_integrals )
         !$omp target enter data map(to: ylm, weights, angular_integrals, body)
-        !$omp target teams distribute parallel do collapse(2) map(to: wingL_f, wingU_f head_f) private(ii, jj, body_f, clm_body)
+        !$omp target map(to: wingL_f, head_f, wingU_f)
+        !$omp parallel private(ii, jj, body_f, clm_body)
+        allocate(body_f(nr), clm_body(nsph_pair))
+        !$omp do collapse(2)
         do ii = 1, nbasis
             do jj = 1, nbasis
-                allocate(body_f(size(head_f)), clm_body(nsph_pair))
                 body_f(:) = head_f(:) * wingL_f(:, jj) * wingU_f(:, ii)
                 call sph_harm_expansion(nsph_pair, body_f, weights, ylm, clm_body)
-                body(jj, ii) = body(jj, ii) + sum(clm_body(:) * angular_integrals(:))
-                deallocate(body_f, clm_body)
+                body(jj,ii) = body(jj,ii) + sum(clm_body(:) * angular_integrals(:))
             end do
         end do
-        !$omp end target teams distribute parallel do
+        !$omp end do
+        deallocate(body_f, clm_body)
+        !$omp end parallel
+        !$omp end target
         !$omp target update from(body)
         !$omp target exit data map(delete: ylm, weights, angular_integrals, body)
         call move_alloc(body             , this%idiel_body        )

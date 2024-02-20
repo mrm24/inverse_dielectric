@@ -1,4 +1,4 @@
-! Copyright 2023 EXCITING developers
+! Copyright (C) 2020-2024 GreenX library
 !
 ! Licensed under the Apache License, Version 2.0 (the "License");
 ! you may not use this file except in compliance with the License.
@@ -38,10 +38,14 @@ module idiel_crystal_symmetry
         !> Rotation matrices Cartesian coordinates
         real(r64), allocatable :: crot(:,:,:)
     contains
-        procedure, public :: initialize=>init_symmetry, symmetryze_complex_tensor
+#ifdef USE_SPGLIB
+        procedure, public :: initialize=>init_symmetry
+#endif
+        procedure, public :: symmetryze_complex_tensor
         final :: clean
     end type symmetry_t
 
+#ifdef USE_SPGLIB
 interface
 
     !> Interface to spg_get_multiplicity (this gives the number of symmetry operations)
@@ -108,6 +112,7 @@ interface
 
 
 end interface
+#endif
 
 contains
 
@@ -119,6 +124,8 @@ contains
         if (allocated(this%crot)) deallocate(this%crot)
         if (allocated(this%qrot)) deallocate(this%qrot)
     end subroutine clean
+
+#ifdef USE_SPGLIB
 
     !> @brief Initializes the symmetry object
     !> @param[in,out] this      - the cell object to deallocate
@@ -202,6 +209,8 @@ contains
         end do
 
     end subroutine init_symmetry
+
+#endif
 
     !> Symmetrizes a Cartesian complex double precision tensor
     !> @param[in] this - symmetry object
