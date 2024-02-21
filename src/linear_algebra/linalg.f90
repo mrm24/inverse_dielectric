@@ -142,8 +142,8 @@ contains
         call magma_zgemm(MagmaTrans, MagmaNoTrans, 3, 3, nb, -zone, wingU_dptr, &
                     nb, S_dptr, nb, zone, L_dptr, 3, world%get_queue())
         call world%syncronize()
-        !$omp target update from(L, S)
-        !$omp target exit data map(delete: Binv, wingU, wingL, L, S)
+        !$omp target update from(L, S, T)
+        !$omp target exit data map(delete: Binv, wingU, wingL, L, S, T)
 #else
         call zgemm('n', 'n', nb,  3, nb,  zone, Binv,  nb, wingL, nb, zzero, S, nb)
         call zgemm('t', 'n',  3, nb, nb,  zone, wingU, nb, Binv, nb, zzero, T, 3)
@@ -175,7 +175,6 @@ contains
         ! External
         external :: zgemm
 #endif
-
         nb = size(Binv,1)
         allocate(S(nb,3))
 

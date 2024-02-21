@@ -134,19 +134,21 @@ contains
       complex(r64), intent(out) :: clm(n)
 
       complex(r64), allocatable :: fw(:)
-      integer(i64) :: i, j
+      integer(i64) :: i
 
       ! Multiply the function with the weights so the matrix-vector products solves the integral for all the (l,m)
-      allocate(fw, source=f)
-      fw(:) = fw(:) * weights(:)
+      allocate(fw, mold=f)
+      fw(:) = f(:) * weights(:)
 
       ! This is a small calculation so it is done with a hand-made definition of matmul so the GPU kernel can be built
       ! clm = Ylm**H \cdot f
+      !$omp parallel do private(i)
       do i = 1, n
           clm(i) = dot_product(ylm(:,i),fw(:))
       end do
+      !$omp end parallel do
 
-      deallocate(fw)
+      return
 
    end subroutine sph_harm_expansion
 

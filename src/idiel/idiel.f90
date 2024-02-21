@@ -123,7 +123,7 @@ interface
 
     !> This initializes everything common (i.e. without frequency dependency) to all computations
     !> @param[in,out] this - idiel_t object
-    !> @param[in]     lattice  - lattice vectors given in rows [nm]
+    !> @param[in]     lattice  - lattice vectors given in rows 
     !> @param[in]     redpos   - reduced positions (3,natoms)
     !> @param[in]     elements - list of elements
     !> @param[in]     nq       - the BZ mesh

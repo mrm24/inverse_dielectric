@@ -130,24 +130,27 @@ contains
         call move_alloc(this%weights          , weights           )
         call move_alloc(this%angular_integrals, angular_integrals )
         allocate(body_f(nr), clm_body(nsph_pair))
-        !$omp target enter data map(to: ylm, weights, angular_integrals)
-        !$omp target teams distribute map(tofrom: body) map(to: wingL_f, head_f) map(alloc: body_f, clm_body) private(ii, jj, body_f, clm_body)
+        !$omp target enter data map(to: ylm, weights, angular_integrals, body)
+        !$omp target enter data map(to: wingL_f, head_f) map(tofrom: body)
+        !$omp target enter data map(alloc: body_f, clm_body)
+        !$omp target teams distribute private(ii, jj, body_f, clm_body)
         do ii = 1, nbasis
-            !$omp parallel do private(ii, jj, body_f, clm_body)
             do jj = 1, nbasis
                 body_f(:) = head_f(:) * wingL_f(:, jj) * conjg(wingL_f(:, ii))
+                ! This call itself is parallelized so each team can use its threads
+                ! to solve it
                 call sph_harm_expansion(nsph_pair, body_f, weights, ylm, clm_body)
                 body(jj,ii) = body(jj,ii) + sum(clm_body(:) * angular_integrals(:))
             end do
-            !$omp end parallel do
         end do
         !$omp end target teams distribute
-        !$omp target exit data map(delete: ylm, weights, angular_integrals)
-        deallocate(body_f, clm_body)
+        !$omp target update from(body)
+        !$omp target exit data map(delete: ylm, weights, angular_integrals, body, wingL_f, head_f, body_f, clm_body)
         call move_alloc(body             , this%idiel_body        )
         call move_alloc(ylm              , this%ylm               )
         call move_alloc(weights          , this%weights           )
         call move_alloc(angular_integrals, this%angular_integrals )
+        deallocate(body_f, clm_body)
 #else
         !$omp parallel shared(this, head_f, wingL_f, nbasis) private(ii, jj, body_f, clm_body)
         allocate(body_f(this%quadrature_npoints), clm_body(nsph_pair))
@@ -268,28 +271,28 @@ contains
         call move_alloc(this%ylm              , ylm               )
         call move_alloc(this%weights          , weights           )
         call move_alloc(this%angular_integrals, angular_integrals )
-        !$omp target enter data map(to: ylm, weights, angular_integrals, body)
-        !$omp target map(to: wingL_f, head_f, wingU_f)
-        !$omp parallel private(ii, jj, body_f, clm_body)
         allocate(body_f(nr), clm_body(nsph_pair))
-        !$omp do collapse(2)
+        !$omp target enter data map(to: ylm, weights, angular_integrals, body)
+        !$omp target enter data map(to: wingL_f, wingU_f, head_f) map(tofrom: body)
+        !$omp target enter data map(alloc: body_f, clm_body)
+        !$omp target teams distribute private(ii, jj, body_f, clm_body)
         do ii = 1, nbasis
             do jj = 1, nbasis
                 body_f(:) = head_f(:) * wingL_f(:, jj) * wingU_f(:, ii)
+                ! This call itself is parallelized so each team can use its threads
+                ! to solve it
                 call sph_harm_expansion(nsph_pair, body_f, weights, ylm, clm_body)
                 body(jj,ii) = body(jj,ii) + sum(clm_body(:) * angular_integrals(:))
             end do
         end do
-        !$omp end do
-        deallocate(body_f, clm_body)
-        !$omp end parallel
-        !$omp end target
+        !$omp end target teams distribute
         !$omp target update from(body)
-        !$omp target exit data map(delete: ylm, weights, angular_integrals, body)
+        !$omp target exit data map(delete: ylm, weights, angular_integrals, body, wingL_f, wingU_f, head_f, body_f, clm_body)
         call move_alloc(body             , this%idiel_body        )
         call move_alloc(ylm              , this%ylm               )
         call move_alloc(weights          , this%weights           )
         call move_alloc(angular_integrals, this%angular_integrals )
+        deallocate(body_f, clm_body)
 #else
         !$omp parallel shared(this, head_f, wingL_f, wingU_f, nbasis) private(ii, jj, body_f, clm_body)
         allocate(body_f(this%quadrature_npoints),  clm_body(nsph_pair))
