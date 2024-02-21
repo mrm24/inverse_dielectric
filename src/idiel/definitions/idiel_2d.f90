@@ -46,22 +46,22 @@ contains
         class(idiel_t), intent(inout) :: this
 
         ! Auxiliary vectors
-        complex(r64), allocatable :: ag(:,:), bg(:,:)
+        complex(aip), allocatable :: ag(:,:), bg(:,:)
         
         ! Macroscopic dielectric matrix
-        complex(r64), allocatable :: A(:,:)
+        complex(aip), allocatable :: A(:,:)
 
         ! Function from which to compute the integral 
-        complex(r64), allocatable :: qAq(:) 
-        complex(r64), allocatable :: wingL_f(:,:)
-        complex(r64), allocatable :: wingU_f(:,:)
-        complex(r64), allocatable :: wLwU_f(:)
+        complex(aip), allocatable :: qAq(:) 
+        complex(aip), allocatable :: wingL_f(:,:)
+        complex(aip), allocatable :: wingU_f(:,:)
+        complex(aip), allocatable :: wLwU_f(:)
 
         ! Basis size
-        integer(i64) :: nbasis
+        integer(i32) :: nbasis
         
         ! Dummy indexes
-        integer(i64) :: ii, jj
+        integer(i32) :: ii, jj
 
         ! Get the basis size
         nbasis = size(this%Binv, 1)
@@ -166,21 +166,21 @@ contains
         class(idiel_t), intent(inout) :: this
 
         ! Auxiliary vectors
-        complex(r64), allocatable :: ag(:,:)
+        complex(aip), allocatable :: ag(:,:)
         
         ! Macroscopic dielectric matrix
-        complex(r64), allocatable :: A(:,:)
+        complex(aip), allocatable :: A(:,:)
 
         ! Function from which to compute the integral 
-        complex(r64), allocatable :: qAq(:) 
-        complex(r64), allocatable :: wingL_f(:,:)
-        complex(r64), allocatable :: wLwU_f(:)
+        complex(aip), allocatable :: qAq(:) 
+        complex(aip), allocatable :: wingL_f(:,:)
+        complex(aip), allocatable :: wLwU_f(:)
 
         ! Basis size
-        integer(i64) :: nbasis
+        integer(i32) :: nbasis
         
         ! Dummy indexes
-        integer(i64) :: ii, jj
+        integer(i32) :: ii, jj
 
         ! Get the basis size
         nbasis = size(this%Binv, 1)
@@ -290,26 +290,26 @@ contains
         
         use idiel_cubic_spline
 
-        complex(r64), intent(in) :: blm_coarse(:,:)
-        real(r64), intent(in)    :: wc(:)
-        complex(r64), intent(in) :: blm_fine(:,:)
-        real(r64), intent(in)    :: wf(:)
-        real(r64), intent(in)    :: r(:)
-        real(r64), intent(in)    :: rmax(:)
-        real(r64), intent(in)    :: rcut
-        complex(r64), intent(in) :: qAq(:)
-        complex(r64), intent(in) :: vr(:,:)
+        complex(aip), intent(in) :: blm_coarse(:,:)
+        real(aip), intent(in)    :: wc(:)
+        complex(aip), intent(in) :: blm_fine(:,:)
+        real(aip), intent(in)    :: wf(:)
+        real(aip), intent(in)    :: r(:)
+        real(aip), intent(in)    :: rmax(:)
+        real(aip), intent(in)    :: rcut
+        complex(aip), intent(in) :: qAq(:)
+        complex(aip), intent(in) :: vr(:,:)
 
-        complex(r64), allocatable         :: w_head_f(:,:)
-        complex(r64)                      :: clm_head(ncir, nr)
-        complex(r64)                      :: r_integral(size_mesh_2d_fine, ncir)
-        integer(i64)                      :: ii, jj
+        complex(aip), allocatable         :: w_head_f(:,:)
+        complex(aip)                      :: clm_head(ncir, nr)
+        complex(aip)                      :: r_integral(size_mesh_2d_fine, ncir)
+        integer(i32)                      :: ii, jj
 
         !! Splines
-        real(r64), allocatable    :: x(:)
-        complex(r64), allocatable :: splines(:,:), integrals(:)
+        real(aip), allocatable    :: x(:)
+        complex(aip), allocatable :: splines(:,:), integrals(:)
 
-        complex(r64) :: w_head
+        complex(aip) :: w_head
 
         allocate(w_head_f, source=vr)
 
@@ -317,7 +317,7 @@ contains
         w_head_f(:,1) =  - (fourpi * rcut)**2 * qAq(:)
 
         do ii = 2, size(w_head_f,2)
-            w_head_f(:, ii) =  - (w_head_f(:,ii) / r(ii))**2 * qAq(:) / ( 1.0_r64 + w_head_f(:,ii) *  qAq(:))
+            w_head_f(:, ii) =  - (w_head_f(:,ii) / r(ii))**2 * qAq(:) / ( 1.0_aip + w_head_f(:,ii) *  qAq(:))
         end do
 
         ! Expand the head component into Fourier
@@ -330,10 +330,10 @@ contains
         ! to obtain the rmax(phi) integral
         r_integral = zzero
         do ii = 1, ncir
-            if ( maxval(abs(clm_head(ii,:))) < 1.0e-7_r64) cycle
+            if ( maxval(abs(clm_head(ii,:))) < 1.0e-7_aip) cycle
              call init_cubic_spline_t(x, splines, integrals, r, r * clm_head(ii,:))
             do jj = 1, size_mesh_2d_fine
-                 r_integral(jj, ii) = integrate(x, splines, integrals, 0.0_r64, rmax(jj))
+                 r_integral(jj, ii) = integrate(x, splines, integrals, 0.0_aip, rmax(jj))
             end do 
             deallocate(x, splines, integrals)
         end do
@@ -341,7 +341,7 @@ contains
         ! Compute the integral
         w_head = zzero
         do ii = 1, ncir
-            if ( maxval(abs(clm_head(ii,:))) < 1.0e-7_r64) cycle
+            if ( maxval(abs(clm_head(ii,:))) < 1.0e-7_aip) cycle
             w_head = w_head + sum(wf(:) * blm_fine(:,ii) * r_integral(:,ii))
         end do
 
@@ -363,37 +363,37 @@ contains
 
         use idiel_cubic_spline
 
-        complex(r64), intent(in) :: blm_coarse(:,:)
-        real(r64), intent(in)    :: wc(:)
-        complex(r64), intent(in) :: blm_fine(:,:)
-        real(r64), intent(in)    :: wf(:)
-        real(r64), intent(in)    :: r(:)
-        real(r64), intent(in)    :: rmax(:)
-        real(r64), intent(in)    :: rcut
-        complex(r64), intent(in) :: wLwU(:)
-        complex(r64), intent(in) :: qAq(:)
-        complex(r64), intent(in) :: vr(:,:)
+        complex(aip), intent(in) :: blm_coarse(:,:)
+        real(aip), intent(in)    :: wc(:)
+        complex(aip), intent(in) :: blm_fine(:,:)
+        real(aip), intent(in)    :: wf(:)
+        real(aip), intent(in)    :: r(:)
+        real(aip), intent(in)    :: rmax(:)
+        real(aip), intent(in)    :: rcut
+        complex(aip), intent(in) :: wLwU(:)
+        complex(aip), intent(in) :: qAq(:)
+        complex(aip), intent(in) :: vr(:,:)
 
 #if defined(USE_GPU) && defined(HAVEOMP5)
         !$omp declare target
 #endif  
 
-        complex(r64), allocatable         :: w_body_f(:,:)
-        complex(r64)                      :: clm_body(ncir, nr)
-        complex(r64)                      :: r_integral(size_mesh_2d_fine, ncir)
-        integer(i64)                      :: ii, jj
+        complex(aip), allocatable         :: w_body_f(:,:)
+        complex(aip)                      :: clm_body(ncir, nr)
+        complex(aip)                      :: r_integral(size_mesh_2d_fine, ncir)
+        integer(i32)                      :: ii, jj
 
         !! Splines
-        real(r64), allocatable    :: x(:)
-        complex(r64), allocatable :: splines(:,:), integrals(:)
+        real(aip), allocatable    :: x(:)
+        complex(aip), allocatable :: splines(:,:), integrals(:)
 
-        complex(r64) :: w_body
+        complex(aip) :: w_body
 
         allocate(w_body_f, source=vr)
 
         ! Compute the body correction
         do ii = 1, size(w_body_f,2)
-            w_body_f(:, ii) =  w_body_f(:,ii) * wLwU(:) / ( 1.0_r64 + w_body_f(:,ii) *  qAq(:))
+            w_body_f(:, ii) =  w_body_f(:,ii) * wLwU(:) / ( 1.0_aip + w_body_f(:,ii) *  qAq(:))
         end do 
 
         ! Expand the body component into Fourier
@@ -406,10 +406,10 @@ contains
         ! to obtain the rmax(phi) integral
         r_integral(:,:) = zzero
         do ii = 1, ncir
-            if (maxval(abs(clm_body(ii,:))) < 1.0e-7_r64) cycle
+            if (maxval(abs(clm_body(ii,:))) < 1.0e-7_aip) cycle
              call init_cubic_spline_t(x, splines, integrals, r, r * clm_body(ii,:))
             do jj = 1, size_mesh_2d_fine
-                 r_integral(jj, ii) = integrate(x, splines, integrals, 0.0_r64, rmax(jj))
+                 r_integral(jj, ii) = integrate(x, splines, integrals, 0.0_aip, rmax(jj))
             end do 
              deallocate(x, splines, integrals)
         end do
@@ -417,7 +417,7 @@ contains
         ! Compute the integral
         w_body = zzero
         do ii = 1, ncir
-            if ( maxval(abs(clm_body(ii,:))) < 1.0e-7_r64) cycle
+            if ( maxval(abs(clm_body(ii,:))) < 1.0e-7_aip) cycle
             w_body = w_body + sum(wf(:) * blm_fine(:,ii) * r_integral(:,ii))
         end do
 

@@ -18,7 +18,7 @@
 !> This module contains the procedures for the computation of the dielectric matrix averages
 module idiel
     
-    use idiel_constants, only: i64, r64, pi, twopi, fourpi, zzero, zone, iunit
+    use idiel_constants, only: i32, r64, aip, pi, onethird, twopi, fourpi, zzero, zone, iunit
     use idiel_crystal_cell, only: cell_t
     use idiel_crystal_symmetry, only: symmetry_t
     use idiel_sph_quadrature, only: compute_angular_mesh_lebedev_131, compute_angular_mesh_lebedev_41
@@ -38,19 +38,19 @@ module idiel
 
 
     !> Order of harmonic spherical/circular (Fourier) expansion
-    integer(i64), parameter :: lmax = 20_i64
+    integer(i32), parameter :: lmax = 20_i32
     !> Number of spherical harmonics
-    integer(i64), parameter :: nsph = (lmax + 1)**2
+    integer(i32), parameter :: nsph = (lmax + 1)**2
     !> Number of pairs spherical harmonics
-    integer(i64), parameter :: nsph_pair = 231_i64
+    integer(i32), parameter :: nsph_pair = 231_i32
     !> Number of circular harmonics
-    integer(i64), parameter :: ncir = (1 + 2*lmax)
+    integer(i32), parameter :: ncir = (1 + 2*lmax)
     !> Number of radial points for 2D integrals
-    integer(i64), parameter :: nr   = 151_i64 
+    integer(i32), parameter :: nr   = 151_i32 
     !> Number of points for small 2D circular (i.e. Fourier) expansion
-    integer(i64), parameter :: size_mesh_2d_coarse = 75_i64
+    integer(i32), parameter :: size_mesh_2d_coarse = 75_i32
     !> Number of points for the big 2D circular (i.e. Fourier) expansion
-    integer(i64), parameter :: size_mesh_2d_fine   = 255_i64
+    integer(i32), parameter :: size_mesh_2d_fine   = 255_i32
 
     !> This type is used to perform all the IDieL operations
     type idiel_t
@@ -59,57 +59,57 @@ module idiel
         !> Symmetry information
         type(symmetry_t), private :: symmetry
         !> The BZ mesh size
-        integer(i64), private :: nq(3) 
+        integer(i32), private :: nq(3) 
         !> Angular mesh
-        real(r64), allocatable, private :: ang(:,:) 
+        real(aip), allocatable, private :: ang(:,:) 
         !> Mesh points (Cartesian)
-        complex(r64), allocatable, private :: xyz(:,:) 
+        complex(aip), allocatable, private :: xyz(:,:) 
         !> Weights for the integrals (fine mesh)
-        real(r64), allocatable, private :: weights_fine(:)
+        real(aip), allocatable, private :: weights_fine(:)
         !> Weights for the integrals (coarse mesh)
-        real(r64), allocatable, private :: weights(:)
+        real(aip), allocatable, private :: weights(:)
         !> Spherical/circular harmonics
-        complex(r64), allocatable, private :: ylm(:,:)
+        complex(aip), allocatable, private :: ylm(:,:)
         !> 3D angular integrals
-        complex(r64), allocatable, private :: angular_integrals(:)
+        complex(aip), allocatable, private :: angular_integrals(:)
         !> Pointer to the head of the dielectric matrix
-        complex(r64), pointer, private :: head(:,:)    => null()
+        complex(aip), pointer, private :: head(:,:)    => null()
         !> Pointer to the lower wing, i.e. in PW G0
-        complex(r64), pointer, private :: wingL(:,:)   => null()
+        complex(aip), pointer, private :: wingL(:,:)   => null()
         !> Pointer to the upper wing, i.e. in PW 0G 
-        complex(r64), pointer, private :: wingU(:,:)   => null()
+        complex(aip), pointer, private :: wingU(:,:)   => null()
         !> Pointer to the inverse of the body block of the dielectric matrix 
-        complex(r64), pointer, private :: Binv(:,:)    => null()
+        complex(aip), pointer, private :: Binv(:,:)    => null()
         !> Actual data in case that it has been computed using this library
-        complex(r64), allocatable :: Binv_data(:,:)
+        complex(aip), allocatable :: Binv_data(:,:)
         !> The head of the inverse
-        complex(r64) :: idiel_head
+        complex(aip) :: idiel_head
         !> The lower wing of the inverse dielectric matrix / screened Coulomb
-        complex(r64), allocatable :: idiel_wingL(:)
+        complex(aip), allocatable :: idiel_wingL(:)
         !> The upper wing of the inverse dielectric matrix / screened Coulomb
-        complex(r64), allocatable :: idiel_wingU(:)
+        complex(aip), allocatable :: idiel_wingU(:)
         !> The body of the inverse dielectric matrix / screened Coulomb
-        complex(r64), allocatable :: idiel_body(:,:)
+        complex(aip), allocatable :: idiel_body(:,:)
         !> Number of points of the quadrature
-        integer(i64), private :: quadrature_npoints 
+        integer(i32), private :: quadrature_npoints 
         !> The handler of linear algebra queues
         type(linalg_world_t), private :: world
         !> Dimensionaly
-        integer(i64), private :: dim = 3
+        integer(i32), private :: dim = 3
         !> 2D angle for large integral
-        real(r64), private, allocatable :: phi(:)
+        real(aip), private, allocatable :: phi(:)
         !> 2D radial mesh for interpolation
-        real(r64), private :: radii(nr)
+        real(aip), private :: radii(nr)
         !> 2D rmax as function of angle
-        real(r64), allocatable, private :: rmax2d(:)
+        real(aip), allocatable, private :: rmax2d(:)
         !> rcut for the 2D Coulomb potential
-        real(r64), private :: rcut 
+        real(aip), private :: rcut 
         !> Exponential function of the screened Coulomb potential 
-        complex(r64), private :: vr(size_mesh_2d_coarse, nr)
+        complex(aip), private :: vr(size_mesh_2d_coarse, nr)
         !> Circular harmonics in the coarse mesh
-        complex(r64), allocatable, private :: blm_coarse(:,:)
+        complex(aip), allocatable, private :: blm_coarse(:,:)
         !> Circular harmonics in the fine mesh
-        complex(r64), allocatable, private :: blm_fine(:,:)
+        complex(aip), allocatable, private :: blm_fine(:,:)
     contains
         procedure, public  :: init_common, set_dielectric_blocks, invert_body, get_n_basis
         procedure, public  :: compute_anisotropic_avg_inversedielectric_3d
@@ -132,13 +132,13 @@ interface
     !> @param[in]     crot     - the rotations in Cartesian coordinates (last index is the space group operation id)
     module subroutine init_common(this, lattice, redpos, elements, nq, dim, nsym, crot)
         class(idiel_t), intent(inout)      :: this
-        real(r64), intent(in)              :: lattice(3,3)
-        real(r64),  intent(in)             :: redpos(:,:)
-        integer(r64),  intent(in)          :: elements(:)
-        integer(i64), intent(in)           :: nq(3)
-        integer(i64), intent(in), optional :: dim
-        integer(i64), intent(in), optional :: nsym
-        real(r64), intent(in), optional    :: crot(:,:,:)
+        real(aip), intent(in)              :: lattice(3,3)
+        real(aip),  intent(in)             :: redpos(:,:)
+        integer(i32),  intent(in)          :: elements(:)
+        integer(i32), intent(in)           :: nq(3)
+        integer(i32), intent(in), optional :: dim
+        integer(i32), intent(in), optional :: nsym
+        real(aip), intent(in), optional    :: crot(:,:,:)
     end subroutine init_common
 
     !> This nullify and deallocates the objects
@@ -155,10 +155,10 @@ interface
     !> @param[in] ib   - inverse of the body of the dielectric matrix (optional)
     module subroutine set_dielectric_blocks(this, h, wl, wu, ib)
         class(idiel_t), intent(inout)              :: this
-        complex(r64), target, intent(in)           :: h(:,:)
-        complex(r64), target, intent(in)           :: wl(:,:)
-        complex(r64), target, intent(in)           :: wu(:,:)
-        complex(r64), target, optional, intent(in) :: ib(:,:)
+        complex(aip), target, intent(in)           :: h(:,:)
+        complex(aip), target, intent(in)           :: wl(:,:)
+        complex(aip), target, intent(in)           :: wu(:,:)
+        complex(aip), target, optional, intent(in) :: ib(:,:)
     end subroutine set_dielectric_blocks
 
     !> This computes the average of the anisotropic inverse dielectric matrix around Gamma
@@ -187,14 +187,14 @@ interface
     !> @param[in] body - the body to invert
     module subroutine invert_body(this, body)
         class(idiel_t), intent(inout), target :: this
-        complex(r64), intent(in) :: body(:,:)
+        complex(aip), intent(in) :: body(:,:)
     end subroutine invert_body
 
     !> This function returns the basis size (for CXX and Python compatibility)
     !> @param[in] this - the idiel_t object to check the size of the used basis
     module function get_n_basis(this) result(nbasis)
         class(idiel_t), intent(inout), target :: this
-        integer(i64) :: nbasis
+        integer(i32) :: nbasis
     end function
 
     module subroutine compute_anisotropic_avg_scrcoulomb_2d(this, hermitian)

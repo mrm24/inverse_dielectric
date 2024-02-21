@@ -16,29 +16,33 @@
 !> Tests the spherical harmonics generation
 program test_sph_harm
 
-    use idiel_constants, only: r64, i64
+    use idiel_constants, only: aip, i32
     use idiel_sph_quadrature, only: compute_angular_mesh_lebedev_21
     use idiel_spherical_harmonics,  only: sph_harm
 
     implicit none 
 
     ! Spherical harmonics
-    integer(i64), parameter :: lmax = 5_i64
-    integer(i64), parameter :: nsph = (lmax+1)**2
-    complex(r64), allocatable :: ylm(:,:)
+    integer(i32), parameter :: lmax = 5_i32
+    integer(i32), parameter :: nsph = (lmax+1)**2
+    complex(aip), allocatable :: ylm(:,:)
     integer :: i
-    real(r64) :: real_ylm(nsph), imag_ylm(nsph)
-    complex(r64) :: ylm_ref(170, nsph)
+    real(aip) :: real_ylm(nsph), imag_ylm(nsph)
+    complex(aip) :: ylm_ref(170, nsph)
 
     ! Tolerance
-    real(r64), parameter :: tolerance = 1.0e-12_r64
-    real(r64) :: rdiff
+#ifdef USE_SINGLE_PRECISION
+    real(aip), parameter :: tolerance = 1.0e-6_aip
+#else
+    real(aip), parameter :: tolerance = 1.0e-12_aip
+#endif
+    real(aip) :: rdiff
 
     ! Weights and points
-    integer(i64), parameter :: np = 170_i64
-    real(r64), allocatable  :: ang_mesh(:,:)
-    real(r64), allocatable  :: xyz_mesh(:,:)
-    real(r64), allocatable  :: weights(:)
+    integer(i32), parameter :: np = 170_i32
+    real(aip), allocatable  :: ang_mesh(:,:)
+    real(aip), allocatable  :: xyz_mesh(:,:)
+    real(aip), allocatable  :: weights(:)
 
     ! Print info
     write(*,*) '[TEST : sph_harm]' 
@@ -56,7 +60,7 @@ program test_sph_harm
     do i = 1, np
         read(101, *) real_ylm(:)
         read(102, *) imag_ylm(:)
-        ylm_ref(i,:) = cmplx( real_ylm, imag_ylm, r64)
+        ylm_ref(i,:) = cmplx( real_ylm, imag_ylm, aip)
     end do
     close(101)
     close(102)
@@ -64,10 +68,10 @@ program test_sph_harm
     rdiff = sum(abs(ylm - ylm_ref))/sum(abs(ylm_ref))
     write(*,'(A, e20.13)')  '  * Regression spherical harmonics result (relative difference): ', rdiff
     if ( rdiff < tolerance ) then
-        write(*,*)  '[TEST : sph_harm: PASSED]'
+         write(*,*)  '[TEST : sph_harm: PASSED]'
     else
-        write(*,*)  '[TEST : sph_harm: FAILED]'
-        stop 1
+         write(*,*)  '[TEST : sph_harm: FAILED]'
+         stop 1
     end if
 
     stop 0

@@ -25,33 +25,32 @@ contains
     module subroutine init_common(this, lattice, redpos, elements, nq, dim, nsym, crot)
 
         class(idiel_t), intent(inout)      :: this
-        real(r64), intent(in)              :: lattice(3,3)
-        real(r64),  intent(in)             :: redpos(:,:)
-        integer(r64),  intent(in)          :: elements(:)
-        integer(i64), intent(in)           :: nq(3)
-        integer(i64), intent(in), optional :: dim
-        integer(i64), intent(in), optional :: nsym
-        real(r64), intent(in), optional    :: crot(:,:,:)
+        real(aip), intent(in)              :: lattice(3,3)
+        real(aip),  intent(in)             :: redpos(:,:)
+        integer(i32),  intent(in)          :: elements(:)
+        integer(i32), intent(in)           :: nq(3)
+        integer(i32), intent(in), optional :: dim
+        integer(i32), intent(in), optional :: nsym
+        real(aip), intent(in), optional    :: crot(:,:,:)
 
         ! Locals
-        integer(i64) :: ii, ll, mm
-        real(r64) :: v_bz
-        real(r64) :: rel_error
-        real(r64), parameter :: onethird = 1.0_r64 / 3.0_r64
-        real(r64), allocatable :: xyz(:,:)
+        integer(i32) :: ii, ll, mm
+        real(aip) :: v_bz
+        real(aip) :: rel_error
+        real(aip), allocatable :: xyz(:,:)
 
         ! The volume in which the integral is performed
-        real(r64) :: v_integral
+        real(aip) :: v_integral
         ! The distance to subcell surface with Gamma in the center
-        real(r64), allocatable :: kmax(:)
+        real(aip), allocatable :: kmax(:)
         ! Geometric part of the integral at given point, note that is multiplied by the weight
-        real(r64), allocatable :: kmax_f(:)
+        real(aip), allocatable :: kmax_f(:)
         ! Spherical harmonics
-        complex(r64), allocatable :: ylm(:,:), ylm_pair(:,:)
+        complex(aip), allocatable :: ylm(:,:), ylm_pair(:,:)
         ! Some cutoff values to create the radial mesh for the 2D case
-        real(r64) :: rmax, dx
+        real(aip) :: rmax, dx
         ! The reciprocal vectors
-        real(r64) :: a(3), b(3)
+        real(aip) :: a(3), b(3)
 
         ! Initialize the crystal structure
         call this%cell%initialize(lattice, redpos, elements)
@@ -83,7 +82,7 @@ contains
         case(2) ! 2D case
 
             ! rcut
-            this%rcut = 0.5_r64 * this%cell%lattice(3,3) 
+            this%rcut = 0.5_aip * this%cell%lattice(3,3) 
 
             ! Initalize the big angular mesh and the weights for the angular part of the integral
             call compute_angular_mesh_gauss_legendre(size_mesh_2d_fine , this%ang, this%weights_fine, xyz)
@@ -107,20 +106,20 @@ contains
             call this%cell%get_kmax_subcell_bz(this%nq, xyz, this%rmax2d)
 
             ! Init the radial mesh (this mesh is intended to provide good treatment of the queue)
-            rmax = 1.02_r64 * maxval(this%rmax2d)
+            rmax = 1.02_aip * maxval(this%rmax2d)
             dx = rmax / (nr - 1)
             do ii = 1, nr
                 this%radii(ii) = (ii - 1) * dx
             end do
 
             do ii = 1, nr
-                this%vr(:,ii) = fourpi * (1.0_r64 - exp(-this%rcut * this%radii(ii)))
+                this%vr(:,ii) = fourpi * (1.0_aip - exp(-this%rcut * this%radii(ii)))
             end do
 
             ! Compute the small mesh
             deallocate(this%ang, xyz)
             call compute_angular_mesh_gauss_legendre(size_mesh_2d_coarse, this%ang, this%weights, xyz)
-            allocate(this%xyz, source=transpose(cmplx(xyz,0.0,r64)))
+            allocate(this%xyz, source=transpose(cmplx(xyz,0.0,aip)))
             this%quadrature_npoints = size(xyz, 1)
             ! Compute circular basis in the coarse mesh
             call circ_harm(lmax, this%ang(:,2), this%blm_coarse)
@@ -156,7 +155,7 @@ contains
             ylm_pair(:,1) = ylm(:,1)
             ii = 2
             do ll = 1, lmax
-                if ( modulo(ll, 2_i64) /= 0) cycle
+                if ( modulo(ll, 2_i32) /= 0) cycle
                 do mm = -ll, ll
                     ylm_pair(:,ii) = ylm(:,ll**2 + mm + ll + 1)
                     ii = ii + 1
@@ -178,7 +177,7 @@ contains
             deallocate(this%ang, this%weights_fine, xyz, ylm, ylm_pair)
             ! Recompute things in the small mesh
             call compute_angular_mesh_lebedev_41(this%ang, this%weights, xyz)
-            allocate(this%xyz,source=transpose(cmplx(xyz,0.0,r64)))
+            allocate(this%xyz,source=transpose(cmplx(xyz,0.0,aip)))
             this%quadrature_npoints = size(xyz, 1)
 
             ! Compute the spherical harmonics in the smaller mesh (save only the pair values)
@@ -188,7 +187,7 @@ contains
             this%ylm(:,1) = ylm(:,1)
             ii = 2
             do ll = 1, lmax
-                if ( modulo(ll, 2_i64) /= 0_i64) cycle
+                if ( modulo(ll, 2_i32) /= 0_i32) cycle
                 do mm = -ll, ll
                     this%ylm(:, ii) = ylm(:,ll**2 + mm + ll + 1)
                     ii = ii + 1
@@ -243,10 +242,10 @@ contains
     module subroutine set_dielectric_blocks(this, h, wl, wu, ib)
         
         class(idiel_t), intent(inout) :: this
-        complex(r64), target, intent(in)      :: h(:,:)
-        complex(r64), target, intent(in)      :: wl(:,:)
-        complex(r64), target, intent(in)      :: wu(:,:)
-        complex(r64), target, optional, intent(in) :: ib(:,:)
+        complex(aip), target, intent(in)      :: h(:,:)
+        complex(aip), target, intent(in)      :: wl(:,:)
+        complex(aip), target, intent(in)      :: wu(:,:)
+        complex(aip), target, optional, intent(in) :: ib(:,:)
 
         ! Associating to internal objects
         this%head    =>  h
@@ -262,7 +261,7 @@ contains
         use idiel_linalg, only: inverse_complex_LU
 
         class(idiel_t), intent(inout), target :: this
-        complex(r64), intent(in) :: body(:,:)
+        complex(aip), intent(in) :: body(:,:)
         
         ! If we have GPU and this was not inited we start the service
         if (.not. this%world%is_queue_set()) call this%world%init()
@@ -281,7 +280,7 @@ contains
 
     module function get_n_basis(this) result(nbasis)
         class(idiel_t), intent(inout), target :: this
-        integer(i64) :: nbasis
+        integer(i32) :: nbasis
         if (.not. associated(this%Binv)) error stop "idiel_t%get_n_basis: Error set inverse dielectric matrix for this" 
         nbasis = size(this%Binv, 1)
     end function

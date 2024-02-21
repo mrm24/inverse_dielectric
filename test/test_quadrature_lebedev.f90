@@ -17,31 +17,31 @@
 
 program test_quadrature_lebedev
     
-    use idiel_constants, only: r64, i64, pi, twopi
+    use idiel_constants, only: aip, i32, pi, twopi
     use idiel_sph_quadrature, only: compute_angular_mesh_lebedev_131, compute_angular_mesh_lebedev_41, &
                                     compute_angular_mesh_lebedev_21
 
     implicit none
 
     ! Tolerance
-    real(r64), parameter :: tolerance = 1.0e-10_r64
+    real(aip), parameter :: tolerance = 1.0e-5_aip
     ! The alpha parameter
-    real(r64), parameter :: alpha = 12.0_r64
+    real(aip), parameter :: alpha = 12.0_aip
     ! The exact integrals of test functions 
-    real(r64), parameter :: I1 = 216_r64 * pi / 35.0_r64
-    real(r64), parameter :: I2 = 6.6961822200736179523_r64
-    real(r64), parameter :: I3 = 4.0_r64 * pi / alpha
-    real(r64), parameter :: I4 = 4.0_r64 * pi / alpha
-    real(r64), parameter :: I5 = 4.0_r64 * pi / alpha
+    real(aip), parameter :: I1 = 216_aip * pi / 35.0_aip
+    real(aip), parameter :: I2 = 6.6961822200736179523_aip
+    real(aip), parameter :: I3 = 4.0_aip * pi / alpha
+    real(aip), parameter :: I4 = 4.0_aip * pi / alpha
+    real(aip), parameter :: I5 = 4.0_aip * pi / alpha
 
     ! Weights and points
-    real(r64), allocatable :: ang_mesh(:,:)
-    real(r64), allocatable :: xyz_mesh(:,:)
-    real(r64), allocatable :: weights(:)
+    real(aip), allocatable :: ang_mesh(:,:)
+    real(aip), allocatable :: xyz_mesh(:,:)
+    real(aip), allocatable :: weights(:)
 
     ! Storage
-    real(r64), allocatable :: f(:)
-    real(r64) :: numerical_integral, rdiff
+    real(aip), allocatable :: f(:)
+    real(aip) :: numerical_integral, rdiff
 
     write(*,*) '[TEST : compute_ang_lebedev]' 
     write(*,*) ' * kind : regression test against precomputed data'
@@ -66,7 +66,7 @@ program test_quadrature_lebedev
     numerical_integral = sum(weights * f)
     rdiff = abs( numerical_integral - I2 ) / I2
     write(*,'(A, e20.13)')  '  * Regression Lebedev 131 (f2) result (relative difference): ', rdiff
-    if (rdiff .lt. 1.0e+3_r64 * tolerance) then
+    if (rdiff .lt. 1.0e+3_aip * tolerance) then
         write(*,*)  '[TEST : compute_ang_lebedev f2: PASSED]'
     else
         write(*,*)  '[TEST : compute_ang_lebedev f2: FAILED]'
@@ -131,7 +131,7 @@ program test_quadrature_lebedev
     numerical_integral = sum(weights * f)
     rdiff = abs( numerical_integral - I2 ) / I2
     write(*,'(A, e20.13)')  '  * Regression Lebedev 21 (f2) result (relative difference): ', rdiff
-    if (rdiff .lt. 1.0e+7_r64 * tolerance) then
+    if (rdiff .lt. 1.0e+7_aip * tolerance) then
         write(*,*)  '[TEST : compute_ang_lebedev f2: PASSED]'
     else
         write(*,*)  '[TEST : compute_ang_lebedev f2: FAILED]'
@@ -196,7 +196,7 @@ program test_quadrature_lebedev
     numerical_integral = sum(weights * f)
     rdiff = abs( numerical_integral - I2 ) / I2
     write(*,'(A, e20.13)')  '  * Regression Lebedev 41 (f2) result (relative difference): ', rdiff
-    if (rdiff .lt. 1.0e+7_r64 * tolerance) then
+    if (rdiff .lt. 1.0e+7_aip * tolerance) then
         write(*,*)  '[TEST : compute_ang_lebedev f2: PASSED]'
     else
         write(*,*)  '[TEST : compute_ang_lebedev f2: FAILED]'
@@ -246,33 +246,33 @@ contains
     !> Test function 1
     pure function f1(r)
         !> Mesh in which to compute
-        real(r64), intent(in)  :: r(:,:)
+        real(aip), intent(in)  :: r(:,:)
         !> Result
-        real(r64), allocatable :: f1(:)
+        real(aip), allocatable :: f1(:)
         !> Elements
-        real(r64), allocatable :: x(:), y(:), z(:)
+        real(aip), allocatable :: x(:), y(:), z(:)
 
         x = r(:,1)
         y = r(:,2)
         z = r(:,3)
 
-        f1 = 1.0_r64 + x + y**2 + y * x**2 + x**4 + y**5 + (x*y*z)**2 
+        f1 = 1.0_aip + x + y**2 + y * x**2 + x**4 + y**5 + (x*y*z)**2 
 
     end function f1
 
     !> Test function 2
     pure function f2(r)
         !> Mesh in which to compute
-        real(r64), intent(in)  :: r(:,:)
+        real(aip), intent(in)  :: r(:,:)
         !> Result
-        real(r64), allocatable :: f2(:)
+        real(aip), allocatable :: f2(:)
         !> Elements
-        real(r64), allocatable  :: x(:), y(:), z(:)
-        real(r64), allocatable, dimension(:) :: exp1, exp2, exp3, exp4
+        real(aip), allocatable  :: x(:), y(:), z(:)
+        real(aip), allocatable, dimension(:) :: exp1, exp2, exp3, exp4
 
-        x = 9.0_r64 * r(:,1)
-        y = 9.0_r64 * r(:,2)
-        z = 9.0_r64 * r(:,3)
+        x = 9.0_aip * r(:,1)
+        y = 9.0_aip * r(:,2)
+        z = 9.0_aip * r(:,3)
 
         exp1 = 0.75 * exp( -0.25 * (x - 2.0)**2)     * exp(-0.25*(y - 2.0)**2)  * exp(-0.25*(z - 2.0)**2)
         exp2 = 0.75 * exp( -1.0/49.0 * (x + 1.0)**2) * exp(-0.10*(y + 1.0))     * exp(-0.10*(z + 1.0))
@@ -286,36 +286,36 @@ contains
     !> Test function 3
     pure function f3(r)
         !> Mesh in which to compute
-        real(r64), intent(in) :: r(:,:)
+        real(aip), intent(in) :: r(:,:)
         !> Result
-        real(r64), allocatable :: f3(:)
+        real(aip), allocatable :: f3(:)
         !> Elements
-        real(r64), allocatable :: x(:), y(:), z(:)
+        real(aip), allocatable :: x(:), y(:), z(:)
 
         x = r(:,1)
         y = r(:,2)
         z = r(:,3)
 
-        f3 = (1.0_r64 + tanh(-alpha*(x+y-z)))/alpha
+        f3 = (1.0_aip + tanh(-alpha*(x+y-z)))/alpha
 
     end function f3
 
     !> Sgn function
     pure function sgn(value)
         
-        real(r64), intent(in) :: value(:)
-        real(r64), allocatable :: sgn(:)
-        integer(i64) :: i
+        real(aip), intent(in) :: value(:)
+        real(aip), allocatable :: sgn(:)
+        integer(i32) :: i
         
         allocate(sgn,source=value)
 
         do i = 1, size(value,1)
-            if (sgn(i) .lt. 0.0_r64) then
-                sgn(i) = -1.0_r64
-            else if (sgn(i) .eq. 0.0_r64) then
-                sgn(i) =  0.0_r64
+            if (sgn(i) .lt. 0.0_aip) then
+                sgn(i) = -1.0_aip
+            else if (sgn(i) .eq. 0.0_aip) then
+                sgn(i) =  0.0_aip
             else 
-                sgn(i) =  1.0_r64
+                sgn(i) =  1.0_aip
             end if
         end do
 
@@ -324,34 +324,34 @@ contains
     !> Test function 4
     pure function f4(r)
         !> Mesh in which to compute
-        real(r64), intent(in) :: r(:,:)
+        real(aip), intent(in) :: r(:,:)
         !> Result
-        real(r64), allocatable :: f4(:)
+        real(aip), allocatable :: f4(:)
         !> Elements
-        real(r64), allocatable :: x(:), y(:), z(:)
+        real(aip), allocatable :: x(:), y(:), z(:)
 
         x = r(:,1)
         y = r(:,2)
         z = r(:,3)
 
-        f4 = (1.0_r64 - sgn(x+y-z))/alpha
+        f4 = (1.0_aip - sgn(x+y-z))/alpha
         
     end function f4
 
     !> Test function 4
     pure function f5(r)
         !> Mesh in which to compute
-        real(r64), intent(in) :: r(:,:)
+        real(aip), intent(in) :: r(:,:)
         !> Result
-        real(r64), allocatable :: f5(:)
+        real(aip), allocatable :: f5(:)
         !> Elements
-        real(r64), allocatable :: x(:), y(:), z(:)
+        real(aip), allocatable :: x(:), y(:), z(:)
 
         x = r(:,1)
         y = r(:,2)
         z = r(:,3)
 
-        f5 = (1.0_r64 - sgn(pi*x + y))/alpha
+        f5 = (1.0_aip - sgn(real(pi,aip)*x + y))/alpha
         
     end function f5
     

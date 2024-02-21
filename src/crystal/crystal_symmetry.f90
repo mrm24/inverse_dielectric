@@ -15,8 +15,8 @@
 !> @file
 !> This module contains information regarding crystal symmetry agnostic of any DFT solver
 module idiel_crystal_symmetry    
-    
-    use idiel_constants,    only: i32, i64, r64, twopi, zzero
+
+    use idiel_constants,    only: i32, aip, twopi, zzero
     use iso_c_binding,  only: C_int, C_double, C_char
     use idiel_crystal_cell, only: cell_t
 
@@ -28,15 +28,15 @@ module idiel_crystal_symmetry
     !> This class contains the symmetry needed by the programm
     type symmetry_t
         !> Space group id
-        integer(i64) :: spgid
+        integer(i32) :: spgid
         !> Number of symmetry operations
-        integer(i64) :: nsym
+        integer(i32) :: nsym
         !> Rotation matrices crystal coordinates
-        integer(i64), allocatable :: rot(:,:,:)
+        integer(i32), allocatable :: rot(:,:,:)
         !> Rotation matrices for qpoints (no inversion symmetry)
-        real(r64), allocatable :: qrot(:,:,:)
+        real(aip), allocatable :: qrot(:,:,:)
         !> Rotation matrices Cartesian coordinates
-        real(r64), allocatable :: crot(:,:,:)
+        real(aip), allocatable :: crot(:,:,:)
     contains
 #ifdef USE_SPGLIB
         procedure, public :: initialize=>init_symmetry
@@ -46,6 +46,13 @@ module idiel_crystal_symmetry
     end type symmetry_t
 
 #ifdef USE_SPGLIB
+
+#ifdef USE_SINGLE_PRECISION
+#define _gesv sgesv
+#else
+#define _gesv dgesv
+#endif
+
 interface
 
     !> Interface to spg_get_multiplicity (this gives the number of symmetry operations)
@@ -135,20 +142,20 @@ contains
         
         class(symmetry_t), intent(inout) :: this
         type(cell_t), intent(in) :: cell
-        real(r64), intent(in), optional :: tolerance
+        real(aip), intent(in), optional :: tolerance
 
         !Locals
-        real(r64) :: tol = 1.0e-5_r64
-        integer(i64) :: isym
+        real(aip) :: tol = 1.0e-5_aip
+        integer(i32) :: isym
         integer(C_int), allocatable ::  rot(:,:,:)
         real(C_double), allocatable ::  tau(:,:)
         character(C_char) :: symbol(11) 
-        real(r64) :: lat(3,3), invlat(3,3)
-        real(r64) :: rT(3,3), temp(3,3), hermitian(3,3)
+        real(aip) :: lat(3,3), invlat(3,3)
+        real(aip) :: rT(3,3), temp(3,3), hermitian(3,3)
         integer :: info, ipiv(3)
 
         ! External
-        external :: dgesv
+        external :: _gesv
 
         ! If present change the tolerance to the desired value
         if (present(tolerance))  tol = tolerance
@@ -158,7 +165,7 @@ contains
                                         real(cell%redpos,C_double)  ,  &
                                         int(cell%elements,C_int),      &   
                                         int(cell%natoms,C_int),        & 
-                                        real(tol,C_double)), i64)
+                                        real(tol,C_double)), i32)
 
 
 
@@ -166,7 +173,7 @@ contains
                                                   real(cell%redpos,C_double)  ,  &
                                                   int(cell%elements,C_int),      &   
                                                   int(cell%natoms,C_int),        & 
-                                                  real(tol,C_double)), i64)
+                                                  real(tol,C_double)), i32)
         
         allocate(rot(3,3,this%nsym), tau(3,this%nsym))
 
@@ -177,7 +184,7 @@ contains
                                          real(cell%redpos,C_double)  ,  &
                                          int(cell%elements,C_int),      &   
                                          int(cell%natoms,C_int),        & 
-                                         real(tol,C_double)), i64)
+                                         real(tol,C_double)), i32)
         
         ! Give it in Fortran Order
         do isym = 1, this%nsym
@@ -186,7 +193,7 @@ contains
 
         allocate(this%rot(3,3,this%nsym))
         allocate(this%qrot(3,3,this%nsym))
-        this%rot = int(rot,i64)
+        this%rot = int(rot,i32)
 
         ! Compute the rotation in the Cartesian rotations
         allocate(this%crot(3,3,this%nsym))
@@ -202,9 +209,9 @@ contains
         ! Compute the qrotations (crystal coordinates)
         hermitian = matmul(cell%lattice,transpose(cell%lattice))
         do isym = 1, this%nsym
-            rT = transpose(real(this%rot(:,:,isym),r64))
+            rT = transpose(real(this%rot(:,:,isym),aip))
             temp = hermitian
-            call dgesv(3,3,temp,3,ipiv,rT,3,info)
+            call _gesv(3,3,temp,3,ipiv,rT,3,info)
             this%qrot(:,:,isym) = transpose(matmul(rT,hermitian))
         end do
 
@@ -218,11 +225,11 @@ contains
     !> @result syidiel_mat33 - the symmetrized vector
     function symmetryze_complex_tensor(this, mat33) result(sym_mat33)
         class(symmetry_t), intent(in) :: this
-        complex(r64), intent(in) :: mat33(3,3)
+        complex(aip), intent(in) :: mat33(3,3)
         
-        complex(r64) :: sym_mat33(3,3)
+        complex(aip) :: sym_mat33(3,3)
         
-        integer(i64) :: isym
+        integer(i32) :: isym
 
         sym_mat33 = zzero
 

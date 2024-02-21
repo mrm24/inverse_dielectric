@@ -18,7 +18,7 @@
 !> This module contains procedures to compute circular harmonics and functions expansion in terms of such a basis
 module idiel_circular_harmonics
    
-   use idiel_constants,   only: i64, r64, pi, twopi, zone, zzero
+   use idiel_constants,   only: i32, aip, pi, twopi, zone, zzero
 
    implicit none 
 
@@ -34,24 +34,24 @@ contains
    !>   @param[out] blm - the spherical harmonics at ang points
    subroutine circ_harm(lmax, ang, blm)
    
-      integer(i64), intent(in)  :: lmax
-      real(r64),    intent(in)  :: ang(:)
-      complex(r64), allocatable, intent(out) :: blm(:,:)
+      integer(i32), intent(in)  :: lmax
+      real(aip),    intent(in)  :: ang(:)
+      complex(aip), allocatable, intent(out) :: blm(:,:)
       
       ! local variables
-      integer(i64) :: l, m, npoints
+      integer(i32) :: l, m, npoints
       
       npoints = size(ang)
       
-      allocate(blm(npoints,(2*lmax+1)), source = cmplx(1.0/sqrt(pi), 0.0, r64))
+      allocate(blm(npoints,(2*lmax+1)), source = cmplx(1.0/sqrt(pi), 0.0, aip))
       
-      blm(:,1) = cmplx(1.0/sqrt(twopi), 0.0, r64)
+      blm(:,1) = cmplx(1.0/sqrt(twopi), 0.0, aip)
 
       !$omp parallel default(shared) private(l, m)
       !$omp do schedule(dynamic)
       do l = 1, lmax
-         blm(:, 2*l    ) = blm(:, 2*l    ) * cmplx(sin(l * ang(:)), 0.0, r64)
-         blm(:, 2*l + 1) = blm(:, 2*l + 1) * cmplx(cos(l * ang(:)), 0.0, r64)
+         blm(:, 2*l    ) = blm(:, 2*l    ) * cmplx(sin(l * ang(:)), 0.0, aip)
+         blm(:, 2*l + 1) = blm(:, 2*l + 1) * cmplx(cos(l * ang(:)), 0.0, aip)
       end do
       !$omp end do
       !$omp end parallel 
@@ -70,15 +70,15 @@ contains
 #if defined(USE_GPU) && defined(HAVEOMP5)
       !$omp declare target
 #endif  
-      integer(i64), intent(in)   :: lmax
-      complex(r64), intent(in)   :: f(:)
-      real(r64),    intent(in)   :: weights(:)
-      complex(r64), intent(in)   :: blm(:,:)
-      complex(r64), intent(out)  :: clm(2*lmax+1)
+      integer(i32), intent(in)   :: lmax
+      complex(aip), intent(in)   :: f(:)
+      real(aip),    intent(in)   :: weights(:)
+      complex(aip), intent(in)   :: blm(:,:)
+      complex(aip), intent(out)  :: clm(2*lmax+1)
 
 
-      complex(r64), allocatable :: fw(:)
-      integer(i64) :: i
+      complex(aip), allocatable :: fw(:)
+      integer(i32) :: i
       ! Multiply the function with the weights so the matrix-vector products solves the integral for all the (l,m)
       allocate(fw, source=f)
       fw(:) = fw(:) * weights(:)

@@ -20,7 +20,7 @@
 module idiel_cpu_magma_t
     
     use iso_c_binding
-    use idiel_constants, only: i32, i64, r64
+    use idiel_constants, only: i32, i32, aip
 
     implicit none
 

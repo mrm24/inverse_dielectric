@@ -6,6 +6,12 @@ option(BENCHMARK "Generate the benchmark executables" OFF)
 option(INTERFACES "Python bindings" OFF)
 option(SPGLIB "Compile with spglib" ON)
 option(OMP5 "If OMP5 support is enabled it offload body corrections to the GPU : only gfortran >= 14.00 -- though it is slow" OFF)
+option(DOUBLE "Use double precision in real and complex" ON)
+
+# Set precision settings
+if(NOT DOUBLE)
+    add_compile_definitions(USE_SINGLE_PRECISION)
+endif()
 
 # Check GPU support
 if(GPU)

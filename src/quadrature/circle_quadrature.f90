@@ -17,7 +17,7 @@
 !> circle
 module idiel_circle_quadrature
         
-    use idiel_constants,   only: i64, r64, pi, twopi
+    use idiel_constants,   only: i32, r64, aip, pi, twopi
     use iso_c_binding,     only: C_int, C_ptr, C_loc
 
     implicit none
@@ -32,15 +32,15 @@ contains
     !> @result    xyz - the Cartesian coordinates 
     pure function polar_2_cartesian(rphi) result(xyz)
         !> The angular mesh (theta,phi)
-        real(r64), intent(in) :: rphi(:,:)
+        real(aip), intent(in) :: rphi(:,:)
         !> The Cartesian mesh
-        real(r64), allocatable :: xyz(:,:)
+        real(aip), allocatable :: xyz(:,:)
 
         allocate(xyz(size(rphi,1),3))
 
         xyz(:,1) = rphi(:,1) * cos(rphi(:,2))
         xyz(:,2) = rphi(:,1) * sin(rphi(:,2))
-        xyz(:,3) = 0.0_r64
+        xyz(:,3) = 0.0_aip
 
     end function polar_2_cartesian
 
@@ -49,11 +49,11 @@ contains
     !> @result    rphi - polar mesh (r,phi) 
     pure function cartesian_2_polar(xyz) result(rphi)
         !> The Cartesian mesh
-        real(r64), intent(in)  :: xyz(:,:)
+        real(aip), intent(in)  :: xyz(:,:)
         !> The angular mesh (theta,phi)
-        real(r64), allocatable :: rphi(:,:)
+        real(aip), allocatable :: rphi(:,:)
 
-        allocate(rphi(size(xyz,1),2), source=0.0_r64)
+        allocate(rphi(size(xyz,1),2), source=0.0_aip)
 
         rphi(:,1) = hypot(xyz(:,1),xyz(:,2))
         rphi(:,2) = atan2(xyz(:,2),xyz(:,1))
@@ -66,11 +66,11 @@ contains
     !> @param[out]  w - weights
     subroutine gauss_legendre_internal(n, x, w)
         
-        integer(i64), intent(in)  :: n
-        real(r64),    intent(out) :: x(:)
-        real(r64),    intent(out) :: w(:)
+        integer(i32), intent(in)  :: n
+        real(aip),    intent(out) :: x(:)
+        real(aip),    intent(out) :: w(:)
 
-        integer(i64) :: i, j
+        integer(i32) :: i, j
         real(r64), parameter :: tol = 1.0e-13_r64
         real(r64) :: root, root_old
         real(r64) :: p1, p2, p3, pp
@@ -100,9 +100,9 @@ contains
 
             end do
             
-            x(i)= -root
-            x(n+1-i)= root
-            w(i)= 2.0_r64 / ((1.0_r64 - root**2) * pp**2)
+            x(i)     = real(-root, aip)
+            x(n+1-i) = real( root, aip)
+            w(i)     = real(2.0_r64 / ((1.0_r64 - root**2) * pp**2), aip)
             w(n+1-i) = w(i)
         
         end do
@@ -117,21 +117,21 @@ contains
     !> @param[out]  w - weights
     subroutine compute_gauss_legendre(n, a, b, x, w)
 
-        integer(i64), intent(in) :: n
-        real(r64), intent(in) :: a
-        real(r64), intent(in) :: b
-        real(r64), allocatable, target, intent(out) :: x(:)
-        real(r64), allocatable, target, intent(out) :: w(:)
+        integer(i32), intent(in) :: n
+        real(aip), intent(in) :: a
+        real(aip), intent(in) :: b
+        real(aip), allocatable, target, intent(out) :: x(:)
+        real(aip), allocatable, target, intent(out) :: w(:)
 
-        real(r64) :: dx, shift
+        real(aip) :: dx, shift
          
         allocate(x(n),w(n))
 
         call gauss_legendre_internal(n, x, w)!int(n,C_int), C_loc(x), C_loc(w))
 
         ! Remap
-        dx    = 0.5_r64 * ( b - a )
-        shift = 0.5_r64 * ( a + b )
+        dx    = 0.5_aip * ( b - a )
+        shift = 0.5_aip * ( a + b )
         x(:)  = dx * x(:) + shift
         w(:)  = dx * w(:)
 
@@ -144,21 +144,21 @@ contains
     !> @param[out]  xyz       - the mesh in cartesian coordinates
     subroutine compute_angular_mesh_gauss_legendre(mesh_size, rphi, w, xyz)
         
-        integer(i64), intent(in)            :: mesh_size
-        real(r64), allocatable, intent(out) :: rphi(:,:)
-        real(r64), allocatable, intent(out) :: w(:)
-        real(r64), allocatable, intent(out) :: xyz(:,:)
+        integer(i32), intent(in)            :: mesh_size
+        real(aip), allocatable, intent(out) :: rphi(:,:)
+        real(aip), allocatable, intent(out) :: w(:)
+        real(aip), allocatable, intent(out) :: xyz(:,:)
 
         ! Phi mesh
-        real(r64), allocatable :: x_phi(:)
+        real(aip), allocatable :: x_phi(:)
 
         ! Idx
-        integer(i64) :: i, idx 
+        integer(i32) :: i, idx 
 
         ! Build theta mesh
-        call compute_gauss_legendre(mesh_size, 0.0_r64, twopi, x_phi, w)
+        call compute_gauss_legendre(mesh_size, 0.0_aip, real(twopi, aip), x_phi, w)
 
-        allocate(rphi(mesh_size,2), source=1.0_r64)
+        allocate(rphi(mesh_size,2), source=1.0_aip)
 
         ! Save in proper format
         rphi(:,2) = x_phi(:)

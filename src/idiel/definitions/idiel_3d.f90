@@ -46,32 +46,32 @@ contains
         class(idiel_t), intent(inout) :: this
 
         ! Auxiliary vectors
-        complex(r64), allocatable :: S(:,:)
+        complex(aip), allocatable :: S(:,:)
         
         ! Macroscopic dielectric matrix
-        complex(r64), allocatable :: L(:,:)
+        complex(aip), allocatable :: L(:,:)
 
         ! Function from which to compute the integral 
-        complex(r64), allocatable :: head_f(:) 
-        complex(r64), allocatable :: wingL_f(:,:)
-        complex(r64), allocatable :: body_f(:)
+        complex(aip), allocatable :: head_f(:) 
+        complex(aip), allocatable :: wingL_f(:,:)
+        complex(aip), allocatable :: body_f(:)
 
         ! Harmonic expansion coefficients
-        complex(r64), allocatable :: clm_head(:)
-        complex(r64), allocatable :: clm_body(:)
+        complex(aip), allocatable :: clm_head(:)
+        complex(aip), allocatable :: clm_body(:)
 
         ! Basis size
-        integer(i64) :: nbasis
+        integer(i32) :: nbasis
         
         ! Dummy indexes
-        integer(i64) :: ii, jj, kk
+        integer(i32) :: ii, jj, kk
 
         ! For device
-        integer(i64)              :: nr
-        complex(r64), allocatable :: ylm(:,:)
-        real(r64), allocatable    :: weights(:)
-        complex(r64), allocatable :: angular_integrals(:)
-        complex(r64), allocatable :: body(:,:)
+        integer(i32)              :: nr
+        complex(aip), allocatable :: ylm(:,:)
+        real(aip), allocatable    :: weights(:)
+        complex(aip), allocatable :: angular_integrals(:)
+        complex(aip), allocatable :: body(:,:)
 
         ! Get the basis size
         nbasis = size(this%Binv, 1)
@@ -183,33 +183,33 @@ contains
         class(idiel_t), intent(inout) :: this
 
         ! Auxiliary vectors
-        complex(r64), allocatable :: S(:,:), T(:,:)
+        complex(aip), allocatable :: S(:,:), T(:,:)
         
         ! Macroscopic dielectric matrix
-        complex(r64), allocatable :: L(:,:)
+        complex(aip), allocatable :: L(:,:)
 
         ! Function from which to compute the integral 
-        complex(r64), allocatable :: head_f(:) 
-        complex(r64), allocatable :: wingL_f(:,:)
-        complex(r64), allocatable :: wingU_f(:,:)
-        complex(r64), allocatable :: body_f(:)
+        complex(aip), allocatable :: head_f(:) 
+        complex(aip), allocatable :: wingL_f(:,:)
+        complex(aip), allocatable :: wingU_f(:,:)
+        complex(aip), allocatable :: body_f(:)
 
         ! Harmonic expansion coefficients
-        complex(r64), allocatable :: clm_head(:)
-        complex(r64), allocatable :: clm_body(:)
+        complex(aip), allocatable :: clm_head(:)
+        complex(aip), allocatable :: clm_body(:)
 
         ! Basis size
-        integer(i64) :: nbasis
+        integer(i32) :: nbasis
         
         ! Dummy indexes
-        integer(i64) :: ii, jj
+        integer(i32) :: ii, jj
 
         ! For device
-        integer(i64)              :: nr
-        complex(r64), allocatable :: ylm(:,:)
-        real(r64), allocatable    :: weights(:)
-        complex(r64), allocatable :: angular_integrals(:)
-        complex(r64), allocatable :: body(:,:)
+        integer(i32)              :: nr
+        complex(aip), allocatable :: ylm(:,:)
+        real(aip), allocatable    :: weights(:)
+        complex(aip), allocatable :: angular_integrals(:)
+        complex(aip), allocatable :: body(:,:)
 
         ! Get the basis size
         nbasis = size(this%Binv, 1)

@@ -16,7 +16,7 @@
 !> Contains elements to compute a natural cubic spline, its integrals and first derivative
 module idiel_cubic_spline
 
-    use idiel_constants,   only: i64, r64, zone, zzero 
+    use idiel_constants,   only: i32, aip, zone, zzero 
     implicit none
 
 contains
@@ -32,12 +32,12 @@ contains
     !$omp declare target
 #endif  
 
-        real(r64), intent(in) :: array(:)
-        real(r64), intent(in) :: value 
+        real(aip), intent(in) :: array(:)
+        real(aip), intent(in) :: value 
 
-        integer(i64) :: answer, right, mid
+        integer(i32) :: answer, right, mid
 
-        answer  = 1_i64
+        answer  = 1_i32
         right   = size(array)
 
         do while (answer <= right)
@@ -68,21 +68,21 @@ contains
 #if defined(USE_GPU) && defined(HAVEOMP5)
         !$omp declare target
 #endif  
-        real(r64),    allocatable, intent(inout)  :: xlim(:)
-        complex(r64), allocatable, intent(inout)  :: splines(:,:)
-        complex(r64), allocatable, intent(inout)  :: integrals(:)
-        real(r64),    intent(in)                  :: x(:)
-        complex(r64), intent(in)                  :: y(:)
+        real(aip),    allocatable, intent(inout)  :: xlim(:)
+        complex(aip), allocatable, intent(inout)  :: splines(:,:)
+        complex(aip), allocatable, intent(inout)  :: integrals(:)
+        real(aip),    intent(in)                  :: x(:)
+        complex(aip), intent(in)                  :: y(:)
 
-        integer(i64) :: n    ! number of splines
-        integer(i64) :: i, j ! Index
-        complex(r64), allocatable :: a(:), b(:), c(:), d(:) ! The splines factors d*x**3 + c*x**2 + b*x + a
-        real(r64), allocatable    :: h(:) ! The step size
-        real(r64), allocatable    :: l(:), mu(:)
-        complex(r64), allocatable :: alpha(:), z(:)
+        integer(i32) :: n    ! number of splines
+        integer(i32) :: i, j ! Index
+        complex(aip), allocatable :: a(:), b(:), c(:), d(:) ! The splines factors d*x**3 + c*x**2 + b*x + a
+        real(aip), allocatable    :: h(:) ! The step size
+        real(aip), allocatable    :: l(:), mu(:)
+        complex(aip), allocatable :: alpha(:), z(:)
 
         ! Given a set of coordinates C with size n+1 the number of splines will be n:
-        n = size(y) - 1_i64
+        n = size(y) - 1_i32
         ! Create a new array a of size n+1 and set a_i = y_i
         allocate(a,source=y)
         ! Create new arrays b and d of size n
@@ -98,7 +98,7 @@ contains
         ! alpha(i) = 3/h(i)*(a(i+1)-a(i)( - 3/h(i-1) * (a(i)-a(i-1))
         allocate(alpha(n))
         do i = 1, n
-            alpha(i) = 3.0_r64 / h(i) * (a(i + 1) - a(i))
+            alpha(i) = 3.0_aip / h(i) * (a(i + 1) - a(i))
         end do
         alpha(2:n) = alpha(2:n) - alpha(1:n-1)
 
@@ -110,7 +110,7 @@ contains
         z(1)  = zzero
         ! Iterate to fill l,mu,z:
         do i = 2, n
-            l(i) = 2.0_r64 * (x(i + 1) - x(i - 1)) - h(i - 1) * mu(i - 1)
+            l(i) = 2.0_aip * (x(i + 1) - x(i - 1)) - h(i - 1) * mu(i - 1)
             mu(i) = h(i) / l(i)
             z(i) = (alpha(i) - h(i - 1) * z(i - 1)) / l(i)
         end do
@@ -120,7 +120,7 @@ contains
         
         do i = n, 1, -1
             c(i) = z(i) - mu(i) * c(i + 1)
-            b(i) = (a(i + 1) - a(i)) / h(i) - h(i) * (c(i + 1) + 2 * c(i)) / 3.0_r64
+            b(i) = (a(i + 1) - a(i)) / h(i) - h(i) * (c(i + 1) + 2 * c(i)) / 3.0_aip
             d(i) = (c(i + 1) - c(i)) / (3 * h(i))
         end do
 
@@ -154,18 +154,18 @@ contains
     !$omp declare target
 #endif  
 
-        complex(r64), intent(in)           :: a
-        complex(r64), intent(in)           :: b
-        complex(r64), intent(in)           :: c
-        complex(r64), intent(in)           :: d
-        real(r64), intent(in)              :: x0
-        real(r64), intent(in)              :: xa
-        real(r64), intent(in)              :: xb
+        complex(aip), intent(in)           :: a
+        complex(aip), intent(in)           :: b
+        complex(aip), intent(in)           :: c
+        complex(aip), intent(in)           :: d
+        real(aip), intent(in)              :: x0
+        real(aip), intent(in)              :: xa
+        real(aip), intent(in)              :: xb
 
-        complex(r64) :: integral
+        complex(aip) :: integral
 
-        integral = a * xb - b * x0 * xb + b / 2_r64 * xb**2 - c / 3.0_r64 * (x0 - xb)**3 + d / 4.0_r64 * (xb - x0)**4 - &
-                   a * xa + b * x0 * xa - b / 2_r64 * xa**2 + c / 3.0_r64 * (x0 - xa)**3 - d / 4.0_r64 * (xa - x0)**4
+        integral = a * xb - b * x0 * xb + b / 2_aip * xb**2 - c / 3.0_aip * (x0 - xb)**3 + d / 4.0_aip * (xb - x0)**4 - &
+                   a * xa + b * x0 * xa - b / 2_aip * xa**2 + c / 3.0_aip * (x0 - xa)**3 - d / 4.0_aip * (xa - x0)**4
 
     end function cubic_poly_integral
 
@@ -178,21 +178,21 @@ contains
 #if defined(USE_GPU) && defined(HAVEOMP5)
     !$omp declare target
 #endif  
-        real(r64),    intent(in)  :: xlim(:)
-        complex(r64), intent(in)  :: splines(:,:)
-        real(r64),    intent(in)  :: new_x
+        real(aip),    intent(in)  :: xlim(:)
+        complex(aip), intent(in)  :: splines(:,:)
+        real(aip),    intent(in)  :: new_x
 
-        complex(r64) :: interpolated_y
-        complex(r64) :: sp(5)
-        real(r64) :: dx 
+        complex(aip) :: interpolated_y
+        complex(aip) :: sp(5)
+        real(aip) :: dx 
 
-        integer(i64) :: i
+        integer(i32) :: i
 
         i = lower_bound(xlim, new_x)
 
         sp(1:5) = splines(1:5,i)
 
-        dx = new_x - real(sp(5), r64)
+        dx = new_x - real(sp(5), aip)
 
         interpolated_y = sp(1) + dx * (sp(2) + dx * (sp(3) + sp(4)*dx)) 
 
@@ -207,17 +207,17 @@ contains
 #if defined(USE_GPU) && defined(HAVEOMP5)
     !$omp declare target
 #endif  
-        real(r64),    intent(in)          :: xlim(:)
-        complex(r64), intent(in)          :: splines(:,:)
-        complex(r64), intent(in)          :: integrals(:)
-        real(r64),             intent(in) :: low
-        real(r64),             intent(in) :: up
+        real(aip),    intent(in)          :: xlim(:)
+        complex(aip), intent(in)          :: splines(:,:)
+        complex(aip), intent(in)          :: integrals(:)
+        real(aip),             intent(in) :: low
+        real(aip),             intent(in) :: up
 
-        complex(r64) :: integral
+        complex(aip) :: integral
 
-        integer(i64) :: i, i0, i1
-        real(r64)    :: x0
-        complex(r64) :: a, b, c, d
+        integer(i32) :: i, i0, i1
+        real(aip)    :: x0
+        complex(aip) :: a, b, c, d
 
         ! Get where the blocks are locate
         i0 = lower_bound(xlim, low)
@@ -270,25 +270,25 @@ contains
     !$omp declare target
 #endif  
 
-        real(r64),    intent(in)  :: xlim(:)
-        complex(r64), intent(in)  :: splines(:,:)
-        real(r64), intent(in)     :: x
+        real(aip),    intent(in)  :: xlim(:)
+        complex(aip), intent(in)  :: splines(:,:)
+        real(aip), intent(in)     :: x
 
-        complex(r64) :: dydx
-        real(r64)    :: dx
-        complex(r64) :: sp(5)
+        complex(aip) :: dydx
+        real(aip)    :: dx
+        complex(aip) :: sp(5)
 
-        integer(i64) :: i
+        integer(i32) :: i
 
         i = lower_bound(xlim, x)
 
-        if (i > size(splines,2)) i = i - 1_i64
+        if (i > size(splines,2)) i = i - 1_i32
 
         sp(1:5) = splines(1:5,i)
 
-        dx = x - real(sp(5), r64)
+        dx = x - real(sp(5), aip)
 
-        dydx =  sp(2)  + 2.0_r64 * sp(3) * dx + 3.0_r64 * sp(4) * dx**2
+        dydx =  sp(2)  + 2.0_aip * sp(3) * dx + 3.0_aip * sp(4) * dx**2
 
     end function derivative
 

@@ -18,7 +18,7 @@
 !> This module contains procedures to compute spherical harmonics and functions expansion in terms of such a basis
 module idiel_spherical_harmonics
    
-   use idiel_constants,   only: i64, r64, fourpi, y00, zzero, zone
+   use idiel_constants,   only: i32, r64, aip, fourpi, y00, zzero, zone
 
    implicit none 
 
@@ -38,12 +38,12 @@ contains
    !>   @param[out] ylm - the spherical harmonics at ang points
    subroutine sph_harm(lmax, ang, ylm)
    
-      integer(i64), intent(in)  :: lmax
-      real(r64),    intent(in)  :: ang(:,:)
-      complex(r64), allocatable, intent(out) :: ylm(:,:)
+      integer(i32), intent(in)  :: lmax
+      real(aip),    intent(in)  :: ang(:,:)
+      complex(aip), allocatable, intent(out) :: ylm(:,:)
       
       ! local variables
-      integer(i64) :: l, m, lm1, lm2, npoints
+      integer(i32) :: l, m, lm1, lm2, npoints
       real(r64), allocatable :: sn(:), cs(:), dx(:), cumul(:), t1(:)
       complex(r64), allocatable :: z(:,:)
       real(r64), allocatable :: x(:,:)
@@ -58,7 +58,7 @@ contains
           error stop "sph_harm: lmax out of range, max value for 0 =< lmax <= 50"
       end if
       
-      allocate(ylm(npoints,(lmax+1)**2), source = y00)
+      allocate(ylm(npoints,(lmax+1)**2), source = cmplx(y00, kind=aip))
       
       !$omp parallel default(shared) private(l, m, lm1, lm2, sn, cs, dx, cumul, t1, z, x)
       !$omp do schedule(dynamic)
@@ -99,11 +99,11 @@ contains
          lm1 = l * (l+1) + 1
          lm2 = lm1
          
-         ylm(:, lm1) = t1 * x(:,0)
+         ylm(:, lm1) = cmplx(t1 * x(:,0), kind=aip)
          do m = 1, l
             lm1 = lm1 + 1
             lm2 = lm2 - 1
-            ylm(:, lm1) = t1 * x(:,m) * z(:,m)
+            ylm(:, lm1) = cmplx(t1 * x(:,m) * z(:,m), kind=aip)
             ylm(:, lm2) = conjg(ylm(:, lm1))
             if (mod(m, 2) /= 0) ylm(:, lm2) = -ylm(:, lm2)
          end do
@@ -127,14 +127,14 @@ contains
 #if defined(USE_GPU) && defined(HAVEOMP5)
       !$omp declare target
 #endif 
-      integer(i64), intent(in)  :: n
-      complex(r64), intent(in)  :: f(:)
-      real(r64),    intent(in)  :: weights(:)
-      complex(r64), intent(in)  :: ylm(:,:)
-      complex(r64), intent(out) :: clm(n)
+      integer(i32), intent(in)  :: n
+      complex(aip), intent(in)  :: f(:)
+      real(aip),    intent(in)  :: weights(:)
+      complex(aip), intent(in)  :: ylm(:,:)
+      complex(aip), intent(out) :: clm(n)
 
-      complex(r64), allocatable :: fw(:)
-      integer(i64) :: i
+      complex(aip), allocatable :: fw(:)
+      integer(i32) :: i
 
       ! Multiply the function with the weights so the matrix-vector products solves the integral for all the (l,m)
       allocate(fw, mold=f)
