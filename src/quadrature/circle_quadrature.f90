@@ -13,7 +13,7 @@
 ! permissions and limitations under the License.
 
 !> @file
-!> Contains elements to compute Gauss-Legendre grid of 2500th order for a unitary
+!> Contains elements to compute Gauss-Legendre grid for a unitary
 !> circle
 module idiel_circle_quadrature
         
@@ -60,12 +60,47 @@ contains
 
     end function cartesian_2_polar
 
+    !> Gauss-Legendre quadrature using Golub–Welsch algorithm
+    !> This was chosen due to stability; indeed the G. Rybicki approach (using Newton method) causes the
+    !> test to miserably produce a reasonable expansion for a fairly simple polynomial. Indeed this method
+    !> matches the accurate implementation of Boost C++.
+    !> @param[in]   n - the number of points
+    !> @param[out]  x - the abscisa points
+    !> @param[out]  w - weights
+    subroutine gauss_legendre_golub_welsch(n, x, w)
+
+        integer(i64), intent(in)  :: n
+        real(r64),    intent(out) :: x(:)
+        real(r64),    intent(out) :: w(:)
+
+        real(r64) :: jacobi(n,n)
+        real(r64), allocatable :: work(:)
+        real(r64), allocatable :: eigenvalues(:)
+        integer   :: i, info
+
+        ! Initialize the Jacobi matrix with beta coefficients
+        do i = 1, n - 1
+            jacobi(i,i+1) = i / sqrt(4.0_r64 * i * i - 1.0_r64)
+            jacobi(i+1,i) = jacobi(i,i+1)
+        end do
+
+        ! Compute eigenvalues (knots) and eigenvectors
+        allocate(eigenvalues(n), work(3*n-1))
+
+        call dsyev('V', 'U', n, jacobi, n, eigenvalues, work, 3*n-1, info)
+        if (info /= 0) error stop "Error(gauss_legendre_golub_welsch) dsyev failed"
+
+        x(:) = eigenvalues(:)
+        w(:) = 2*jacobi(1,:)**2
+
+    end subroutine gauss_legendre_golub_welsch
+
     !> Gauss-Legendre quadrature using G. Rybicki approach in range [-1,1]
     !> @param[in]   n - the number of points
     !> @param[out]  x - the abscisa points
     !> @param[out]  w - weights
-    subroutine gauss_legendre_internal(n, x, w)
-        
+    subroutine gauss_legendre_rybicki(n, x, w)
+
         integer(i64), intent(in)  :: n
         real(r64),    intent(out) :: x(:)
         real(r64),    intent(out) :: w(:)
@@ -77,8 +112,8 @@ contains
 
         ! We exploit the symmetry of the quadrature
         do i=1, (n+1)/2
-            
-            ! Use Newton's method 
+
+            ! Use Newton's method
             root     = cos(pi*(i-0.25_r64)/(n+0.5_r64))
             root_old = huge(root)
 
@@ -86,7 +121,7 @@ contains
 
                 p1=1.0_r64
                 p2=0.0_r64
-            
+
                 do j = 1, n
                     p3 = p2
                     p2 = p1
@@ -99,15 +134,15 @@ contains
                 root  = root_old - p1 / pp
 
             end do
-            
+
             x(i)= -root
             x(n+1-i)= root
             w(i)= 2.0_r64 / ((1.0_r64 - root**2) * pp**2)
             w(n+1-i) = w(i)
-        
+
         end do
 
-    end subroutine gauss_legendre_internal
+    end subroutine gauss_legendre_rybicki
 
     !> Compute the gauss legendre mesh for arbitrary range
     !> @param[in]   n - the number of points 
@@ -124,10 +159,11 @@ contains
         real(r64), allocatable, target, intent(out) :: w(:)
 
         real(r64) :: dx, shift
-         
+        integer :: i
+
         allocate(x(n),w(n))
 
-        call gauss_legendre_internal(n, x, w)!int(n,C_int), C_loc(x), C_loc(w))
+        call gauss_legendre_golub_welsch(n, x, w)
 
         ! Remap
         dx    = 0.5_r64 * ( b - a )
