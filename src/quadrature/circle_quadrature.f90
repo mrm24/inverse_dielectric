@@ -61,10 +61,8 @@ contains
     end function cartesian_2_polar
 
     !> Gauss-Legendre quadrature using Golub–Welsch algorithm
-    !> This was chosen due to stability; indeed the G. Rybicki approach (using Newton method) causes the
-    !> test to miserably produce a reasonable expansion for a fairly simple polynomial. Indeed this method
-    !> matches the accurate implementation of Boost C++. Solved in double precision and then
-    !> casted to proper precision (float or double).
+    !> This was chosen due to stability. Indeed this method
+    !> matches in precision accurate implementation of Boost C++. 
     !> @param[in]   n - the number of points
     !> @param[out]  x - the abscisa points
     !> @param[out]  w - weights
@@ -88,7 +86,7 @@ contains
         ! Compute eigenvalues (knots) and eigenvectors
         allocate(eigenvalues(n), work(3*n-1))
 
-        call dsyev('V', 'U', n, jacobi, n, eigenvalues, work, 3*n-1, info)
+        call dsyev('v', 'u', n, jacobi, n, eigenvalues, work, 3*n-1, info)
         if (info /= 0) error stop "Error(gauss_legendre_golub_welsch) dsyev failed"
 
         x(:) = real(eigenvalues(:), kind=aip)
@@ -96,11 +94,7 @@ contains
 
     end subroutine gauss_legendre_golub_welsch
 
-    !> Gauss-Legendre quadrature using G. Rybicki approach, in some 
-    !> cases the small errors coming from the iterative method can 
-    !> propagate and cause catastrophic side effects, specially in the
-    !> computation of Fourier expansion coefficients. The internal loop 
-    !> is done in double precision.
+    !> Gauss-Legendre quadrature using G. Rybicki approach
     !> @param[in]   n - the number of points
     !> @param[out]  x - the abscisa points
     !> @param[out]  w - weights
@@ -167,7 +161,7 @@ contains
          
         allocate(x(n),w(n))
 
-        call gauss_legendre_rybicki(n, x, w)
+        call gauss_legendre_golub_welsch(n, x, w)
 
         ! Remap
         dx    = 0.5_aip * ( b - a )

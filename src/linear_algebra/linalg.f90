@@ -33,19 +33,21 @@ module idiel_linalg
 
 ! Set some macros so the proper linear algebra are called
 #ifdef USE_SINGLE_PRECISION
-#define _getrf      cgetrf
-#define _getri      cgetri
-#define _gemm       cgemm
-#define _getrf_gpu  cgetrf_magma
-#define _getri_gpu  cgetri_magma
-#define _gemm_gpu   cgemm_magma
+#define _getrf             cgetrf
+#define _getri             cgetri
+#define _gemm              cgemm
+#define _getrf_gpu         magma_cgetrf_gpu
+#define _getri_gpu         magma_cgetri_gpu
+#define _get_getri_nb_gpu  magma_get_cgetri_nb
+#define _gemm_gpu          magma_cgemm
 #else
-#define _getrf      zgetrf
-#define _getri      zgetri
-#define _gemm       zgemm
-#define _getrf_gpu  zgetrf_magma
-#define _getri_gpu  zgetri_magma
-#define _gemm_gpu   zgemm_magma
+#define _getrf             zgetrf
+#define _getri             zgetri
+#define _gemm              zgemm
+#define _getrf_gpu         magma_zgetrf_gpu
+#define _getri_gpu         magma_zgetri_gpu
+#define _get_getri_nb_gpu  magma_get_zgetri_nb
+#define _gemm_gpu          magma_zgemm
 #endif
 
     
@@ -80,7 +82,7 @@ contains
 
 #ifdef USE_GPU
 
-        nb = magma_get_zgetri_nb(n)
+        nb = _get_getri_nb_gpu(n)
         lwork = nb * size(A,1)
         allocate(ipiv(size(A,1)))
         allocate(work(lwork))

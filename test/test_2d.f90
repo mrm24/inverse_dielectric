@@ -43,9 +43,16 @@ program test_2d
 
     ! Reference data to compare
     real(aip) :: head_ref(4) = [ -0.27165343E+03_aip, -0.97552958E+02_aip, -0.49406608E+02_aip, -0.46006706E+01_aip]
+    complex(aip) :: body_ref(4) = [ (-1.98341339762901914E-002_aip,-3.38140317306334658E-019_aip), &
+                                    (-9.59818027259629059E-003_aip,-4.06834974195416980E-020_aip), &
+                                    (-6.16528641837310598E-003_aip, 1.23527194124926345E-019_aip), &
+                                    (-9.44568563628567226E-004_aip,-2.00846029587093419E-021_aip)] 
     real(aip) :: rdiff
+#ifdef USE_SINGLE_PRECISION
+    real(aip), parameter    :: tolerance = 0.07_aip
+#else
     real(aip), parameter    :: tolerance = 0.05_aip
-
+#endif
     ! Computation object
     type(idiel_t) :: inv_diel
 
@@ -73,7 +80,6 @@ program test_2d
     redpos(:,3) = [2.0_aip/3.0_aip , 2.0_aip/3.0_aip, -0.14764992_aip]
 
     ! Init common objects
-    write(*,*) 'Init'
 #ifdef USE_SPGLIB
     call inv_diel%init_common(lattice, redpos, types, ngrid, 2_i32)
 #else 
@@ -93,22 +99,29 @@ program test_2d
     write(*,*) '[TEST: idiel_t (2d)]'
     do iom = 1, size(head,3)
         ! Invert body
-        write(*,*) 'Invert'
         call inv_diel%invert_body(body(:,:,iom))
         ! Load the data to the worker
-        write(*,*) 'Set blocks'
         call inv_diel%set_dielectric_blocks(head(:,:,iom), wingL(:,:,iom), wingU(:,:,iom))
         ! Compute the average
-        write(*,*) 'Compute'
-        call inv_diel%compute_anisotropic_avg_scrcoulomb_2d(.false.)
+        call inv_diel%compute_anisotropic_avg_scrcoulomb_2d(.true.)
 
         ! Check the head
         rdiff = abs(inv_diel%idiel_head - head_ref(iom))/abs(head_ref(iom))
         write(*,'(A,I2,A,e20.13)')  '  * Regression (HEAD,',iom,') result (relative difference): ', rdiff
         if ( rdiff .lt. tolerance) then
-             write(*,*)  '[TEST: idiel_t (2d) (HEAD,',iom,'): PASSED]'
+             write(*,*)  '[TEST: idiel_t (2d) (HEAD,',iom,'): PASSED]', abs(inv_diel%idiel_head), head_ref(iom)
         else
-             write(*,*)  '[TEST: idiel_t (2d) (HEAD,',iom,'): FAILED]'
+             write(*,*)  '[TEST: idiel_t (2d) (HEAD,',iom,'): FAILED]', abs(inv_diel%idiel_head), head_ref(iom)
+             stop 1
+        end if
+
+        ! Check the body (only first element)
+        rdiff = abs(inv_diel%idiel_body(1,1) - body_ref(iom))/abs(body_ref(iom))
+        write(*,'(A,I2,A,e20.13)')  '  * Regression (BODY,',iom,') result (relative difference): ', rdiff
+        if ( rdiff .lt. tolerance) then
+             write(*,*)  '[TEST: idiel_t (2d) (BODY,',iom,'): PASSED]', abs(inv_diel%idiel_body(1,1)), abs(body_ref(iom))
+        else
+             write(*,*)  '[TEST: idiel_t (2d) (BODY,',iom,'): FAILED]', abs(inv_diel%idiel_body(1,1)), abs(body_ref(iom))
              stop 1
         end if
 

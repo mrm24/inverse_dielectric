@@ -49,6 +49,18 @@ program test_dielectric_average_iso
     real(aip) :: head_ref(12) = [ 6.442031104885004E-002, 0.132222402626860, 0.316390106319300, 0.516127938510703, &
                                   0.645769722906067, 0.707300869613546, 0.733254256631726, 0.785227466265463, &
                                   0.864527818748701, 0.941940576487719, 0.987846211386285, 1.00132129472395 ]
+    complex(aip) ::  body_ref(12) =    [(0.99929660640900964_aip,  1.74324304756898034E-021_aip), &
+                                        (0.99931353362452746_aip, -4.57572808687006110E-022_aip), &
+                                        (0.99934423000483308_aip, -3.15453273667631766E-022_aip), &
+                                        (0.99937212492878569_aip, -6.82160838609231033E-022_aip), &
+                                        (0.99939388057919998_aip, -4.45690387272341898E-022_aip), &
+                                        (0.99940735120538882_aip,  1.44789913499821991E-022_aip), &
+                                        (0.99941408651989239_aip,  3.88464023785692835E-022_aip), &
+                                        (0.99943077579868456_aip,  4.45218643325182083E-023_aip), &
+                                        (0.99947190296600508_aip,  2.63938186362001598E-022_aip), &
+                                        (0.99957442290201637_aip, -1.71839395069885518E-022_aip), &
+                                        (0.99980527163746624_aip,  1.04080503186989247E-022_aip), &
+                                        (0.99998843669895232_aip, -7.63825135003370565E-024_aip) ]
     real(aip) :: rdiff
 #ifdef USE_SINGLE_PRECISION
     real(aip), parameter    :: tolerance = 1.0e-4_aip
@@ -129,7 +141,17 @@ program test_dielectric_average_iso
             write(*,*)  '[TEST : idiel_t (WING U,',iom,'): FAILED]'
             stop 1
         end if
-        
+
+        ! Check the body only one element
+        rdiff = abs(inv_diel%idiel_body(1,1) - body_ref(iom))/body_ref(iom)
+        write(*,'(A,I3,A, e20.13)')  '  * Regression (BODY,',iom,') result (relative difference): ', rdiff
+        if ( rdiff .lt. tolerance) then
+            write(*,*)  '[TEST : idiel_t (BODY,',iom,'): PASSED]'
+        else
+            write(*,*)  '[TEST : idiel_t (BODY,',iom,'): FAILED]'
+            stop 1
+        end if
+
     end do 
 
     stop 0

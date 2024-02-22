@@ -24,7 +24,11 @@ program test_circular_expansion
 
     integer(i32), parameter :: msize = 75_i32
     integer(i32), parameter :: lmax  = 20_i32
-    real(aip),    parameter :: tolerance = 1.0e-12_aip
+#ifdef USE_SINGLE_PRECISION
+    real(aip), parameter    :: tolerance = 1.0e-4_aip
+#else
+    real(aip), parameter    :: tolerance = 1.0e-12_aip
+#endif
     real(aip), allocatable :: rphi(:,:), w(:), xyz(:,:)
     complex(aip), allocatable :: blm(:,:)
     complex(aip), allocatable :: f2expand(:), fexact(:), fint(:)
@@ -44,25 +48,25 @@ program test_circular_expansion
     ! Check that the quadrature integrates the circular harmonics
     integral = real(sum(w * blm(:,1)))
     if ( abs(integral-2.50662827463100_aip)/2.50662827463100_aip <= tolerance) then
-        write(*,*)  '[TEST : idiel_circular_harmonics and idiel_circle_quadrature: PASSED]'
+        write(*,*)  '[TEST : idiel_circular_harmonics and idiel_circle_quadrature: PASSED]', rdiff
     else   
-        write(*,*)  '[TEST : idiel_circular_harmonics and idiel_circle_quadrature: FAILED]'
+        write(*,*)  '[TEST : idiel_circular_harmonics and idiel_circle_quadrature: FAILED]', rdiff
         stop 1
     end if
 
     do i = 2, 2*lmax+1
         integral = real(sum(w * blm(:,i)))
         if ( integral <= tolerance) then
-            write(*,*)  '[TEST : idiel_circular_harmonics and idiel_circle_quadrature: PASSED]'
+            write(*,*)  '[TEST : idiel_circular_harmonics and idiel_circle_quadrature: PASSED]', rdiff
         else   
-            write(*,*)  '[TEST : idiel_circular_harmonics and idiel_circle_quadrature: FAILED]'
+            write(*,*)  '[TEST : idiel_circular_harmonics and idiel_circle_quadrature: FAILED]', rdiff
             stop 1
         end if
     end do
 
     write(*,*)  '[TEST : circ_harm_expansion]'
     f2expand = f1(xyz)
-    call circ_harm_expansion(10_i32, f2expand, w, blm, clm)
+    call circ_harm_expansion(lmax, f2expand, w, blm, clm)
     deallocate(rphi, w, xyz, blm)
     
     call compute_angular_mesh_gauss_legendre(10*msize, rphi, w, xyz)
@@ -80,9 +84,9 @@ program test_circular_expansion
     do i = 1, 10*msize
         rdiff = abs(real(fint(i))-real(fexact(i))) / abs(real(fexact(i)))
         if ( rdiff <= tolerance) then
-            write(*,*)  '[TEST : circ_harm_expansion: PASSED]'
+            write(*,*)  '[TEST : circ_harm_expansion: PASSED]', rdiff
         else   
-            write(*,*)  '[TEST : circ_harm_expansion: FAILED]'
+            write(*,*)  '[TEST : circ_harm_expansion: FAILED]', rdiff
             stop 1
         end if
     end do 

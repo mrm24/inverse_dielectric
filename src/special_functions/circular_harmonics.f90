@@ -58,23 +58,23 @@ contains
    
    end subroutine circ_harm
     
-   !> It expands the function f in terms of spherical harmonics (up to l = 20)
+   !> It expands the function f in terms of circular harmonics (up to l = 20)
    !> Notice that this function is intended to be used with a Gauss-Legendre grid of size 20 which integrates all harmonics up to 10
    !> expansion coefficients should be accurate up to l = 20
-   !> @param[in] lmax     - the spherical expansion order
+   !> @param[in] lexp     - the Fourier expansion order
    !> @param[in] f        - the function to expand (the values for different radius are provided in the radii)
    !> @param[in] weights  - the mesh points weights
    !> @param[in] blm      - the spherical harmonics in the mesh
    !> @param[out] clm     - the expansion coefficients
-   subroutine circ_harm_expansion(lmax, f, weights, blm, clm)
+   subroutine circ_harm_expansion(lexp, f, weights, blm, clm)
 #if defined(USE_GPU) && defined(HAVEOMP5)
       !$omp declare target
 #endif  
-      integer(i32), intent(in)   :: lmax
+      integer(i32), intent(in)   :: lexp
       complex(aip), intent(in)   :: f(:)
       real(aip),    intent(in)   :: weights(:)
       complex(aip), intent(in)   :: blm(:,:)
-      complex(aip), intent(out)  :: clm(2*lmax+1)
+      complex(aip), intent(out)  :: clm(2*lexp+1)
 
 
       complex(aip), allocatable :: fw(:)
@@ -88,7 +88,6 @@ contains
       do i = 1, size(clm)
         clm(i) = sum(blm(:,i) * fw(:))
       end do
-
    end subroutine circ_harm_expansion
 
 end module idiel_circular_harmonics
