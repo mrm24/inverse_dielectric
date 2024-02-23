@@ -10,6 +10,7 @@ option(DOUBLE "Use double precision in real and complex" ON)
 
 # Set precision settings
 if(NOT DOUBLE)
+    message(STATUS "Compiling with single precision")
     add_compile_definitions(USE_SINGLE_PRECISION)
 endif()
 

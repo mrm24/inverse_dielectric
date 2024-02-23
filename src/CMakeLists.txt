@@ -15,6 +15,11 @@ add_subdirectory(interpolation)
 # Spherical quadrature
 add_subdirectory(quadrature)
 
+if(GPU)
+# GPU register
+    add_subdirectory(gpu)
+endif(GPU)
+
 # Linear algebra
 add_subdirectory(linear_algebra)
 

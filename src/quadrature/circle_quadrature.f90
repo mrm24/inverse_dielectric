@@ -61,7 +61,6 @@ contains
     end function cartesian_2_polar
 
     !> Gauss-Legendre quadrature using Golub–Welsch algorithm
-    !> This was chosen due to stability. Indeed this method
     !> matches in precision accurate implementation of Boost C++. 
     !> @param[in]   n - the number of points
     !> @param[out]  x - the abscisa points
@@ -72,12 +71,15 @@ contains
         real(aip),    intent(out) :: x(:)
         real(aip),    intent(out) :: w(:)
 
-        real(r64) :: jacobi(n,n)
+        real(r64), allocatable :: jacobi(:,:)
         real(r64), allocatable :: work(:)
         real(r64), allocatable :: eigenvalues(:)
         integer(i32)  :: i, info
 
+        external :: dsyev
+
         ! Initialize the Jacobi matrix with beta coefficients
+        allocate(jacobi(n,n), source = 0.0_r64)
         do i = 1, n - 1
             jacobi(i,i+1) = i / sqrt(4.0_r64 * i * i - 1.0_r64)
             jacobi(i+1,i) = jacobi(i,i+1)
@@ -91,6 +93,8 @@ contains
 
         x(:) = real(eigenvalues(:), kind=aip)
         w(:) = real(2_r64*jacobi(1,:)**2, kind=aip)
+
+        deallocate(eigenvalues, jacobi, work)
 
     end subroutine gauss_legendre_golub_welsch
 
@@ -158,6 +162,7 @@ contains
         real(aip), allocatable, target, intent(out) :: w(:)
 
         real(aip) :: dx, shift
+        integer   :: i
          
         allocate(x(n),w(n))
 

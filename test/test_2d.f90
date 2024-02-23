@@ -109,9 +109,9 @@ program test_2d
         rdiff = abs(inv_diel%idiel_head - head_ref(iom))/abs(head_ref(iom))
         write(*,'(A,I2,A,e20.13)')  '  * Regression (HEAD,',iom,') result (relative difference): ', rdiff
         if ( rdiff .lt. tolerance) then
-             write(*,*)  '[TEST: idiel_t (2d) (HEAD,',iom,'): PASSED]', abs(inv_diel%idiel_head), head_ref(iom)
+             write(*,*)  '[TEST: idiel_t (2d) (HEAD,',iom,'): PASSED]', abs(inv_diel%idiel_head), abs(head_ref(iom))
         else
-             write(*,*)  '[TEST: idiel_t (2d) (HEAD,',iom,'): FAILED]', abs(inv_diel%idiel_head), head_ref(iom)
+             write(*,*)  '[TEST: idiel_t (2d) (HEAD,',iom,'): FAILED]', abs(inv_diel%idiel_head), abs(head_ref(iom))
              stop 1
         end if
 
