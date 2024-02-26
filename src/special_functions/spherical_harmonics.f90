@@ -125,7 +125,7 @@ contains
    !> @param[out] clm     - the expansion coefficients
    subroutine sph_harm_expansion(n, f, weights, ylm, clm)
 #if defined(USE_GPU) && defined(HAVEOMP5)
-      !$omp declare target
+      !$omp declare target 
 #endif 
       integer(i32), intent(in)  :: n
       complex(aip), intent(in)  :: f(:)
@@ -142,11 +142,11 @@ contains
 
       ! This is a small calculation so it is done with a hand-made definition of matmul so the GPU kernel can be built
       ! clm = Ylm**H \cdot f
-      !$omp parallel do private(i)
+      !$omp do private(i) 
       do i = 1, n
           clm(i) = dot_product(ylm(:,i),fw(:))
       end do
-      !$omp end parallel do
+      !$omp end do
 
       return
 

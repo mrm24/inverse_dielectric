@@ -211,37 +211,37 @@ extern "C" {
         delete rg;
     }
 
-    void _alloc_device_device_host_register(device_host_register* rg, const char* id, std::size_t size, int device_id) {
-        std::string cxx_id(id);
+    void _alloc_device_device_host_register(device_host_register* rg, const int id_len, const char* id, std::size_t size, int device_id) {
+        std::string cxx_id(id, id_len);
         rg->alloc_device(cxx_id, size, device_id);
     }
 
-    void _associate_device_device_host_register(device_host_register* rg, const char* id, void* host_ptr) {
-        std::string cxx_id(id);
+    void _associate_device_device_host_register(device_host_register* rg, const int id_len, const char* id, void* host_ptr) {
+        std::string cxx_id(id, id_len);
         rg->associate(cxx_id, host_ptr);
     }
 
-    void _disassociate_device_device_host_register(device_host_register* rg, const char* id) {
-        std::string cxx_id(id);
+    void _disassociate_device_device_host_register(device_host_register* rg, const int id_len, const char* id) {
+        std::string cxx_id(id, id_len);
         rg->disassociate(cxx_id);
     }
 
-    void _host_to_device_device_device_host_register(device_host_register* rg, const char* id){
-        std::string cxx_id(id);
+    void _host_to_device_device_device_host_register(device_host_register* rg, const int id_len, const char* id){
+        std::string cxx_id(id, id_len);
         rg->host_to_device(cxx_id);
     }
 
-    void _device_to_host_device_device_host_register(device_host_register* rg, const char* id){
-        std::string cxx_id(id);
+    void _device_to_host_device_device_host_register(device_host_register* rg, const int id_len, const char* id){
+        std::string cxx_id(id, id_len);
         rg->device_to_host(cxx_id);
     }
 
-    void _remove_device_device_host_register(device_host_register* rg, const char* id){
-        std::string cxx_id(id);
+    void _remove_device_device_host_register(device_host_register* rg, const int id_len, const char* id){
+        std::string cxx_id(id, id_len);
         rg->remove(cxx_id);
     }
-    void*  _get_device_ptr_device_device_host_register(device_host_register* rg, const char* id){
-        std::string cxx_id(id);
+    void*  _get_device_ptr_device_device_host_register(device_host_register* rg, const int id_len, const char* id){
+        std::string cxx_id(id, id_len);
         auto d_ptr = rg->get_device_ptr(cxx_id);
         return d_ptr;
     }

@@ -41,10 +41,10 @@ endif()
 
 # Check compilers for GPU offloading using OMP5
 if(GPU AND OMP5)
-  if (NOT CMAKE_Fortran_COMPILER MATCHES "gfortran" AND 
-       CMAKE_Fortran_COMPILER_VERSION LESS 1400) 
-    message(FATAL_ERROR "GPU offload of loops is only supported by gfortran version >= 14")
-  endif()
+ if (NOT CMAKE_Fortran_COMPILER MATCHES "gfortran" AND 
+      CMAKE_Fortran_COMPILER_VERSION LESS 1400) 
+   message(FATAL_ERROR "GPU offload of loops is only supported by gfortran version >= 14")
+ endif()
 endif()
 
 # Select compilers
@@ -78,10 +78,17 @@ elseif(CMAKE_Fortran_COMPILER MATCHES "nvfortran")
     message(STATUS "NVIDIA compilers")
     set(CMAKE_CXX_COMPILER "nvc++")
     set(CMAKE_Fortran_COMPILER "nvfortran")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3 -fPIC -mp")
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O3 -fPIC \
-                             -mp \
-                              ")
+    if (GPU)
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3 -fPIC -mp=gpu")
+      set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O3 -fPIC \
+                              -mp=gpu \
+                                ")
+    else()
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3 -fPIC -mp")
+      set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O3 -fPIC \
+                              -mp \
+                                ")
+    endif(GPU)
     set(linalg_lib "openblas")
 else()
     message(FATAL_ERROR "Compiler is not recognized: only GNU, Intel and NVIDIA compilers are officially supported")

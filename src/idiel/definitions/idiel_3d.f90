@@ -147,7 +147,7 @@ contains
             call world%register%assoc("qS", C_loc(wingL_f))
             call world%register%assoc("invqLq", C_loc(head_f))
 
-            !$omp target teams distribute private(ii, jj, body_f, clm_body)
+            !$omp target teams distribute private(ii, jj, body_f, clm_body) collapse(2)
             do ii = 1, nbasis
                 do jj = 1, nbasis
                     body_f(:) = head_f(:) * wingL_f(:, jj) * conjg(wingL_f(:, ii))
@@ -309,7 +309,7 @@ contains
         call world%register%assoc("qT", C_loc(wingU_f))
         call world%register%assoc("invqLq", C_loc(head_f))
 
-        !$omp target teams distribute private(ii, jj, body_f, clm_body)
+        !$omp target teams distribute private(ii, jj, body_f, clm_body) collapse(2)
         do ii = 1, nbasis
             do jj = 1, nbasis
                 body_f(:) = head_f(:) * wingL_f(:, jj) * wingU_f(:, ii)
