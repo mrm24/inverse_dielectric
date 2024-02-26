@@ -85,21 +85,28 @@ contains
         nb = _get_getri_nb_gpu(n)
         lwork = nb * size(A,1)
         allocate(ipiv(size(A,1)))
-        allocate(work(lwork))
 
-        !$omp target enter data map(to: inverse_A) map(alloc: work)
+        !Allocate in device inverse_A, associate to host inverse_A, and copy from host to device
+        call world%register%alloc("inverse_A", n*n*c_sizeof(zzero), world%get_device())
+        call world%register%assoc("inverse_A", C_loc(inverse_A))
+        call world%register%to_device("inverse_A")
+        ! Allocate in device work array
+        call world%register%alloc("work", lwork*c_sizeof(zzero), world%get_device())
 
         ! Obtain device pointers
-        dA_ptr    = omp_get_mapped_ptr(C_loc(inverse_A), world%get_device())
-        dwork_ptr = omp_get_mapped_ptr(C_loc(work), world%get_device())
+        dA_ptr    = world%register%device_ptr("inverse_A")
+        dwork_ptr = world%register%device_ptr("work")
 
         call _getrf_gpu(n, n, dA_ptr, n, ipiv, info)
         if (info /= 0) error stop "inverse_complex_LU: error calling magma_Xgetrf"
         call _getri_gpu(n, dA_ptr, n, ipiv, dwork_ptr, lwork, info)
         if (info /= 0) error stop "inverse_complex_LU: error calling magma_Xgetri"
-        
-        !$omp target update from(inverse_A)
-        !$omp target exit data map(delete: inverse_A, work)
+
+        call world%register%from_device("inverse_A")
+        call world%register%remove("inverse_A")
+        call world%register%remove("work")
+
+        deallocate(ipiv)
 #else
 
         nb = 64
@@ -111,9 +118,9 @@ contains
         if (info /= 0) error stop "inverse_complex_LU: error calling zgetrf"
         call _getri(n, inverse_A, n, ipiv, work, lwork, info)
         if (info /= 0) error stop "inverse_complex_LU: error calling zgetri"
-#endif
 
         deallocate(work, ipiv)
+#endif
 
     end subroutine inverse_complex_LU
 
@@ -148,13 +155,36 @@ contains
         allocate(S(nb,3))
         allocate(T(3,nb))
 #ifdef USE_GPU
-        !$omp target enter data map(to: Binv, wingL, wingU, L) map(alloc: S, T)
-        L_dptr     = omp_get_mapped_ptr(C_loc(L)    , world%get_device())
-        S_dptr     = omp_get_mapped_ptr(C_loc(S)    , world%get_device())
-        T_dptr     = omp_get_mapped_ptr(C_loc(T)    , world%get_device())
-        Binv_dptr  = omp_get_mapped_ptr(C_loc(Binv) , world%get_device())
-        wingL_dptr = omp_get_mapped_ptr(C_loc(wingL), world%get_device())
-        wingU_dptr = omp_get_mapped_ptr(C_loc(wingU), world%get_device())
+        
+        ! GPU allocation
+        call world%register%alloc("Binv", nb*nb*c_sizeof(zzero), world%get_device())
+        call world%register%alloc("wingL", 3*nb*c_sizeof(zzero), world%get_device())
+        call world%register%alloc("wingU", 3*nb*c_sizeof(zzero), world%get_device())
+        call world%register%alloc("L", 9*c_sizeof(zzero), world%get_device())
+        call world%register%alloc("S", 3*nb*c_sizeof(zzero), world%get_device())
+        call world%register%alloc("T", 3*nb*c_sizeof(zzero), world%get_device())
+
+        ! GPU-CPU association
+        call world%register%assoc("Binv",  C_loc(Binv))
+        call world%register%assoc("wingL", C_loc(wingL))
+        call world%register%assoc("wingU", C_loc(wingU))
+        call world%register%assoc("L",     C_loc(L))
+        call world%register%assoc("S",     C_loc(S))
+        call world%register%assoc("T",     C_loc(T))
+
+        ! CPU -> GPU copy
+        call world%register%to_device("Binv")
+        call world%register%to_device("wingL")
+        call world%register%to_device("wingU")
+        call world%register%to_device("L")
+
+        ! Get device pointers
+        L_dptr     = world%register%device_ptr("L")
+        S_dptr     = world%register%device_ptr("S")
+        T_dptr     = world%register%device_ptr("T")
+        Binv_dptr  = world%register%device_ptr("Binv")
+        wingL_dptr = world%register%device_ptr("wingL")
+        wingU_dptr = world%register%device_ptr("wingU")
 
         call _gemm_gpu(MagmaNoTrans, MagmaNoTrans, nb, 3, nb, zone, Binv_dptr, &
                     nb, wingL_dptr, nb, zzero, S_dptr, nb, world%get_queue())
@@ -163,8 +193,20 @@ contains
         call _gemm_gpu(MagmaTrans, MagmaNoTrans, 3, 3, nb, -zone, wingU_dptr, &
                     nb, S_dptr, nb, zone, L_dptr, 3, world%get_queue())
         call world%syncronize()
-        !$omp target update from(L, S, T)
-        !$omp target exit data map(delete: Binv, wingU, wingL, L, S, T)
+        
+        ! Update L 
+        call world%register%from_device("L")
+
+        ! Deassociate from device but keep them there
+        call world%register%deassoc("L")
+        call world%register%deassoc("S")
+        call world%register%deassoc("T")
+
+        ! Delete from device
+        call world%register%remove("Binv")
+        call world%register%remove("wingL")
+        call world%register%remove("wingU")
+
 #else
         call _gemm('n', 'n', nb,  3, nb,  zone, Binv,  nb, wingL, nb, zzero, S, nb)
         call _gemm('t', 'n',  3, nb, nb,  zone, wingU, nb, Binv, nb, zzero, T, 3)
@@ -200,19 +242,46 @@ contains
         allocate(S(nb,3))
 
 #ifdef USE_GPU
-        !$omp target enter data map(to: Binv, wingL, L)  map(alloc: S)
-        L_dptr     = omp_get_mapped_ptr(C_loc(L)    , world%get_device())
-        S_dptr     = omp_get_mapped_ptr(C_loc(S)    , world%get_device())
-        Binv_dptr  = omp_get_mapped_ptr(C_loc(Binv) , world%get_device())
-        wingL_dptr = omp_get_mapped_ptr(C_loc(wingL), world%get_device())
+        ! GPU allocation
+        call world%register%alloc("Binv", nb*nb*c_sizeof(zzero), world%get_device())
+        call world%register%alloc("wingL", 3*nb*c_sizeof(zzero), world%get_device())
+        call world%register%alloc("L", 9*c_sizeof(zzero), world%get_device())
+        call world%register%alloc("S", 3*nb*c_sizeof(zzero), world%get_device())
+
+        ! GPU-CPU association
+        call world%register%assoc("Binv",  C_loc(Binv))
+        call world%register%assoc("wingL", C_loc(wingL))
+        call world%register%assoc("L",     C_loc(L))
+        call world%register%assoc("S",     C_loc(S))
+
+        ! CPU -> GPU copy
+        call world%register%to_device("Binv")
+        call world%register%to_device("wingL")
+        call world%register%to_device("L")
+
+        ! Get device pointers
+        L_dptr     = world%register%device_ptr("L")
+        S_dptr     = world%register%device_ptr("S")
+        Binv_dptr  = world%register%device_ptr("Binv")
+        wingL_dptr = world%register%device_ptr("wingL")
 
         call _gemm_gpu(MagmaNoTrans, MagmaNoTrans, nb, 3, nb, zone, Binv_dptr, &
                         nb, wingL_dptr, nb, zzero, S_dptr, nb, world%get_queue())
         call _gemm_gpu(MagmaConjTrans, MagmaNoTrans, 3, 3, nb, -zone, wingL_dptr, &
                         nb, S_dptr, nb, zone, L_dptr, 3, world%get_queue())
         call world%syncronize()
-        !$omp target update from(L, S)
-        !$omp target exit data map(delete: Binv, wingL, L, S)
+        
+        ! Update L 
+        call world%register%from_device("L")
+
+        ! Deassociate from device but keep them there
+        call world%register%deassoc("L")
+        call world%register%deassoc("S")
+
+        ! Delete from device
+        call world%register%remove("Binv")
+        call world%register%remove("wingL")
+
 #else
         call _gemm('n', 'n', nb, 3, nb,  zone, Binv,  nb, wingL, nb, zzero, S, nb)
         call _gemm('c', 'n',  3, 3, nb, -zone, wingL, nb, S,     nb, zone,  L, 3)
@@ -231,7 +300,7 @@ contains
         complex(aip),    target, allocatable, intent(inout) :: L(:,:)
         complex(aip),    target, allocatable, intent(in)    :: q(:,:)
         type(linalg_world_t), intent(inout)                 :: world
-        complex(aip), allocatable, intent(out)              :: invqLq(:)
+        complex(aip),    target, allocatable, intent(out)   :: invqLq(:)
 
         complex(aip), target, allocatable :: Lq(:,:)
         integer(i32) :: nr 
@@ -250,13 +319,21 @@ contains
 
 #ifdef USE_GPU
 
-        !$omp target enter data map(to: q)
-        !$omp target enter data map(to: L)
-        !$omp target enter data map(alloc: Lq)
+        ! Create Lq in the device
+        call world%register%alloc("Lq", size(q) * c_sizeof(zzero), world%get_device())
+        call world%register%assoc("Lq", C_loc(Lq))
 
-        L_dptr   = omp_get_mapped_ptr(C_loc(L) , world%get_device())
-        Lq_dptr  = omp_get_mapped_ptr(C_loc(Lq), world%get_device())
-        q_dptr   = omp_get_mapped_ptr(C_loc(q) , world%get_device())
+        ! Reassociate q and L to host memory
+        call world%register%assoc("q", C_loc(q))
+        call world%register%assoc("L", C_loc(L))
+
+        ! Update L in device to the symmetrized one
+        call world%register%to_device("L")
+        
+        ! Get device pointers
+        L_dptr   = world%register%device_ptr("L")
+        Lq_dptr  = world%register%device_ptr("Lq")
+        q_dptr   = world%register%device_ptr("q")
 
         call _gemm_gpu(MagmaNoTrans, MagmaNoTrans, 3, nr, 3, zone, L_dptr, &
                          3, q_dptr, 3, zzero, Lq_dptr, 3, world%get_queue())
@@ -267,13 +344,21 @@ contains
 
         if (allocated(invqLq)) deallocate(invqLq)
         allocate(invqLq(size(q,2)))
-#ifdef USE_GPU 
-        !$omp target teams distribute parallel do private(i) map(tofrom: invqLq)
+#ifdef USE_GPU
+        call world%register%alloc("invqLq", size(invqLq) * c_sizeof(zzero), world%get_device())
+        call world%register%assoc("invqLq", C_loc(invqLq))
+        !$omp target teams distribute parallel do private(i) 
         do i = 1, size(q,2)
                 invqLq(i) = 1.0_aip / dot_product(q(:,i),Lq(:,i))
         end do
         !$omp end target teams distribute parallel do
-        !$omp target exit data map(delete: Lq, L, q)
+        
+        call world%register%from_device("invqLq")
+        call world%register%remove("invqLq")
+        
+        call world%register%deassoc("q")
+        call world%register%remove("Lq")
+        call world%register%remove("L")
 #else       
         !$omp parallel shared(invqLq, Lq, q) private(i)
         !$omp do
@@ -314,16 +399,28 @@ contains
         allocate(qS(nr,nb))
 
 #ifdef USE_GPU
-        !$omp target enter data map(always, alloc: qS) map(to: S, q)
-        q_dptr   = omp_get_mapped_ptr(C_loc(q)  , world%get_device())
-        qS_dptr  = omp_get_mapped_ptr(C_loc(qS) , world%get_device())
-        S_dptr   = omp_get_mapped_ptr(C_loc(S)  , world%get_device())
+
+        ! Create Lq in the device
+        call world%register%alloc("qS", size(qS) * c_sizeof(zzero), world%get_device())
+        call world%register%assoc("qS", C_loc(qS))
+
+        ! Reassociate q and L to host memory
+        call world%register%assoc("q", C_loc(q))
+        call world%register%assoc("S", C_loc(S))
+
+        ! Get device pointers
+        q_dptr   = world%register%device_ptr("q")
+        qS_dptr  = world%register%device_ptr("qS")
+        S_dptr   = world%register%device_ptr("S")
 
         call _gemm_gpu(MagmaTrans, MagmaTrans, nr, nb, 3, zone, q_dptr, &
                         3, S_dptr, nb, zzero, qS_dptr, nr, world%get_queue())
         call world%syncronize()
-        !$omp target update from(qS)
-        !$omp target exit data map(delete: S, q, qS)
+        
+        call world%register%from_device("qS")
+        call world%register%remove("S")
+        call world%register%remove("qS")
+        call world%register%deassoc("q")
 #else   
         call _gemm('T', 'T', nr, nb, 3, zone, q, 3, S, nb, zzero, qS, nr)
 #endif  
@@ -355,16 +452,27 @@ contains
         nb = size(T,2)
         allocate(qT(nr,nb))
 #ifdef USE_GPU
-        !$omp target enter data map(alloc: qT) map(to: T, q)
-        q_dptr   = omp_get_mapped_ptr(C_loc(q)  , world%get_device())
-        qT_dptr  = omp_get_mapped_ptr(C_loc(qT) , world%get_device())
-        T_dptr   = omp_get_mapped_ptr(C_loc(T)  , world%get_device())
+        call world%register%alloc("qT", size(qT) * c_sizeof(zzero), world%get_device())
+        call world%register%assoc("qT", C_loc(qT))
+
+        ! Reassociate q and L to host memory
+        call world%register%assoc("q", C_loc(q))
+        call world%register%assoc("T", C_loc(T))
+
+        ! Get device pointers
+        q_dptr   = world%register%device_ptr("q")
+        qT_dptr  = world%register%device_ptr("qT")
+        T_dptr   = world%register%device_ptr("T")
 
         call _gemm_gpu(MagmaTrans, MagmaNoTrans, nr, nb, 3, zone, q_dptr, &
                         3, T_dptr, 3, zzero, qT_dptr, nr, world%get_queue())
+        
         call world%syncronize()
-        !$omp target update from(qT)
-        !$omp target exit data map(delete: T, q, qT)
+
+        call world%register%from_device("qT")
+        call world%register%remove("T")
+        call world%register%remove("qT")
+        call world%register%deassoc("q")
 #else   
         call _gemm('T', 'N', nr, nb, 3, zone, q, 3, T, 3, zzero, qT, nr)
 #endif  
@@ -408,18 +516,39 @@ contains
 
         wingL = -cmplx(1.0_aip/sqrt(fourpi), 0.0_aip, aip) * wingL
         A     = -cmplx(1.0_aip/fourpi, 0.0_aip, aip) * A
-        wingU =  -cmplx(1.0_aip/sqrt(fourpi), 0.0_aip, aip) * wingU
+        wingU = -cmplx(1.0_aip/sqrt(fourpi), 0.0_aip, aip) * wingU
         allocate(bg(3,nb))
 
 #ifdef USE_GPU
-        !$omp target enter data map(to: A, wingL, Binv) map(alloc: ag)
-        !$omp target enter data map(to: wingU) map(alloc: bg)
-        A_dptr     = omp_get_mapped_ptr(C_loc(A)    , world%get_device())
-        ag_dptr    = omp_get_mapped_ptr(C_loc(ag)   , world%get_device())
-        bg_dptr    = omp_get_mapped_ptr(C_loc(bg)   , world%get_device())
-        Binv_dptr  = omp_get_mapped_ptr(C_loc(Binv) , world%get_device())
-        wingL_dptr = omp_get_mapped_ptr(C_loc(wingL), world%get_device())
-        wingU_dptr = omp_get_mapped_ptr(C_loc(wingU), world%get_device())
+        ! Alloc in the device
+        call world%register%alloc("A"    , size(A) * c_sizeof(zzero), world%get_device())
+        call world%register%alloc("ag"   , size(ag) * c_sizeof(zzero), world%get_device())
+        call world%register%alloc("bg"   , size(bg) * c_sizeof(zzero), world%get_device())
+        call world%register%alloc("Binv" , size(Binv) * c_sizeof(zzero), world%get_device())
+        call world%register%alloc("wingL", size(wingL) * c_sizeof(zzero), world%get_device())
+        call world%register%alloc("wingU", size(wingU) * c_sizeof(zzero), world%get_device())
+
+        ! Associate
+        call world%register%assoc("A"    , C_loc(A)    )
+        call world%register%assoc("ag"   , C_loc(ag)   )
+        call world%register%assoc("bg"   , C_loc(bg)   )
+        call world%register%assoc("Binv" , C_loc(Binv) )
+        call world%register%assoc("wingL", C_loc(wingL))
+        call world%register%assoc("wingU", C_loc(wingU))
+
+        ! Host device movement
+        call world%register%to_device("A")
+        call world%register%to_device("Binv")
+        call world%register%to_device("wingL")
+        call world%register%to_device("wingU")
+
+        ! Get device pointers
+        A_dptr     = world%register%device_ptr("A"    )
+        ag_dptr    = world%register%device_ptr("ag"   )
+        bg_dptr    = world%register%device_ptr("bg"   )
+        Binv_dptr  = world%register%device_ptr("Binv" )
+        wingL_dptr = world%register%device_ptr("wingL")
+        wingU_dptr = world%register%device_ptr("wingU")
 
         call _gemm_gpu(MagmaNoTrans, MagmaNoTrans, nb, 3, nb, -zone, Binv_dptr, &
                     nb, wingL_dptr, nb, zzero, ag_dptr, nb, world%get_queue())
@@ -428,8 +557,20 @@ contains
         call _gemm_gpu(MagmaTrans, MagmaNoTrans, 3, 3, nb, -zone, wingU_dptr, &
                     nb, ag_dptr, nb, zone, A_dptr, 3, world%get_queue())
         call world%syncronize()
-        !$omp target update from(A, ag, bg)
-        !$omp target exit data map(delete: Binv, wingU, wingL, A, ag, bg)
+
+        ! Update A
+        call world%register%from_device("A")
+
+        ! Deassociate from device but keep them there
+        call world%register%deassoc("A")
+        call world%register%deassoc("ag")
+        call world%register%deassoc("bg")
+
+        ! Delete from device
+        call world%register%remove("Binv")
+        call world%register%remove("wingL")
+        call world%register%remove("wingU")
+
 #else
         call _gemm('n', 'n', nb,  3, nb,  -zone, Binv,  nb, wingL, nb, zzero, ag, nb)
         call _gemm('t', 'n',  3, nb, nb,  -zone, wingU, nb, Binv, nb, zzero, bg, 3)
@@ -472,19 +613,46 @@ contains
         A     = -cmplx(1.0_aip/fourpi, 0.0_aip, aip) * A
 
 #ifdef USE_GPU
-        !$omp target enter data map(to: A, wingL, Binv) map(alloc: ag)
-        A_dptr     = omp_get_mapped_ptr(C_loc(A)    , world%get_device())
-        ag_dptr    = omp_get_mapped_ptr(C_loc(ag)   , world%get_device())
-        Binv_dptr  = omp_get_mapped_ptr(C_loc(Binv) , world%get_device())
-        wingL_dptr = omp_get_mapped_ptr(C_loc(wingL), world%get_device())
+        ! Alloc in the device
+        call world%register%alloc("A"    , size(A) * c_sizeof(zzero), world%get_device())
+        call world%register%alloc("ag"   , size(ag) * c_sizeof(zzero), world%get_device())
+        call world%register%alloc("Binv" , size(Binv) * c_sizeof(zzero), world%get_device())
+        call world%register%alloc("wingL", size(wingL) * c_sizeof(zzero), world%get_device())
+
+        ! Associate
+        call world%register%assoc("A"    , C_loc(A)    )
+        call world%register%assoc("ag"   , C_loc(ag)   )
+        call world%register%assoc("Binv" , C_loc(Binv) )
+        call world%register%assoc("wingL", C_loc(wingL))
+
+        ! Host device movement
+        call world%register%to_device("A")
+        call world%register%to_device("Binv")
+        call world%register%to_device("wingL")
+
+        ! Get device pointers
+        A_dptr     = world%register%device_ptr("A"    )
+        ag_dptr    = world%register%device_ptr("ag"   )
+        Binv_dptr  = world%register%device_ptr("Binv" )
+        wingL_dptr = world%register%device_ptr("wingL")
 
         call _gemm_gpu(MagmaNoTrans, MagmaNoTrans, nb, 3, nb, -zone, Binv_dptr, &
                         nb, wingL_dptr, nb, zzero, ag_dptr, nb, world%get_queue())
         call _gemm_gpu(MagmaConjTrans, MagmaNoTrans, 3, 3, nb, -zone, wingL_dptr, &
                         nb, ag_dptr, nb, zone, A_dptr, 3, world%get_queue())
         call world%syncronize()
-        !$omp target update from(A, ag)
-        !$omp target exit data map(delete: Binv, wingL, A, ag)
+
+        ! Update A
+        call world%register%from_device("A")
+
+        ! Deassociate from device but keep them there
+        call world%register%deassoc("A")
+        call world%register%deassoc("ag")
+
+        ! Delete from device
+        call world%register%remove("Binv")
+        call world%register%remove("wingL")
+
 #else
         call _gemm('n', 'n', nb, 3, nb, -zone, Binv,  nb, wingL, nb, zzero, ag, nb)
         call _gemm('c', 'n',  3, 3, nb, -zone, wingL, nb, ag,     nb, zone,  A, 3)
@@ -503,7 +671,7 @@ contains
         complex(aip), target, allocatable, intent(inout)   :: A(:,:)
         complex(aip), target, allocatable, intent(in)      :: q(:,:)
         type(linalg_world_t), intent(inout)                :: world
-        complex(aip), allocatable, intent(out)             :: qAq(:)
+        complex(aip), target, allocatable, intent(out)     :: qAq(:)
 
         complex(aip), target, allocatable :: Aq(:,:)
         integer(i32) :: nr 
@@ -520,12 +688,23 @@ contains
         allocate(Aq, mold=q)
 
 #ifdef USE_GPU
-        !$omp target enter data map(to: A)
-        !$omp target enter data map(to: q)
-        !$omp target enter data map(alloc: Aq)
-        A_dptr   = omp_get_mapped_ptr(C_loc(A) , world%get_device())
-        Aq_dptr  = omp_get_mapped_ptr(C_loc(Aq), world%get_device())
-        q_dptr   = omp_get_mapped_ptr(C_loc(q) , world%get_device())
+        
+        ! Create Aq in the device
+        call world%register%alloc("Aq", size(q) * c_sizeof(zzero), world%get_device())
+        call world%register%assoc("Aq", C_loc(Aq))
+
+        ! Reassociate q and L to host memory
+        call world%register%assoc("q", C_loc(q))
+        call world%register%assoc("A", C_loc(A))
+
+        ! Update L in device to the symmetrized one
+        call world%register%to_device("A")
+
+        ! Get device pointers
+        A_dptr   = world%register%device_ptr("A")
+        Aq_dptr  = world%register%device_ptr("Aq")
+        q_dptr   = world%register%device_ptr("q")
+
         call _gemm_gpu(MagmaNoTrans, MagmaNoTrans, 3, nr, 3, zone, A_dptr, &
                          3, q_dptr, 3, zzero, Aq_dptr, 3, world%get_queue())
         call world%syncronize()
@@ -535,12 +714,20 @@ contains
 
         allocate(qAq(size(q,2)))
 #ifdef USE_GPU 
-        !$omp target teams distribute parallel do private(i) map(tofrom: qAq)
+        call world%register%alloc("qAq", size(qAq) * c_sizeof(zzero), world%get_device())
+        call world%register%assoc("qAq", C_loc(qAq))
+        !$omp target teams distribute parallel do private(i) 
         do i = 1, size(q,2)
                 qAq(i) = dot_product(q(:,i),Aq(:,i))
         end do
         !$omp end target teams distribute parallel do
-        !$omp target exit data map(delete: Aq, A, q)
+        
+        call world%register%from_device("qAq")
+        call world%register%remove("qAq")
+        
+        call world%register%deassoc("q")
+        call world%register%remove("Aq")
+        call world%register%remove("A")
 #else       
         !$omp parallel shared(qAq, Aq, q) private(i)
         !$omp do
@@ -554,6 +741,112 @@ contains
         deallocate(A)
 
     end subroutine compute_qAq
+
+    !> It computes ag term for the correction of the body
+    !> @param[in] q      - the linear algebra object containing q
+    !> @param[in] ag     - ag vector
+    !> @param[in] world  - the linalg_world_t handler 
+    !> @param[out] qag   - (in GPU if compiled for)
+    subroutine compute_inverse_ag(q, ag, world, qag)
+        complex(aip), target, allocatable,  intent(inout)   :: q(:,:)
+        complex(aip), target, allocatable,  intent(inout)   :: ag(:,:)
+        type(linalg_world_t),       intent(inout)           :: world
+        complex(aip), target, allocatable,  intent(inout)   :: qag(:,:)
+
+        integer(i32) :: nr, nb 
+
+#if USE_GPU
+        type(C_ptr) :: qag_dptr, ag_dptr, q_dptr
+#else
+        ! External
+        external :: _gemm
+#endif 
+
+        nr = size(q,2)
+        nb = size(ag,1)
+        allocate(qag(nr,nb))
+
+#ifdef USE_GPU
+
+        ! Create Lq in the device
+        call world%register%alloc("qag", size(qag) * c_sizeof(zzero), world%get_device())
+        call world%register%assoc("qag", C_loc(qag))
+
+        ! Reassociate q and L to host memory
+        call world%register%assoc("q",  C_loc(q))
+        call world%register%assoc("ag", C_loc(ag))
+
+        ! Get device pointers
+        q_dptr    = world%register%device_ptr("q")
+        qag_dptr  = world%register%device_ptr("qag")
+        ag_dptr   = world%register%device_ptr("ag")
+
+        call _gemm_gpu(MagmaTrans, MagmaTrans, nr, nb, 3, zone, q_dptr, &
+                        3, ag_dptr, nb, zzero, qag_dptr, nr, world%get_queue())
+        call world%syncronize()
+        
+        call world%register%from_device("qag")
+        call world%register%remove("ag")
+        call world%register%remove("qag")
+        call world%register%deassoc("q")
+#else   
+        call _gemm('T', 'T', nr, nb, 3, zone, q, 3, ag, nb, zzero, qag, nr)
+#endif  
+        deallocate(ag)
+
+    end subroutine compute_inverse_ag
+
+    !> It computes bg term for the correction of the body
+    !> @param[in] q -  qs
+    !> @param[in] bg - bg vector
+    !> @param[in] world - the linalg_world_t handler 
+    !> @param[out] qbg   - (in GPU if compiled for)
+    subroutine compute_inverse_bg(q, bg, world, qbg)
+        complex(aip), target, allocatable,  intent(inout)  :: q(:,:)
+        complex(aip), target, allocatable,  intent(inout)  :: bg(:,:)
+        type(linalg_world_t),               intent(inout)  :: world
+        complex(aip), target, allocatable,  intent(out)    :: qbg(:,:)
+
+        integer(i32) :: nr, nb 
+
+#if USE_GPU
+        type(C_ptr) :: qbg_dptr, bg_dptr, q_dptr
+#else
+        ! External
+        external :: _gemm
+#endif 
+
+        nr = size(q,2)
+        nb = size(bg,2)
+        allocate(qbg(nr,nb))
+#ifdef USE_GPU
+        call world%register%alloc("qbg", size(qbg) * c_sizeof(zzero), world%get_device())
+        call world%register%assoc("qbg", C_loc(qbg))
+
+        ! Reassociate q and L to host memory
+        call world%register%assoc("q", C_loc(q))
+        call world%register%assoc("bg", C_loc(bg))
+
+        ! Get device pointers
+        q_dptr    = world%register%device_ptr("q")
+        qbg_dptr  = world%register%device_ptr("qbg")
+        bg_dptr   = world%register%device_ptr("bg")
+
+        call _gemm_gpu(MagmaTrans, MagmaNoTrans, nr, nb, 3, zone, q_dptr, &
+                        3, bg_dptr, 3, zzero, qbg_dptr, nr, world%get_queue())
+        
+        call world%syncronize()
+
+        call world%register%from_device("qbg")
+        call world%register%remove("bg")
+        call world%register%remove("qbg")
+        call world%register%deassoc("q")
+#else   
+        call _gemm('T', 'N', nr, nb, 3, zone, q, 3, T, 3, zzero, qT, nr)
+#endif  
+        deallocate(bg)
+
+    end subroutine compute_inverse_bg
 
 #undef _getrf
 #undef _getri

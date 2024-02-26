@@ -21,6 +21,7 @@ module idiel_gpu_magma_t
     use iso_c_binding
     use magma2
     use idiel_constants, only: i32, i32, aip
+    use m_gpu_register_fortran, only: device_host_register
 
     implicit none
 
@@ -33,6 +34,8 @@ module idiel_gpu_magma_t
         integer :: device = -1
         !> GPU queue
         type(C_ptr), private  :: queue    = C_null_ptr
+        !> Device host register
+        type(device_host_register) :: register
     contains
         procedure, public :: init, finish, is_queue_set, get_queue, syncronize, get_device
     end type linalg_world_t
@@ -64,6 +67,9 @@ contains
         ! Init the GPU queue
         call magma_queue_create(this%device, this%queue)
 
+        ! Init register
+        call this%register%init()
+
     end subroutine init
 
     !> This subroutine finishes the MAGMA world and the queue
@@ -77,6 +83,9 @@ contains
         
         ! Destroy world
         call magma_finalize()
+
+        ! Clean register
+        call this%register%finish()
     
     end subroutine finish
 

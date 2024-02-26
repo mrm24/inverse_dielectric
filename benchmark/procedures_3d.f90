@@ -18,36 +18,39 @@
 !> Program showcasing the 3D routines
 program procedures_3d
 
-    use idiel_constants, only: r64, i64, pi, twopi, zzero
+    use idiel_constants, only: aip, i32, pi, twopi, zzero
     use idiel, only: idiel_t
 
     implicit none
 
     ! GW data
-    integer(i64), parameter :: nomega = 32_i64  ! Number of frequencies
-    integer(i64) :: iom
+    integer(i32), parameter :: nomega = 32_i32  ! Number of frequencies
+    integer(i32) :: iom
 
     ! Mesh data
-    integer(i64), parameter :: ngrid(3) = [6_i64, 6_i64, 8_i64]
+    integer(i32), parameter :: ngrid(3) = [6_i32, 6_i32, 8_i32]
 
     ! Silicon crystal data
-    integer(i64), parameter :: natoms = 4_i64
-    real(r64) :: a(3), b(3), c(3), lattice(3,3)
-    real(r64), allocatable :: redpos(:,:)
-    integer(i64), allocatable :: types(:)
+    integer(i32), parameter :: natoms = 4_i32
+    real(aip) :: a(3), b(3), c(3), lattice(3,3)
+    real(aip), allocatable :: redpos(:,:)
+    integer(i32), allocatable :: types(:)
 
     ! Dielectric data
-    complex(r64), allocatable :: head(:,:,:), wingL(:,:,:)
-    complex(r64), allocatable :: wingU(:,:,:), body(:,:,:)
+    complex(aip), allocatable :: head(:,:,:), wingL(:,:,:)
+    complex(aip), allocatable :: wingU(:,:,:), body(:,:,:)
 
     ! Computation object
     type(idiel_t) :: inv_diel
 
-    ! Lattice vectors
-    a(:) = [3.13061478636775_r64, -9.89555085794508_r64, 0.00000000000000_r64]
-    b(:) = [3.13061478636775_r64,  9.89555085794508_r64, 0.00000000000000_r64]
-    c(:) = [0.00000000000000_r64,  0.00000000000000_r64, 8.26566207441072_r64]
+    ! In case that no SPG we set only Identity (i.e. no symmetry)
+    integer(i32) :: nsym = 1
+    real(aip)    :: crot(3,3,1)
 
+    ! Lattice vectors
+    a(:) = [3.13061478636775_aip, -9.89555085794508_aip, 0.00000000000000_aip]
+    b(:) = [3.13061478636775_aip,  9.89555085794508_aip, 0.00000000000000_aip]
+    c(:) = [0.00000000000000_aip,  0.00000000000000_aip, 8.26566207441072_aip]
 
     lattice(1,:) = a(:)
     lattice(2,:) = b(:)
@@ -55,14 +58,14 @@ program procedures_3d
 
     ! Atomic types (they might differ that the atomic number)
     allocate(types(natoms))
-    types(:) = [15_i64, 15_i64, 15_i64, 15_i64]
+    types(:) = [15_i32, 15_i32, 15_i32, 15_i32]
 
     ! Reduced positions
     allocate(redpos(3,natoms))
-    redpos(:,1) = [0.8966_r64, 0.1034_r64, 0.0806_r64]
-    redpos(:,2) = [0.6034_r64, 0.3966_r64, 0.5806_r64]
-    redpos(:,3) = [0.3966_r64, 0.6034_r64, 0.4194_r64]
-    redpos(:,4) = [0.1034_r64, 0.8966_r64, 0.9194_r64]
+    redpos(:,1) = [0.8966_aip, 0.1034_aip, 0.0806_aip]
+    redpos(:,2) = [0.6034_aip, 0.3966_aip, 0.5806_aip]
+    redpos(:,3) = [0.3966_aip, 0.6034_aip, 0.4194_aip]
+    redpos(:,4) = [0.1034_aip, 0.8966_aip, 0.9194_aip]
 
     ! Reading files
     call load_from_file('diel3d/head',  head)
@@ -73,7 +76,15 @@ program procedures_3d
     !!!!!!!!!!!! Here it goes the main programm !!!!!!!!!!!!!!!!!!!
 
     ! Init common objects
-    call inv_diel%init_common(lattice, redpos, types, ngrid)
+#ifdef USE_SPGLIB
+    call inv_diel%init_common(lattice, redpos, types, ngrid, 3_i32)
+#else 
+    crot = 0.0_aip
+    crot(1,1,1) = 1.0_aip
+    crot(2,2,1) = 1.0_aip
+    crot(3,3,1) = 1.0_aip
+    call inv_diel%init_common(lattice, redpos, types, ngrid, 3_i32, nsym, crot)
+#endif
 
     ! First do cycle for each frequency by considering the Hermitian matrix (actual case)
     do iom = 1, nomega
@@ -104,12 +115,12 @@ contains
     subroutine load_from_file(fname, data, data2)
 
         character(len=*), intent(in) :: fname
-        complex(r64), allocatable, intent(out) :: data(:,:,:)
-        complex(r64), allocatable, optional, intent(out) :: data2(:,:,:)
+        complex(aip), allocatable, intent(out) :: data(:,:,:)
+        complex(aip), allocatable, optional, intent(out) :: data2(:,:,:)
 
         integer :: fin
-        real(r64), allocatable  :: dreal(:,:,:), dimag(:,:,:)
-        integer(i64) :: data_shape(3)
+        real(aip), allocatable  :: dreal(:,:,:), dimag(:,:,:)
+        integer(i32) :: data_shape(3)
         
         open(file=fname, newunit=fin, status='old', action='read')
 
@@ -122,17 +133,17 @@ contains
             allocate(data2, mold=data)
             read(fin, *) dreal
             read(fin, *) dimag
-            data = cmplx(dreal, dimag, r64) 
+            data = cmplx(dreal, dimag, aip) 
             read(fin, *) dreal
             read(fin, *) dimag
-            data2 = cmplx(dreal, dimag, r64) 
+            data2 = cmplx(dreal, dimag, aip) 
         else
             allocate(data(data_shape(1),data_shape(2),data_shape(3)))
             allocate(dreal(data_shape(1),data_shape(2),data_shape(3)))
             allocate(dimag, mold=dreal)
             read(fin, *) dreal
             read(fin, *) dimag
-            data = cmplx(dreal, dimag, r64) 
+            data = cmplx(dreal, dimag, aip) 
         end if
 
         close(fin)

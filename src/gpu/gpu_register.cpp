@@ -14,15 +14,16 @@
 ///
 ///  @file
 ///  This file contains a host-device register, which can in principle can be used to
-///  create a fine map host-device map address. I have exposed C functions for Fortran interfacing.
+///  create a fine map host-device map address (even for derived types). 
+///  I have exposed C functions for Fortran interfacing.
 ///  Limits: each host must have its own register, though it can connect to several devices.
 ///  Dependencies: OMP4.5 or higher
-///  TODO: Add errors if info fails
 ///
 #include <unordered_map>
 #include <tuple>
 #include <string>
 #include <stdexcept>
+#include <iostream>
 #include <omp.h>
 
 /// Alias for: {Device id, size, host_ptr, device_ptr}
@@ -63,10 +64,16 @@ public:
     /// @param[in] size      - the bytes that should be allocated in the device
     /// @param[in] device_id - device id in which the memory should be allocated
     void alloc_device(identifier id, std::size_t size, std::size_t device_id) {
-        auto d_ptr = omp_target_alloc(size, device_id);
         if (rg.count(id) != 0) {
             throw std::runtime_error("Error in alloc_device: " + id + " is already in use");
         }
+
+        auto d_ptr = omp_target_alloc(size, device_id);
+
+        if (d_ptr == nullptr) {
+            throw std::runtime_error("Error in alloc: " + id + ". Call to omp_target_alloc failed");
+        }
+
         rg[id] = {device_id, size, nullptr, d_ptr};
     }
 
@@ -89,6 +96,11 @@ public:
         }
 
         auto info = omp_target_associate_ptr(host_ptr, std::get<3>(mrg), std::get<1>(mrg), 0, std::get<0>(mrg));
+
+        if (info != 0) {
+            throw std::runtime_error("Error in associate: " + id + ". Call to omp_target_associate_ptr failed");
+        }
+
         std::get<2>(mrg) = host_ptr;
     }
 
@@ -105,6 +117,12 @@ public:
             throw std::runtime_error("Error in disassociate: " + id + " device pointer is not associated to a host pointer");
         }
         auto info = omp_target_disassociate_ptr(std::get<2>(mrg), std::get<0>(mrg));
+        
+        if (info != 0) {
+            throw std::runtime_error("Error in disassociate: " + id + ". Call to omp_target_disassociate_ptr failed");
+        }
+
+        std::get<2>(mrg) = nullptr;
     }
 
     /// Send data between the host and the device, namely between memory addresses associated to the id
@@ -119,7 +137,12 @@ public:
         if (std::get<2>(mrg) == nullptr || std::get<3>(mrg) == nullptr) {
             throw std::runtime_error("Error in host_to_device: " + id + " some pointers are not associated");
         }
+
         auto info = omp_target_memcpy(std::get<3>(mrg), std::get<2>(mrg), std::get<1>(mrg), 0, 0, std::get<0>(mrg), this->host_id);
+
+        if (info != 0) {
+            throw std::runtime_error("Error in host_to_device: " + id + ". Call to omp_target_memcpy failed");
+        }
     }
 
     /// Send data between the device and the host, namely Between memory addresses associated to the id
@@ -134,7 +157,12 @@ public:
         if (std::get<2>(mrg) == nullptr || std::get<3>(mrg) == nullptr) {
             throw std::runtime_error("Error in device_to_host: " + id + " some pointers are not associated");
         }
+        
         auto info = omp_target_memcpy(std::get<2>(mrg), std::get<3>(mrg), std::get<1>(mrg), 0, 0, this->host_id, std::get<0>(mrg));
+
+        if (info != 0) {
+            throw std::runtime_error("Error in device_to_host: " + id + ". Call to omp_target_memcpy failed");
+        }
     }
 
     /// Removes id from the register, it cleans and disassociate if required
@@ -148,6 +176,9 @@ public:
             omp_target_free(std::get<3>(mrg), std::get<0>(mrg));
         } else {
             auto info = omp_target_disassociate_ptr(std::get<2>(mrg), std::get<0>(mrg));
+            if (info != 0) {
+                throw std::runtime_error("Error in remove: " + id + ". Call to omp_target_disassociate_ptr failed");
+            }
             omp_target_free(std::get<3>(mrg), std::get<0>(mrg));
         }
         rg.erase(id);
@@ -165,7 +196,7 @@ public:
 
 };
 
-/// Expose methods for Fortran
+/// Expose C++ class and members for Fortran interfacing
 extern "C" {
 
     void _constructor_device_host_register(device_host_register** rg) {

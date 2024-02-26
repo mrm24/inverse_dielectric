@@ -97,8 +97,8 @@ contains
         ! WINGag : Compute \frac{ \mathbf{\hat{q}} \cdot ag_{\alpha}(\mathbf{G})}{\mathbf{\hat{q} A \hat{q}}} and
         ! \frac{ \mathbf{\hat{q}} \cdot bg_{\alpha}(\mathbf{G})}{\mathbf{\hat{q} A \hat{q}}} 
         ! Note that there is head missing term to allow for the efficient computation of the body term
-        call compute_inverse_wingL(this%xyz, ag, this%world, wingL_f)
-        call compute_inverse_wingU(this%xyz, bg, this%world, wingU_f)
+        call compute_inverse_ag(this%xyz, ag, this%world, wingL_f)
+        call compute_inverse_bg(this%xyz, bg, this%world, wingU_f)
         
         ! bghe body is directly computed as saving it to RAM is too intensive
 
@@ -216,7 +216,7 @@ contains
         ! WINGag : Compute \frac{ \mathbf{\hat{q}} \cdot ag_{\alpha}(\mathbf{G})}{\mathbf{\hat{q} A \hat{q}}} and
         ! \frac{ \mathbf{\hat{q}} \cdot bg_{\alpha}(\mathbf{G})}{\mathbf{\hat{q} A \hat{q}}} 
         ! Note that there is head missing term to allow for the efficient computation of the body term
-        call compute_inverse_wingL(this%xyz, ag, this%world, wingL_f)
+        call compute_inverse_ag(this%xyz, ag, this%world, wingL_f)
         
         ! bghe body is directly computed as saving it to RAM is too intensive
 

@@ -18,20 +18,22 @@
 !> This module contains the procedures for the computation of the dielectric matrix averages
 submodule (idiel) idiel_common
 
+    use iso_c_binding
+
     implicit none
 
 contains
 
     module subroutine init_common(this, lattice, redpos, elements, nq, dim, nsym, crot)
 
-        class(idiel_t), intent(inout)      :: this
-        real(aip), intent(in)              :: lattice(3,3)
-        real(aip),  intent(in)             :: redpos(:,:)
-        integer(i32),  intent(in)          :: elements(:)
-        integer(i32), intent(in)           :: nq(3)
-        integer(i32), intent(in), optional :: dim
-        integer(i32), intent(in), optional :: nsym
-        real(aip), intent(in), optional    :: crot(:,:,:)
+        class(idiel_t), target, intent(inout) :: this
+        real(aip), intent(in)                 :: lattice(3,3)
+        real(aip),  intent(in)                :: redpos(:,:)
+        integer(i32),  intent(in)             :: elements(:)
+        integer(i32), intent(in)              :: nq(3)
+        integer(i32), intent(in), optional    :: dim
+        integer(i32), intent(in), optional    :: nsym
+        real(aip), intent(in), optional       :: crot(:,:,:)
 
         ! Locals
         integer(i32) :: ii, ll, mm
@@ -124,6 +126,17 @@ contains
             ! Compute circular basis in the coarse mesh
             call circ_harm(lmax, this%ang(:,2), this%blm_coarse)
 
+#ifdef USE_GPU
+            ! Alloc in the GPU
+            call this%world%register%alloc("q", size(this%xyz) * c_sizeof(zzero), this%world%get_device())
+            ! Associate 
+            call this%world%register%assoc("q", C_loc(this%xyz))
+            ! Copy
+            call this%world%register%to_device("q")
+            ! Deassociate
+            call this%world%register%deassoc("q")
+#endif
+
         case(3) ! 3D case
             ! Compute the volume in which the integral will be performed
             v_bz = 8.0 * pi**3 / this%cell%vuc 
@@ -195,6 +208,30 @@ contains
             end do
 
             deallocate(ylm, xyz)
+
+#ifdef USE_GPU
+            ! Alloc in the GPU
+            call this%world%register%alloc("q", size(this%xyz) * c_sizeof(zzero), this%world%get_device())
+            call this%world%register%alloc("ylm", size(this%ylm) * c_sizeof(zzero), this%world%get_device())
+            call this%world%register%alloc("weights", size(this%weights) * c_sizeof(pi), this%world%get_device())
+            call this%world%register%alloc("angular_integrals", size(this%angular_integrals) * c_sizeof(zzero), this%world%get_device())
+            ! Associate 
+            call this%world%register%assoc("q", C_loc(this%xyz))
+            call this%world%register%assoc("ylm", C_loc(this%ylm))
+            call this%world%register%assoc("weights", C_loc(this%weights))
+            call this%world%register%assoc("angular_integrals", C_loc(this%angular_integrals))
+            ! Copy
+            call this%world%register%to_device("q")
+            call this%world%register%to_device("ylm")
+            call this%world%register%to_device("weights")
+            call this%world%register%to_device("angular_integrals")
+            ! Deassociate
+            call this%world%register%deassoc("q")
+            call this%world%register%deassoc("ylm")
+            call this%world%register%deassoc("weights")
+            call this%world%register%deassoc("angular_integrals")
+#endif
+
         case default
             error stop "Error(idiel_t%init_common): Error dimension should be either 3 or 2"
         end select 
@@ -206,6 +243,8 @@ contains
     module subroutine clean(this)
 
         class(idiel_t), intent(inout) :: this
+
+        if (this%world%is_queue_set()) call this%world%finish()
 
         if (associated(this%head))        nullify(this%head)
         if (associated(this%wingL))       nullify(this%wingL)
@@ -219,8 +258,7 @@ contains
         if (allocated(this%idiel_wingL))  deallocate(this%idiel_wingL)
         if (allocated(this%idiel_wingU))  deallocate(this%idiel_wingU)
         if (allocated(this%idiel_body))   deallocate(this%idiel_body)
-        if (this%world%is_queue_set()) call this%world%finish()
-
+        
         ! 2D stuff
         if (allocated(this%phi))         deallocate(this%phi)
         if (allocated(this%rmax2d))      deallocate(this%rmax2d)

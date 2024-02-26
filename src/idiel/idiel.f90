@@ -131,14 +131,14 @@ interface
     !> @param[in]     nysm     - the number of symmetry operations
     !> @param[in]     crot     - the rotations in Cartesian coordinates (last index is the space group operation id)
     module subroutine init_common(this, lattice, redpos, elements, nq, dim, nsym, crot)
-        class(idiel_t), intent(inout)      :: this
-        real(aip), intent(in)              :: lattice(3,3)
-        real(aip),  intent(in)             :: redpos(:,:)
-        integer(i32),  intent(in)          :: elements(:)
-        integer(i32), intent(in)           :: nq(3)
-        integer(i32), intent(in), optional :: dim
-        integer(i32), intent(in), optional :: nsym
-        real(aip), intent(in), optional    :: crot(:,:,:)
+        class(idiel_t), target, intent(inout) :: this
+        real(aip), intent(in)                 :: lattice(3,3)
+        real(aip),  intent(in)                :: redpos(:,:)
+        integer(i32),  intent(in)             :: elements(:)
+        integer(i32), intent(in)              :: nq(3)
+        integer(i32), intent(in), optional    :: dim
+        integer(i32), intent(in), optional    :: nsym
+        real(aip), intent(in), optional       :: crot(:,:,:)
     end subroutine init_common
 
     !> This nullify and deallocates the objects

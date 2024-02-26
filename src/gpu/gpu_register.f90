@@ -20,6 +20,9 @@ module m_gpu_register_fortran
 
     implicit none
 
+    private
+    public  :: device_host_register
+
     type device_host_register
         !> The C ptr holding the pointer to cxx class
         type(c_ptr) :: device_host_register_cxx = c_null_ptr
@@ -148,6 +151,5 @@ contains
         type(c_ptr) :: d_ptr
         d_ptr = get_device_ptr_device_device_host_register(this%device_host_register_cxx, id)
     end function device_ptr
-
 
 end module m_gpu_register_fortran
