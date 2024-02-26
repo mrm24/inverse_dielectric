@@ -354,7 +354,8 @@ contains
         !$omp end target teams distribute parallel do
         
         call world%register%from_device("invqLq")
-        call world%register%remove("invqLq")
+        
+        call world%register%deassoc("invqLq")
         
         call world%register%deassoc("q")
         call world%register%remove("Lq")
@@ -419,7 +420,7 @@ contains
         
         call world%register%from_device("qS")
         call world%register%remove("S")
-        call world%register%remove("qS")
+        call world%register%deassoc("qS")
         call world%register%deassoc("q")
 #else   
         call _gemm('T', 'T', nr, nb, 3, zone, q, 3, S, nb, zzero, qS, nr)
@@ -471,7 +472,7 @@ contains
 
         call world%register%from_device("qT")
         call world%register%remove("T")
-        call world%register%remove("qT")
+        call world%register%deassoc("qT")
         call world%register%deassoc("q")
 #else   
         call _gemm('T', 'N', nr, nb, 3, zone, q, 3, T, 3, zzero, qT, nr)

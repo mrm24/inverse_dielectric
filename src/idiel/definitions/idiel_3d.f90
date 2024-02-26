@@ -43,7 +43,7 @@ contains
 
         use idiel_linalg
 
-        class(idiel_t), intent(inout) :: this
+        class(idiel_t), target, intent(inout) :: this
 
         ! Auxiliary vectors
         complex(aip), allocatable :: S(:,:)
@@ -52,13 +52,13 @@ contains
         complex(aip), allocatable :: L(:,:)
 
         ! Function from which to compute the integral 
-        complex(aip), allocatable :: head_f(:) 
-        complex(aip), allocatable :: wingL_f(:,:)
-        complex(aip), allocatable :: body_f(:)
+        complex(aip), target, allocatable :: head_f(:) 
+        complex(aip), target, allocatable :: wingL_f(:,:)
+        complex(aip), target, allocatable :: body_f(:)
 
         ! Harmonic expansion coefficients
-        complex(aip), allocatable :: clm_head(:)
-        complex(aip), allocatable :: clm_body(:)
+        complex(aip), target, allocatable :: clm_head(:)
+        complex(aip), target, allocatable :: clm_body(:)
 
         ! Basis size
         integer(i32) :: nbasis
@@ -123,34 +123,55 @@ contains
         ! Here we compute the body 
         ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
 #if defined(USE_GPU) && defined(HAVEOMP5)
-        ! We need to move to temporaries so it can be easily decomposed into kernels
-        nr = this%quadrature_npoints
-        call move_alloc(this%idiel_body       , body              )
-        call move_alloc(this%ylm              , ylm               )
-        call move_alloc(this%weights          , weights           )
-        call move_alloc(this%angular_integrals, angular_integrals )
-        allocate(body_f(nr), clm_body(nsph_pair))
-        !$omp target enter data map(to: ylm, weights, angular_integrals, body)
-        !$omp target enter data map(to: wingL_f, head_f) map(tofrom: body)
-        !$omp target enter data map(alloc: body_f, clm_body)
-        !$omp target teams distribute private(ii, jj, body_f, clm_body)
-        do ii = 1, nbasis
-            do jj = 1, nbasis
-                body_f(:) = head_f(:) * wingL_f(:, jj) * conjg(wingL_f(:, ii))
-                ! This call itself is parallelized so each team can use its threads
-                ! to solve it
-                call sph_harm_expansion(nsph_pair, body_f, weights, ylm, clm_body)
-                body(jj,ii) = body(jj,ii) + sum(clm_body(:) * angular_integrals(:))
+        ! We need to use associations for OMP to understand
+        associate(quadrature_npoints => this%quadrature_npoints, body => this%idiel_body, &
+                  ylm => this%ylm, weights => this%weights, angular_integrals => this%angular_integrals, &
+                  world => this%world)
+
+            allocate(body_f(quadrature_npoints), clm_body(nsph_pair))
+
+            call world%register%alloc("body", size(body) * c_sizeof(zzero), world%get_device())
+            call world%register%assoc("body", C_loc(body))
+            call world%register%to_device("body")
+
+            call world%register%alloc("body_f", size(body_f) * c_sizeof(zzero), world%get_device())
+            call world%register%assoc("body_f", C_loc(body_f))
+
+            call world%register%alloc("clm_body", size(clm_body) * c_sizeof(zzero), world%get_device())
+            call world%register%assoc("clm_body", C_loc(clm_body))
+
+            call world%register%assoc("ylm", C_loc(ylm))
+            call world%register%assoc("weights", C_loc(weights)) 
+            call world%register%assoc("angular_integrals", C_loc(angular_integrals))
+
+            call world%register%assoc("qS", C_loc(wingL_f))
+            call world%register%assoc("invqLq", C_loc(head_f))
+
+            !$omp target teams distribute private(ii, jj, body_f, clm_body)
+            do ii = 1, nbasis
+                do jj = 1, nbasis
+                    body_f(:) = head_f(:) * wingL_f(:, jj) * conjg(wingL_f(:, ii))
+                    ! This call itself is parallelized so each team can use its threads
+                    ! to solve it
+                    call sph_harm_expansion(nsph_pair, body_f, weights, ylm, clm_body)
+                    body(jj,ii) = body(jj,ii) + sum(clm_body(:) * angular_integrals(:))
+                end do
             end do
-        end do
-        !$omp end target teams distribute
-        !$omp target update from(body)
-        !$omp target exit data map(delete: ylm, weights, angular_integrals, body, wingL_f, head_f, body_f, clm_body)
-        call move_alloc(body             , this%idiel_body        )
-        call move_alloc(ylm              , this%ylm               )
-        call move_alloc(weights          , this%weights           )
-        call move_alloc(angular_integrals, this%angular_integrals )
-        deallocate(body_f, clm_body)
+            !$omp end target teams distribute
+            
+            call world%register%from_device("body")
+
+            call world%register%deassoc("ylm")
+            call world%register%deassoc("weights")
+            call world%register%deassoc("angular_integrals")
+            
+            call world%register%remove("body")
+            call world%register%remove("body_f")
+            call world%register%remove("clm_body")
+
+            deallocate(body_f, clm_body)
+
+        end associate
 #else
         !$omp parallel shared(this, head_f, wingL_f, nbasis) private(ii, jj, body_f, clm_body)
         allocate(body_f(this%quadrature_npoints), clm_body(nsph_pair))
@@ -172,6 +193,11 @@ contains
         !            Clean              !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+#ifdef USE_GPU
+        call this%world%register%remove("invqLq")
+        call this%world%register%remove("qS")
+#endif
+
         deallocate(head_f, wingL_f)
 
     end subroutine compute_anisotropic_avg_hermitian
@@ -180,7 +206,7 @@ contains
 
         use idiel_linalg
 
-        class(idiel_t), intent(inout) :: this
+        class(idiel_t), target, intent(inout) :: this
 
         ! Auxiliary vectors
         complex(aip), allocatable :: S(:,:), T(:,:)
@@ -189,27 +215,20 @@ contains
         complex(aip), allocatable :: L(:,:)
 
         ! Function from which to compute the integral 
-        complex(aip), allocatable :: head_f(:) 
-        complex(aip), allocatable :: wingL_f(:,:)
-        complex(aip), allocatable :: wingU_f(:,:)
-        complex(aip), allocatable :: body_f(:)
+        complex(aip), target, allocatable :: head_f(:) 
+        complex(aip), target, allocatable :: wingL_f(:,:)
+        complex(aip), target, allocatable :: wingU_f(:,:)
+        complex(aip), target, allocatable :: body_f(:)
 
         ! Harmonic expansion coefficients
-        complex(aip), allocatable :: clm_head(:)
-        complex(aip), allocatable :: clm_body(:)
+        complex(aip), target, allocatable :: clm_head(:)
+        complex(aip), target, allocatable :: clm_body(:)
 
         ! Basis size
         integer(i32) :: nbasis
         
         ! Dummy indexes
         integer(i32) :: ii, jj
-
-        ! For device
-        integer(i32)              :: nr
-        complex(aip), allocatable :: ylm(:,:)
-        real(aip), allocatable    :: weights(:)
-        complex(aip), allocatable :: angular_integrals(:)
-        complex(aip), allocatable :: body(:,:)
 
         ! Get the basis size
         nbasis = size(this%Binv, 1)
@@ -265,16 +284,31 @@ contains
         ! Here we compute the body 
         ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
 #if defined(USE_GPU) && defined(HAVEOMP5)
-        ! We need to move to temporaries so it can be easily decomposed into kernels
-        nr = this%quadrature_npoints
-        call move_alloc(this%idiel_body       , body              )
-        call move_alloc(this%ylm              , ylm               )
-        call move_alloc(this%weights          , weights           )
-        call move_alloc(this%angular_integrals, angular_integrals )
-        allocate(body_f(nr), clm_body(nsph_pair))
-        !$omp target enter data map(to: ylm, weights, angular_integrals, body)
-        !$omp target enter data map(to: wingL_f, wingU_f, head_f) map(tofrom: body)
-        !$omp target enter data map(alloc: body_f, clm_body)
+        ! We need to use associations for OMP to understand
+        associate(quadrature_npoints => this%quadrature_npoints, body => this%idiel_body, &
+            ylm => this%ylm, weights => this%weights, angular_integrals => this%angular_integrals, &
+            world => this%world)
+
+        allocate(body_f(quadrature_npoints), clm_body(nsph_pair))
+
+        call world%register%alloc("body", size(body) * c_sizeof(zzero), world%get_device())
+        call world%register%assoc("body", C_loc(body))
+        call world%register%to_device("body")
+
+        call world%register%alloc("body_f", size(body_f) * c_sizeof(zzero), world%get_device())
+        call world%register%assoc("body_f", C_loc(body_f))
+
+        call world%register%alloc("clm_body", size(clm_body) * c_sizeof(zzero), world%get_device())
+        call world%register%assoc("clm_body", C_loc(clm_body))
+
+        call world%register%assoc("ylm", C_loc(ylm))
+        call world%register%assoc("weights", C_loc(weights)) 
+        call world%register%assoc("angular_integrals", C_loc(angular_integrals))
+
+        call world%register%assoc("qS", C_loc(wingL_f))
+        call world%register%assoc("qT", C_loc(wingU_f))
+        call world%register%assoc("invqLq", C_loc(head_f))
+
         !$omp target teams distribute private(ii, jj, body_f, clm_body)
         do ii = 1, nbasis
             do jj = 1, nbasis
@@ -286,13 +320,20 @@ contains
             end do
         end do
         !$omp end target teams distribute
-        !$omp target update from(body)
-        !$omp target exit data map(delete: ylm, weights, angular_integrals, body, wingL_f, wingU_f, head_f, body_f, clm_body)
-        call move_alloc(body             , this%idiel_body        )
-        call move_alloc(ylm              , this%ylm               )
-        call move_alloc(weights          , this%weights           )
-        call move_alloc(angular_integrals, this%angular_integrals )
+
+        call world%register%from_device("body")
+
+        call world%register%deassoc("ylm")
+        call world%register%deassoc("weights")
+        call world%register%deassoc("angular_integrals")
+
+        call world%register%remove("body")
+        call world%register%remove("body_f")
+        call world%register%remove("clm_body")
+
         deallocate(body_f, clm_body)
+
+        end associate
 #else
         !$omp parallel shared(this, head_f, wingL_f, wingU_f, nbasis) private(ii, jj, body_f, clm_body)
         allocate(body_f(this%quadrature_npoints),  clm_body(nsph_pair))
@@ -313,6 +354,12 @@ contains
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !            Clean              !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+#ifdef USE_GPU
+        call this%world%register%remove("invqLq")
+        call this%world%register%remove("qS")
+        call this%world%register%remove("qT")
+#endif
 
         deallocate(head_f, wingL_f, wingU_f)
 

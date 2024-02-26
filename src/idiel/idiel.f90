@@ -172,14 +172,14 @@ interface
     !> This computes the average of the anisotropic inverse dielectric matrix around Gamma for Hermitian matrices (i.e. purely imaginary frequencies)
     !> @param[in] this       - the current idiel_t object for which to compute the average
     module subroutine compute_anisotropic_avg_hermitian(this)
-        class(idiel_t), intent(inout) :: this
+        class(idiel_t), target, intent(inout) :: this
     end subroutine compute_anisotropic_avg_hermitian
 
 
     !> This computes the average of the anisotropic inverse dielectric matrix around Gamma for general matrices 
     !> @param[in] this       - the current idiel_t object for which to compute the average
     module subroutine compute_anisotropic_avg_general(this)
-        class(idiel_t), intent(inout) :: this
+        class(idiel_t), target, intent(inout) :: this
     end subroutine compute_anisotropic_avg_general
 
     !> Inverts the body and stores it (GPU or CPU depending on the compilation)
