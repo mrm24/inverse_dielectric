@@ -142,11 +142,11 @@ contains
 
       ! This is a small calculation so it is done with a hand-made definition of matmul so the GPU kernel can be built
       ! clm = Ylm**H \cdot f
-      !$omp do private(i) 
+      !$omp distribute parallel do private(i) 
       do i = 1, n
           clm(i) = dot_product(ylm(:,i),fw(:))
       end do
-      !$omp end do
+      !$omp end distribute parallel do
 
       return
 
