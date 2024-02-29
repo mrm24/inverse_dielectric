@@ -72,6 +72,7 @@ contains
 #endif 
 #if defined(INTELGPU)
             this%device = omp_get_default_device()
+            call omp_set_default_device(this%device)
 #endif
         end if
 

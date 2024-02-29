@@ -22,7 +22,7 @@ program test_inverse
     
     implicit none
 
-    integer(i32), parameter :: n = 3000_i32
+    integer(i32), parameter :: n = 6000_i32
     complex(aip), allocatable :: A(:,:), inverse_A(:,:)
     type(gpu_world_t) :: world
     integer(i32) :: i
