@@ -147,7 +147,7 @@ contains
             call world%register%assoc("qS", C_loc(wingL_f))
             call world%register%assoc("invqLq", C_loc(head_f))
 
-            !$omp target teams distribute private(ii, jj, body_f, clm_body) collapse(2)
+            !$omp target teams distribute private(ii, jj, body_f, clm_body) allocate(omp_pteam_mem_alloc: body_f, clm_body) collapse(2)
             do ii = 1, nbasis
                 do jj = 1, nbasis
                     body_f(:) = head_f(:) * wingL_f(:, jj) * conjg(wingL_f(:, ii))
@@ -289,49 +289,49 @@ contains
             ylm => this%ylm, weights => this%weights, angular_integrals => this%angular_integrals, &
             world => this%world)
 
-        allocate(body_f(quadrature_npoints), clm_body(nsph_pair))
+            allocate(body_f(quadrature_npoints), clm_body(nsph_pair))
 
-        call world%register%alloc("body", size(body) * c_sizeof(zzero), world%get_device())
-        call world%register%assoc("body", C_loc(body))
-        call world%register%to_device("body")
+            call world%register%alloc("body", size(body) * c_sizeof(zzero), world%get_device())
+            call world%register%assoc("body", C_loc(body))
+            call world%register%to_device("body")
 
-        call world%register%alloc("body_f", size(body_f) * c_sizeof(zzero), world%get_device())
-        call world%register%assoc("body_f", C_loc(body_f))
+            call world%register%alloc("body_f", size(body_f) * c_sizeof(zzero), world%get_device())
+            call world%register%assoc("body_f", C_loc(body_f))
 
-        call world%register%alloc("clm_body", size(clm_body) * c_sizeof(zzero), world%get_device())
-        call world%register%assoc("clm_body", C_loc(clm_body))
+            call world%register%alloc("clm_body", size(clm_body) * c_sizeof(zzero), world%get_device())
+            call world%register%assoc("clm_body", C_loc(clm_body))
 
-        call world%register%assoc("ylm", C_loc(ylm))
-        call world%register%assoc("weights", C_loc(weights)) 
-        call world%register%assoc("angular_integrals", C_loc(angular_integrals))
+            call world%register%assoc("ylm", C_loc(ylm))
+            call world%register%assoc("weights", C_loc(weights)) 
+            call world%register%assoc("angular_integrals", C_loc(angular_integrals))
 
-        call world%register%assoc("qS", C_loc(wingL_f))
-        call world%register%assoc("qT", C_loc(wingU_f))
-        call world%register%assoc("invqLq", C_loc(head_f))
+            call world%register%assoc("qS", C_loc(wingL_f))
+            call world%register%assoc("qT", C_loc(wingU_f))
+            call world%register%assoc("invqLq", C_loc(head_f))
 
-        !$omp target teams distribute private(ii, jj, body_f, clm_body) collapse(2)
-        do ii = 1, nbasis
-            do jj = 1, nbasis
-                body_f(:) = head_f(:) * wingL_f(:, jj) * wingU_f(:, ii)
-                ! This call itself is parallelized so each team can use its threads
-                ! to solve it
-                call sph_harm_expansion(nsph_pair, body_f, weights, ylm, clm_body)
-                body(jj,ii) = body(jj,ii) + sum(clm_body(:) * angular_integrals(:))
+            !$omp target teams distribute private(ii, jj, body_f, clm_body) allocate(omp_pteam_mem_alloc: body_f, clm_body) collapse(2)
+            do ii = 1, nbasis
+                do jj = 1, nbasis
+                    body_f(:) = head_f(:) * wingL_f(:, jj) * wingU_f(:, ii)
+                    ! This call itself is parallelized so each team can use its threads
+                    ! to solve it
+                    call sph_harm_expansion(nsph_pair, body_f, weights, ylm, clm_body)
+                    body(jj,ii) = body(jj,ii) + sum(clm_body(:) * angular_integrals(:))
+                end do
             end do
-        end do
-        !$omp end target teams distribute
+            !$omp end target teams distribute
 
-        call world%register%from_device("body")
+            call world%register%from_device("body")
 
-        call world%register%deassoc("ylm")
-        call world%register%deassoc("weights")
-        call world%register%deassoc("angular_integrals")
+            call world%register%deassoc("ylm")
+            call world%register%deassoc("weights")
+            call world%register%deassoc("angular_integrals")
 
-        call world%register%remove("body")
-        call world%register%remove("body_f")
-        call world%register%remove("clm_body")
+            call world%register%remove("body")
+            call world%register%remove("body_f")
+            call world%register%remove("clm_body")
 
-        deallocate(body_f, clm_body)
+            deallocate(body_f, clm_body)
 
         end associate
 #else

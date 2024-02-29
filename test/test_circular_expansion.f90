@@ -69,7 +69,7 @@ program test_circular_expansion
     call circ_harm_expansion(lmax, f2expand, w, blm, clm)
     deallocate(rphi, w, xyz, blm)
     
-    call compute_angular_mesh_gauss_legendre(10*msize, rphi, w, xyz)
+    call compute_angular_mesh_gauss_legendre(10_i32*msize, rphi, w, xyz)
     call circ_harm(msize, rphi(:,2), blm)
     fexact = f1(xyz)
     allocate(fint, mold=fexact)

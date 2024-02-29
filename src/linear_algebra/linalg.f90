@@ -23,12 +23,10 @@ module idiel_linalg
     use idiel_constants, only: i32, i32, aip, zzero, zone, fourpi
     use iso_c_binding
 #ifdef USE_GPU
-    use omp_lib
-    use magma2
-    use idiel_gpu_magma_t, only: linalg_world_t
-#else
-    use idiel_cpu_magma_t, only: linalg_world_t
+    use idiel_unique_gpu_interface
 #endif
+    use idiel_gpu_world_t, only: gpu_world_t
+
 
 
 ! Set some macros so the proper linear algebra are called
@@ -36,21 +34,19 @@ module idiel_linalg
 #define _getrf             cgetrf
 #define _getri             cgetri
 #define _gemm              cgemm
-#define _getrf_gpu         magma_cgetrf_gpu
-#define _getri_gpu         magma_cgetri_gpu
-#define _get_getri_nb_gpu  magma_get_cgetri_nb
-#define _gemm_gpu          magma_cgemm
+#define _getrf_gpu         cgetrf_gpu
+#define _getri_gpu         cgetri_gpu
+#define _get_getri_nb_gpu  get_cgetri_nb_gpu
+#define _gemm_gpu          cgemm_gpu
 #else
 #define _getrf             zgetrf
 #define _getri             zgetri
 #define _gemm              zgemm
-#define _getrf_gpu         magma_zgetrf_gpu
-#define _getri_gpu         magma_zgetri_gpu
-#define _get_getri_nb_gpu  magma_get_zgetri_nb
-#define _gemm_gpu          magma_zgemm
-#endif
-
-    
+#define _getrf_gpu         zgetrf_gpu
+#define _getri_gpu         zgetri_gpu
+#define _get_getri_nb_gpu  get_zgetri_nb_gpu
+#define _gemm_gpu          zgemm_gpu
+#endif   
     implicit none
 
 contains
@@ -58,12 +54,12 @@ contains
     !> Inverts the A matrix and save the result to inverse_A
     !> @param[in] A - the complex matrix to invert
     !> @param[in] inverse_A - the inverse of A
-    !> @param[in] world - the linalg_world_t handler
+    !> @param[in] world - the gpu_world_t handler
     subroutine inverse_complex_LU(A, inverse_A, world)
 
         complex(aip), contiguous, intent(in)            :: A(:,:)
         complex(aip), target, allocatable, intent(out)  :: inverse_A(:,:)
-        type(linalg_world_t), intent(inout)             :: world
+        type(gpu_world_t), intent(inout)             :: world
 
         ! LAPACK
         integer(i32) :: info, lwork, nb, n
@@ -96,11 +92,11 @@ contains
         ! Obtain device pointers
         dA_ptr    = world%register%device_ptr("inverse_A")
         dwork_ptr = world%register%device_ptr("work")
-
-        call _getrf_gpu(n, n, dA_ptr, n, ipiv, info)
-        if (info /= 0) error stop "inverse_complex_LU: error calling magma_Xgetrf"
-        call _getri_gpu(n, dA_ptr, n, ipiv, dwork_ptr, lwork, info)
-        if (info /= 0) error stop "inverse_complex_LU: error calling magma_Xgetri"
+        
+        call _getrf_gpu(n, n, dA_ptr, n, ipiv, info, world)
+        if (info /= 0) error stop "inverse_complex_LU: error calling Xgetrf gpu"
+        call _getri_gpu(n, dA_ptr, n, ipiv, dwork_ptr, lwork, info, world)
+        if (info /= 0) error stop "inverse_complex_LU: error calling Xgetri gpu"
 
         call world%register%from_device("inverse_A")
         call world%register%remove("inverse_A")
@@ -140,7 +136,7 @@ contains
         complex(aip), target, intent(inout)                        :: wingU(:,:)
         complex(aip), target, allocatable, intent(out)             :: T(:,:)
         complex(aip), target, intent(inout)                        :: L(:,:)
-        type(linalg_world_t), intent(inout)                        :: world
+        type(gpu_world_t), intent(inout)                        :: world
 
         integer(i32) :: nb
 
@@ -186,12 +182,12 @@ contains
         wingL_dptr = world%register%device_ptr("wingL")
         wingU_dptr = world%register%device_ptr("wingU")
 
-        call _gemm_gpu(MagmaNoTrans, MagmaNoTrans, nb, 3, nb, zone, Binv_dptr, &
-                    nb, wingL_dptr, nb, zzero, S_dptr, nb, world%get_queue())
-        call _gemm_gpu(MagmaTrans, MagmaNoTrans, 3, nb, nb, zone, wingU_dptr, &
-                    nb, Binv_dptr, nb, zzero, T_dptr, 3, world%get_queue())
-        call _gemm_gpu(MagmaTrans, MagmaNoTrans, 3, 3, nb, -zone, wingU_dptr, &
-                    nb, S_dptr, nb, zone, L_dptr, 3, world%get_queue())
+        call _gemm_gpu('n', 'n', nb, 3, nb, zone, Binv_dptr, &
+                    nb, wingL_dptr, nb, zzero, S_dptr, nb, world)
+        call _gemm_gpu('t', 'n', 3, nb, nb, zone, wingU_dptr, &
+                    nb, Binv_dptr, nb, zzero, T_dptr, 3, world)
+        call _gemm_gpu('t', 'n', 3, 3, nb, -zone, wingU_dptr, &
+                    nb, S_dptr, nb, zone, L_dptr, 3, world)
         call world%syncronize()
         
         ! Update L 
@@ -228,7 +224,7 @@ contains
         complex(aip), target, intent(inout)                        :: wingL(:,:)
         complex(aip), target, allocatable, intent(out)             :: S(:,:)
         complex(aip), target, intent(inout)                        :: L(:,:)
-        type(linalg_world_t), intent(inout)                        :: world
+        type(gpu_world_t), intent(inout)                        :: world
 
         integer(i32) :: nb
 
@@ -265,10 +261,10 @@ contains
         Binv_dptr  = world%register%device_ptr("Binv")
         wingL_dptr = world%register%device_ptr("wingL")
 
-        call _gemm_gpu(MagmaNoTrans, MagmaNoTrans, nb, 3, nb, zone, Binv_dptr, &
-                        nb, wingL_dptr, nb, zzero, S_dptr, nb, world%get_queue())
-        call _gemm_gpu(MagmaConjTrans, MagmaNoTrans, 3, 3, nb, -zone, wingL_dptr, &
-                        nb, S_dptr, nb, zone, L_dptr, 3, world%get_queue())
+        call _gemm_gpu('n', 'n', nb, 3, nb, zone, Binv_dptr, &
+                        nb, wingL_dptr, nb, zzero, S_dptr, nb, world)
+        call _gemm_gpu('c', 'n', 3, 3, nb, -zone, wingL_dptr, &
+                        nb, S_dptr, nb, zone, L_dptr, 3, world)
         call world%syncronize()
         
         ! Update L 
@@ -293,13 +289,13 @@ contains
     !> It computes 1 / q^T \cdot L \cdot q 
     !> @param[in] L      - macroscopic dielectric matrix (if GPU it must be loaded)
     !> @param[in] q      - the object q (if GPU it must be loaded)
-    !> @param[in] world  - the linalg_world_t handler 
+    !> @param[in] world  - the gpu_world_t handler 
     !> @returns invqLq (if GPU it will also provide the GPU object)
     subroutine compute_inverse_head(L, q, world, invqLq)
 
         complex(aip),    target, allocatable, intent(inout) :: L(:,:)
         complex(aip),    target, allocatable, intent(in)    :: q(:,:)
-        type(linalg_world_t), intent(inout)                 :: world
+        type(gpu_world_t), intent(inout)                 :: world
         complex(aip),    target, allocatable, intent(out)   :: invqLq(:)
 
         complex(aip), target, allocatable :: Lq(:,:)
@@ -335,8 +331,8 @@ contains
         Lq_dptr  = world%register%device_ptr("Lq")
         q_dptr   = world%register%device_ptr("q")
 
-        call _gemm_gpu(MagmaNoTrans, MagmaNoTrans, 3, nr, 3, zone, L_dptr, &
-                         3, q_dptr, 3, zzero, Lq_dptr, 3, world%get_queue())
+        call _gemm_gpu('n', 'n', 3, nr, 3, zone, L_dptr, &
+                         3, q_dptr, 3, zzero, Lq_dptr, 3, world)
         call world%syncronize()
 #else   
         call _gemm('n', 'n', 3, nr, 3, zone, L, 3, q, 3, zzero, Lq, 3)
@@ -378,12 +374,12 @@ contains
     !> It computes Sq term of  \frac{ \mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})}{\mathbf{\hat{q} L \hat{q}}}
     !> @param[in] q - the linear algebra object containing q
     !> @param[in] S - S vector
-    !> @param[in] world - the linalg_world_t handler 
+    !> @param[in] world - the gpu_world_t handler 
     !> @param[out] qS   - (in GPU if compiled for)
     subroutine compute_inverse_wingL(q, S, world, qS)
         complex(aip), target, allocatable,  intent(inout)   :: q(:,:)
         complex(aip), target, allocatable,  intent(inout)   :: S(:,:)
-        type(linalg_world_t),       intent(inout)           :: world
+        type(gpu_world_t),       intent(inout)           :: world
         complex(aip), target, allocatable,  intent(inout)   :: qS(:,:)
 
         integer(i32) :: nr, nb 
@@ -414,8 +410,8 @@ contains
         qS_dptr  = world%register%device_ptr("qS")
         S_dptr   = world%register%device_ptr("S")
 
-        call _gemm_gpu(MagmaTrans, MagmaTrans, nr, nb, 3, zone, q_dptr, &
-                        3, S_dptr, nb, zzero, qS_dptr, nr, world%get_queue())
+        call _gemm_gpu('t', 't', nr, nb, 3, zone, q_dptr, &
+                        3, S_dptr, nb, zzero, qS_dptr, nr, world)
         call world%syncronize()
         
         call world%register%from_device("qS")
@@ -432,12 +428,12 @@ contains
     !> It computes Tq term of \frac{ \mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})}{\mathbf{\hat{q} L \hat{q}}}
     !> @param[in] ref_q - the linear algebra object containing q
     !> @param[in] ref_S - the linear algebra object containing T
-    !> @param[in] world - the linalg_world_t handler 
+    !> @param[in] world - the gpu_world_t handler 
     !> @param[out] qT   - (in GPU if compiled for)
     subroutine compute_inverse_wingU(q, T, world, qT)
         complex(aip), target, allocatable,  intent(inout)  :: q(:,:)
         complex(aip), target, allocatable,  intent(inout)  :: T(:,:)
-        type(linalg_world_t),               intent(inout)  :: world
+        type(gpu_world_t),               intent(inout)  :: world
         complex(aip), target, allocatable,  intent(out)    :: qT(:,:)
 
         integer(i32) :: nr, nb 
@@ -465,8 +461,8 @@ contains
         qT_dptr  = world%register%device_ptr("qT")
         T_dptr   = world%register%device_ptr("T")
 
-        call _gemm_gpu(MagmaTrans, MagmaNoTrans, nr, nb, 3, zone, q_dptr, &
-                        3, T_dptr, 3, zzero, qT_dptr, nr, world%get_queue())
+        call _gemm_gpu('t', 'n', nr, nb, 3, zone, q_dptr, &
+                        3, T_dptr, 3, zzero, qT_dptr, nr, world)
         
         call world%syncronize()
 
@@ -496,7 +492,7 @@ contains
         complex(aip), target, intent(inout)              :: wingU(:,:)
         complex(aip), target, allocatable, intent(out)   :: bg(:,:)
         complex(aip), target, intent(inout)              :: A(:,:)
-        type(linalg_world_t), intent(inout)              :: world
+        type(gpu_world_t), intent(inout)              :: world
 
         integer :: nb, i
 
@@ -551,12 +547,12 @@ contains
         wingL_dptr = world%register%device_ptr("wingL")
         wingU_dptr = world%register%device_ptr("wingU")
 
-        call _gemm_gpu(MagmaNoTrans, MagmaNoTrans, nb, 3, nb, -zone, Binv_dptr, &
-                    nb, wingL_dptr, nb, zzero, ag_dptr, nb, world%get_queue())
-        call _gemm_gpu(MagmaTrans, MagmaNoTrans, 3, nb, nb, -zone, wingU_dptr, &
-                    nb, Binv_dptr, nb, zzero, bg_dptr, 3, world%get_queue())
-        call _gemm_gpu(MagmaTrans, MagmaNoTrans, 3, 3, nb, -zone, wingU_dptr, &
-                    nb, ag_dptr, nb, zone, A_dptr, 3, world%get_queue())
+        call _gemm_gpu('n', 'n', nb, 3, nb, -zone, Binv_dptr, &
+                    nb, wingL_dptr, nb, zzero, ag_dptr, nb, world)
+        call _gemm_gpu('t', 'n', 3, nb, nb, -zone, wingU_dptr, &
+                    nb, Binv_dptr, nb, zzero, bg_dptr, 3, world)
+        call _gemm_gpu('t', 'n', 3, 3, nb, -zone, wingU_dptr, &
+                    nb, ag_dptr, nb, zone, A_dptr, 3, world)
         call world%syncronize()
 
         ! Update A
@@ -591,7 +587,7 @@ contains
         complex(aip), target, intent(inout)                      :: wingL(:,:)
         complex(aip), target, allocatable, intent(out)           :: ag(:,:)
         complex(aip), target, intent(inout)                      :: A(:,:)
-        type(linalg_world_t), intent(inout)                      :: world
+        type(gpu_world_t), intent(inout)                      :: world
 
         integer :: nb, i
 
@@ -637,10 +633,10 @@ contains
         Binv_dptr  = world%register%device_ptr("Binv" )
         wingL_dptr = world%register%device_ptr("wingL")
 
-        call _gemm_gpu(MagmaNoTrans, MagmaNoTrans, nb, 3, nb, -zone, Binv_dptr, &
-                        nb, wingL_dptr, nb, zzero, ag_dptr, nb, world%get_queue())
-        call _gemm_gpu(MagmaConjTrans, MagmaNoTrans, 3, 3, nb, -zone, wingL_dptr, &
-                        nb, ag_dptr, nb, zone, A_dptr, 3, world%get_queue())
+        call _gemm_gpu('n', 'n', nb, 3, nb, -zone, Binv_dptr, &
+                        nb, wingL_dptr, nb, zzero, ag_dptr, nb, world)
+        call _gemm_gpu('c', 'n', 3, 3, nb, -zone, wingL_dptr, &
+                        nb, ag_dptr, nb, zone, A_dptr, 3, world)
         call world%syncronize()
 
         ! Update A
@@ -665,13 +661,13 @@ contains
     !> It computes q^T \cdot A \cdot q 
     !> @param[in] A      - A tensor (if GPU it must be loaded)
     !> @param[in] q      - the object q (if GPU it must be loaded)
-    !> @param[in] world  - the linalg_world_t handler 
+    !> @param[in] world  - the gpu_world_t handler 
     !> @param[out] qAq   - (if GPU it will also provide the GPU object)
     subroutine compute_qAq(A, q, world, qAq)
 
         complex(aip), target, allocatable, intent(inout)   :: A(:,:)
         complex(aip), target, allocatable, intent(in)      :: q(:,:)
-        type(linalg_world_t), intent(inout)                :: world
+        type(gpu_world_t), intent(inout)                :: world
         complex(aip), target, allocatable, intent(out)     :: qAq(:)
 
         complex(aip), target, allocatable :: Aq(:,:)
@@ -706,8 +702,8 @@ contains
         Aq_dptr  = world%register%device_ptr("Aq")
         q_dptr   = world%register%device_ptr("q")
 
-        call _gemm_gpu(MagmaNoTrans, MagmaNoTrans, 3, nr, 3, zone, A_dptr, &
-                         3, q_dptr, 3, zzero, Aq_dptr, 3, world%get_queue())
+        call _gemm_gpu('n', 'n', 3, nr, 3, zone, A_dptr, &
+                         3, q_dptr, 3, zzero, Aq_dptr, 3, world)
         call world%syncronize()
 #else   
         call _gemm('n', 'n', 3, nr, 3, zone, A, 3, q, 3, zzero, Aq, 3)
@@ -746,12 +742,12 @@ contains
     !> It computes ag term for the correction of the body
     !> @param[in] q      - the linear algebra object containing q
     !> @param[in] ag     - ag vector
-    !> @param[in] world  - the linalg_world_t handler 
+    !> @param[in] world  - the gpu_world_t handler 
     !> @param[out] qag   - (in GPU if compiled for)
     subroutine compute_inverse_ag(q, ag, world, qag)
         complex(aip), target, allocatable,  intent(inout)   :: q(:,:)
         complex(aip), target, allocatable,  intent(inout)   :: ag(:,:)
-        type(linalg_world_t),       intent(inout)           :: world
+        type(gpu_world_t),       intent(inout)           :: world
         complex(aip), target, allocatable,  intent(inout)   :: qag(:,:)
 
         integer(i32) :: nr, nb 
@@ -782,8 +778,8 @@ contains
         qag_dptr  = world%register%device_ptr("qag")
         ag_dptr   = world%register%device_ptr("ag")
 
-        call _gemm_gpu(MagmaTrans, MagmaTrans, nr, nb, 3, zone, q_dptr, &
-                        3, ag_dptr, nb, zzero, qag_dptr, nr, world%get_queue())
+        call _gemm_gpu('t', 't', nr, nb, 3, zone, q_dptr, &
+                        3, ag_dptr, nb, zzero, qag_dptr, nr, world)
         call world%syncronize()
         
         call world%register%from_device("qag")
@@ -800,12 +796,12 @@ contains
     !> It computes bg term for the correction of the body
     !> @param[in] q -  qs
     !> @param[in] bg - bg vector
-    !> @param[in] world - the linalg_world_t handler 
+    !> @param[in] world - the gpu_world_t handler 
     !> @param[out] qbg   - (in GPU if compiled for)
     subroutine compute_inverse_bg(q, bg, world, qbg)
         complex(aip), target, allocatable,  intent(inout)  :: q(:,:)
         complex(aip), target, allocatable,  intent(inout)  :: bg(:,:)
-        type(linalg_world_t),               intent(inout)  :: world
+        type(gpu_world_t),               intent(inout)  :: world
         complex(aip), target, allocatable,  intent(out)    :: qbg(:,:)
 
         integer(i32) :: nr, nb 
@@ -833,8 +829,8 @@ contains
         qbg_dptr  = world%register%device_ptr("qbg")
         bg_dptr   = world%register%device_ptr("bg")
 
-        call _gemm_gpu(MagmaTrans, MagmaNoTrans, nr, nb, 3, zone, q_dptr, &
-                        3, bg_dptr, 3, zzero, qbg_dptr, nr, world%get_queue())
+        call _gemm_gpu('t', 'n', nr, nb, 3, zone, q_dptr, &
+                        3, bg_dptr, 3, zzero, qbg_dptr, nr, world)
         
         call world%syncronize()
 
@@ -843,7 +839,7 @@ contains
         call world%register%remove("qbg")
         call world%register%deassoc("q")
 #else   
-        call _gemm('T', 'N', nr, nb, 3, zone, q, 3, T, 3, zzero, qT, nr)
+        call _gemm('T', 'N', nr, nb, 3, zone, q, 3, bg, 3, zzero, qbg, nr)
 #endif  
         deallocate(bg)
 

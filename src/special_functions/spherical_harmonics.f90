@@ -140,14 +140,20 @@ contains
       allocate(fw, mold=f)
       fw(:) = f(:) * weights(:)
 
+      clm(1:n) = zzero
+
       ! This is a small calculation so it is done with a hand-made definition of matmul so the GPU kernel can be built
       ! clm = Ylm**H \cdot f
-      !$omp distribute parallel do private(i) 
+      ! TODO: Change to metadirective whenever those become standard
+#if defined(USE_GPU) && defined(HAVEOMP5)
+      !$omp distribute parallel do private(i)
+#endif 
       do i = 1, n
           clm(i) = dot_product(ylm(:,i),fw(:))
       end do
+#if defined(USE_GPU) && defined(HAVEOMP5)
       !$omp end distribute parallel do
-
+#endif
       return
 
    end subroutine sph_harm_expansion

@@ -118,45 +118,45 @@ contains
         character(len=*), intent(in) :: id
         integer(c_size_t), value :: size
         integer(c_int), value :: device_id
-        call alloc_device_device_host_register(this%device_host_register_cxx, len(id), id, size, device_id)
+        call alloc_device_device_host_register(this%device_host_register_cxx, len(id, kind=c_int), id, size, device_id)
     end subroutine alloc
 
     subroutine remove(this, id)
         class(device_host_register), intent(inout) :: this
         character(len=*), intent(in) :: id
-        call remove_device_device_host_register(this%device_host_register_cxx, len(id), id)
+        call remove_device_device_host_register(this%device_host_register_cxx, len(id, kind=c_int), id)
     end subroutine remove
 
     subroutine assoc(this, id, host_ptr)
         class(device_host_register), intent(inout) :: this
         character(len=*), intent(in) :: id
         type(c_ptr), value :: host_ptr
-        call associate_device_device_host_register(this%device_host_register_cxx, len(id), id, host_ptr)
+        call associate_device_device_host_register(this%device_host_register_cxx, len(id, kind=c_int), id, host_ptr)
     end subroutine assoc
 
     subroutine deassoc(this, id)
         class(device_host_register), intent(inout) :: this
         character(len=*), intent(in) :: id
-        call disassociate_device_device_host_register(this%device_host_register_cxx, len(id), id)
+        call disassociate_device_device_host_register(this%device_host_register_cxx, len(id, kind=c_int), id)
     end subroutine deassoc
 
     subroutine to_device(this, id)
         class(device_host_register), intent(inout) :: this
         character(len=*), intent(in) :: id
-        call host_to_device_device_device_host_register(this%device_host_register_cxx, len(id), id)
+        call host_to_device_device_device_host_register(this%device_host_register_cxx, len(id, kind=c_int), id)
     end subroutine to_device
 
     subroutine from_device(this, id)
         class(device_host_register), intent(inout) :: this
         character(len=*), intent(in) :: id
-        call device_to_host_device_device_host_register(this%device_host_register_cxx, len(id), id)
+        call device_to_host_device_device_host_register(this%device_host_register_cxx, len(id, kind=c_int), id)
     end subroutine from_device
 
     function device_ptr(this, id) result(d_ptr)
         class(device_host_register), intent(inout) :: this
         character(len=*), intent(in) :: id
         type(c_ptr) :: d_ptr
-        d_ptr = get_device_ptr_device_device_host_register(this%device_host_register_cxx, len(id), id)
+        d_ptr = get_device_ptr_device_device_host_register(this%device_host_register_cxx, len(id, kind=c_int), id)
     end function device_ptr
 
 end module m_gpu_register_fortran

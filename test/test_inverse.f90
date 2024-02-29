@@ -18,17 +18,13 @@ program test_inverse
     
     use idiel_constants,         only: i32, aip, zzero
     use idiel_linalg,            only: inverse_complex_LU
-#ifdef USE_GPU
-    use idiel_gpu_magma_t, only: linalg_world_t
-#else
-    use idiel_cpu_magma_t, only: linalg_world_t
-#endif
+    use idiel_gpu_world_t,       only: gpu_world_t
     
     implicit none
 
     integer(i32), parameter :: n = 3000_i32
     complex(aip), allocatable :: A(:,:), inverse_A(:,:)
-    type(linalg_world_t) :: world
+    type(gpu_world_t) :: world
     integer(i32) :: i
     real(aip) :: rdiff
     real(aip), parameter    :: tolerance = 1.0e-12_aip

@@ -25,11 +25,7 @@ module idiel
     use idiel_spherical_harmonics, only: sph_harm, sph_harm_expansion
     use idiel_circle_quadrature, only: compute_angular_mesh_gauss_legendre
     use idiel_circular_harmonics, only: circ_harm, circ_harm_expansion
-#ifdef USE_GPU
-    use idiel_gpu_magma_t, only: linalg_world_t
-#else
-    use idiel_cpu_magma_t, only: linalg_world_t
-#endif
+    use idiel_gpu_world_t, only: gpu_world_t
 
     implicit none
 
@@ -93,7 +89,7 @@ module idiel
         !> Number of points of the quadrature
         integer(i32), private :: quadrature_npoints 
         !> The handler of linear algebra queues
-        type(linalg_world_t), private :: world
+        type(gpu_world_t), private :: world
         !> Dimensionaly
         integer(i32), private :: dim = 3
         !> 2D angle for large integral

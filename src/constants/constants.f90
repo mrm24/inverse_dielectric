@@ -25,6 +25,8 @@ module idiel_constants
     
     !> Integer single precision
     integer, parameter :: i32  = int32
+    !> Real single precision
+    integer, parameter :: r32  = real32
     !> Real double precision
     integer, parameter :: r64  = real64
 

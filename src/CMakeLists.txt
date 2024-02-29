@@ -1,5 +1,7 @@
 #Process the folders
 
+add_compile_definitions(NVIDIA_GPU)
+
 # Constants
 add_subdirectory(constants)
 
@@ -15,10 +17,8 @@ add_subdirectory(interpolation)
 # Spherical quadrature
 add_subdirectory(quadrature)
 
-if(GPU)
-# GPU register
-    add_subdirectory(gpu)
-endif(GPU)
+# GPU stuff, if not supported it generate CPU backends
+add_subdirectory(gpu)
 
 # Linear algebra
 add_subdirectory(linear_algebra)
@@ -35,12 +35,15 @@ if(CMAKE_Fortran_COMPILER MATCHES "ifx")
 endif()
 message(STATUS "MODULES dir : ${MOD_DIR}")
 add_library(IDieL_objects OBJECT ${SRC})
-message(STATUS "Boost path : ${Boost_INCLUDE_DIRS}")
 add_library(IDieL SHARED $<TARGET_OBJECTS:IDieL_objects>)
 
 # Add symbols to the static library so we only need to link against it and not its dependencies
 if (GPU)
-    set(LINKS ${spg_lib} ${linalg_lib} ${MAGMA_DIR}/lib/libmagma.so)
+    if (NVIDIA OR AMD)
+        set(LINKS ${spg_lib} ${linalg_lib} ${MAGMA_DIR}/lib/libmagma.so)
+    else()
+        set(LINKS ${spg_lib} ${linalg_lib})
+    endif()
 else()
     set(LINKS ${spg_lib} ${linalg_lib})
 endif(GPU)
