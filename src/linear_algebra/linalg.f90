@@ -492,7 +492,7 @@ contains
         complex(aip), target, intent(inout)              :: wingU(:,:)
         complex(aip), target, allocatable, intent(out)   :: bg(:,:)
         complex(aip), target, intent(inout)              :: A(:,:)
-        type(gpu_world_t), intent(inout)              :: world
+        type(gpu_world_t), intent(inout)                 :: world
 
         integer :: nb, i
 
@@ -583,10 +583,10 @@ contains
     !> @param[inout] A     - the A ternsor, on entry contains the head
     !> @param[inout] world - the linear algebra manager
     subroutine compute_auxiliary_and_A_2d_hermitian(Binv, wingL, ag, A, world)
-        complex(aip), target, intent(inout)                      :: Binv(:,:)
-        complex(aip), target, intent(inout)                      :: wingL(:,:)
-        complex(aip), target, allocatable, intent(out)           :: ag(:,:)
-        complex(aip), target, intent(inout)                      :: A(:,:)
+        complex(aip), target, intent(inout)                   :: Binv(:,:)
+        complex(aip), target, intent(inout)                   :: wingL(:,:)
+        complex(aip), target, allocatable, intent(out)        :: ag(:,:)
+        complex(aip), target, intent(inout)                   :: A(:,:)
         type(gpu_world_t), intent(inout)                      :: world
 
         integer :: nb, i
@@ -720,7 +720,7 @@ contains
         !$omp end target teams distribute parallel do
         
         call world%register%from_device("qAq")
-        call world%register%remove("qAq")
+        call world%register%deassoc("qAq")
         
         call world%register%deassoc("q")
         call world%register%remove("Aq")
@@ -784,7 +784,7 @@ contains
         
         call world%register%from_device("qag")
         call world%register%remove("ag")
-        call world%register%remove("qag")
+        call world%register%deassoc("qag")
         call world%register%deassoc("q")
 #else   
         call _gemm('T', 'T', nr, nb, 3, zone, q, 3, ag, nb, zzero, qag, nr)
@@ -836,7 +836,7 @@ contains
 
         call world%register%from_device("qbg")
         call world%register%remove("bg")
-        call world%register%remove("qbg")
+        call world%register%deassoc("qbg")
         call world%register%deassoc("q")
 #else   
         call _gemm('T', 'N', nr, nb, 3, zone, q, 3, bg, 3, zzero, qbg, nr)

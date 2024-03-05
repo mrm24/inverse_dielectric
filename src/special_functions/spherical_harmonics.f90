@@ -138,9 +138,13 @@ contains
 
       ! Multiply the function with the weights so the matrix-vector products solves the integral for all the (l,m)
       allocate(fw, mold=f)
+#if defined(USE_GPU) && defined(HAVEOMP5)
+      !$omp workshare
+#endif 
       fw(:) = f(:) * weights(:)
-
-      clm(1:n) = zzero
+#if defined(USE_GPU) && defined(HAVEOMP5)
+      !$omp end workshare 
+#endif 
 
       ! This is a small calculation so it is done with a hand-made definition of matmul so the GPU kernel can be built
       ! clm = Ylm**H \cdot f

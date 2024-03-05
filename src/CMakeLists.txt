@@ -36,6 +36,7 @@ endif()
 message(STATUS "MODULES dir : ${MOD_DIR}")
 add_library(IDieL_objects OBJECT ${SRC})
 add_library(IDieL SHARED $<TARGET_OBJECTS:IDieL_objects>)
+set_target_properties(IDieL PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
 
 # Add symbols to the static library so we only need to link against it and not its dependencies
 if (GPU)

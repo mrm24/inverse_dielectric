@@ -110,10 +110,13 @@ contains
             ! Init the radial mesh (this mesh is intended to provide good treatment of the queue)
             rmax = 1.02_aip * maxval(this%rmax2d)
             dx = rmax / (nr - 1)
+            allocate(this%radii(nr))
             do ii = 1, nr
                 this%radii(ii) = (ii - 1) * dx
             end do
 
+            ! Precompte exponential factors
+            allocate(this%vr(size_mesh_2d_coarse,nr))
             do ii = 1, nr
                 this%vr(:,ii) = fourpi * (1.0_aip - exp(-this%rcut * this%radii(ii)))
             end do
@@ -129,12 +132,43 @@ contains
 #ifdef USE_GPU
             ! Alloc in the GPU
             call this%world%register%alloc("q", size(this%xyz) * c_sizeof(zzero), this%world%get_device())
+            call this%world%register%alloc("blm_coarse"   , size(this%blm_coarse  ) * c_sizeof(zzero),  this%world%get_device())
+            call this%world%register%alloc("weights"      , size(this%weights     ) * c_sizeof(pi),  this%world%get_device())
+            call this%world%register%alloc("blm_fine"     , size(this%blm_fine    ) * c_sizeof(zzero),  this%world%get_device())
+            call this%world%register%alloc("weights_fine" , size(this%weights_fine) * c_sizeof(pi),  this%world%get_device())
+            call this%world%register%alloc("radii"        , size(this%radii       ) * c_sizeof(pi),  this%world%get_device())
+            call this%world%register%alloc("rmax2d"       , size(this%rmax2d      ) * c_sizeof(pi),  this%world%get_device())
+            call this%world%register%alloc("vr"           , size(this%vr          ) * c_sizeof(zzero),  this%world%get_device())
+
             ! Associate 
             call this%world%register%assoc("q", C_loc(this%xyz))
+            call this%world%register%assoc("blm_coarse"   , C_loc(this%blm_coarse)  )
+            call this%world%register%assoc("weights"      , C_loc(this%weights)     )
+            call this%world%register%assoc("blm_fine"     , C_loc(this%blm_fine)    )
+            call this%world%register%assoc("weights_fine" , C_loc(this%weights_fine))
+            call this%world%register%assoc("radii"        , C_loc(this%radii)       )
+            call this%world%register%assoc("rmax2d"       , C_loc(this%rmax2d)      )
+            call this%world%register%assoc("vr"           , C_loc(this%vr)          )
             ! Copy
             call this%world%register%to_device("q")
+            call this%world%register%to_device("blm_coarse"   )
+            call this%world%register%to_device("weights"      )
+            call this%world%register%to_device("blm_fine"     )
+            call this%world%register%to_device("weights_fine" )
+            call this%world%register%to_device("radii"        )
+            call this%world%register%to_device("rmax2d"       )
+            call this%world%register%to_device("vr"           )
+
             ! Deassociate
             call this%world%register%deassoc("q")
+            call this%world%register%deassoc("blm_coarse"   )
+            call this%world%register%deassoc("weights"      )
+            call this%world%register%deassoc("blm_fine"     )
+            call this%world%register%deassoc("weights_fine" )
+            call this%world%register%deassoc("radii"        )
+            call this%world%register%deassoc("rmax2d"       )
+            call this%world%register%deassoc("vr"           )
+
 #endif
 
         case(3) ! 3D case
@@ -264,6 +298,8 @@ contains
         if (allocated(this%rmax2d))      deallocate(this%rmax2d)
         if (allocated(this%blm_coarse))  deallocate(this%blm_coarse)
         if (allocated(this%blm_fine))    deallocate(this%blm_fine)
+        if (allocated(this%vr))          deallocate(this%vr)
+        if (allocated(this%radii))       deallocate(this%radii)
         
         ! 3D stuff
         if (allocated(this%angular_integrals)) deallocate(this%angular_integrals)

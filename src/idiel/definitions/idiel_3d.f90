@@ -147,10 +147,12 @@ contains
             call world%register%assoc("qS", C_loc(wingL_f))
             call world%register%assoc("invqLq", C_loc(head_f))
 
-            !$omp target teams distribute private(ii, jj, body_f, clm_body) allocate(omp_pteam_mem_alloc: body_f, clm_body) collapse(2)
+            !$omp target teams distribute private(ii, jj, body_f, clm_body) collapse(2)
             do ii = 1, nbasis
                 do jj = 1, nbasis
+                    !$omp workshare
                     body_f(:) = head_f(:) * wingL_f(:, jj) * conjg(wingL_f(:, ii))
+                    !$omp end workshare
                     ! This call itself is parallelized so each team can use its threads
                     ! to solve it
                     call sph_harm_expansion(nsph_pair, body_f, weights, ylm, clm_body)
@@ -309,10 +311,12 @@ contains
             call world%register%assoc("qT", C_loc(wingU_f))
             call world%register%assoc("invqLq", C_loc(head_f))
 
-            !$omp target teams distribute private(ii, jj, body_f, clm_body) allocate(omp_pteam_mem_alloc: body_f, clm_body) collapse(2)
+            !$omp target teams distribute private(ii, jj, body_f, clm_body) collapse(2)
             do ii = 1, nbasis
                 do jj = 1, nbasis
+                    !$omp workshare
                     body_f(:) = head_f(:) * wingL_f(:, jj) * wingU_f(:, ii)
+                    !$omp end workshare
                     ! This call itself is parallelized so each team can use its threads
                     ! to solve it
                     call sph_harm_expansion(nsph_pair, body_f, weights, ylm, clm_body)

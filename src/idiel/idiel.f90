@@ -95,13 +95,13 @@ module idiel
         !> 2D angle for large integral
         real(aip), private, allocatable :: phi(:)
         !> 2D radial mesh for interpolation
-        real(aip), private :: radii(nr)
+        real(aip), private, allocatable :: radii(:)
         !> 2D rmax as function of angle
         real(aip), allocatable, private :: rmax2d(:)
         !> rcut for the 2D Coulomb potential
         real(aip), private :: rcut 
         !> Exponential function of the screened Coulomb potential 
-        complex(aip), private :: vr(size_mesh_2d_coarse, nr)
+        complex(aip), allocatable, private :: vr(:,:)
         !> Circular harmonics in the coarse mesh
         complex(aip), allocatable, private :: blm_coarse(:,:)
         !> Circular harmonics in the fine mesh
@@ -199,13 +199,14 @@ interface
     end subroutine compute_anisotropic_avg_scrcoulomb_2d
 
     module subroutine compute_anisotropic_avg_scrcoulomb_2d_general(this)
-        class(idiel_t), intent(inout) :: this
+        class(idiel_t), target, intent(inout) :: this
     end subroutine compute_anisotropic_avg_scrcoulomb_2d_general
 
     module subroutine compute_anisotropic_avg_scrcoulomb_2d_hermitian(this)
-        class(idiel_t), intent(inout) :: this
+        class(idiel_t), target, intent(inout) :: this
     end subroutine compute_anisotropic_avg_scrcoulomb_2d_hermitian
 
 end interface
 
 end module idiel
+

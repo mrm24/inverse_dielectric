@@ -102,14 +102,14 @@ elseif(CMAKE_Fortran_COMPILER MATCHES "gfortran")
     set(CMAKE_CXX_COMPILER "g++")
     set(CMAKE_Fortran_COMPILER "gfortran")
     if(GPU)
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3 -fPIC -fopenmp \
-                            -foffload-options=-lm -fopenmp-allocators")
-      set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O3 -fPIC \
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -fopenmp \
+                            -foffload-options=-lm ")
+      set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cpp -O3 -fPIC \
                                 -ffree-line-length-512 -fopenmp -fopenmp-allocators \
                                 -foffload-options=-lgfortran -foffload-options=-lm")
     else()
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3 -fPIC -fopenmp")
-      set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O3 -fPIC \
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -flto -fPIC -fopenmp")
+      set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cpp -flto -O3 -fPIC \
                                 -ffree-line-length-512 -fopenmp \
                                 ")
     endif()
