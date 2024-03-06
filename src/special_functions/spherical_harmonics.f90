@@ -150,13 +150,13 @@ contains
       ! clm = Ylm**H \cdot f
       ! TODO: Change to metadirective whenever those become standard
 #if defined(USE_GPU) && defined(HAVEOMP5)
-      !$omp distribute parallel do private(i)
+      !$omp parallel do private(i)
 #endif 
       do i = 1, n
           clm(i) = dot_product(ylm(:,i),fw(:))
       end do
 #if defined(USE_GPU) && defined(HAVEOMP5)
-      !$omp end distribute parallel do
+      !$omp end parallel do
 #endif
       return
 

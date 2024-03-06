@@ -65,12 +65,12 @@ else()
 endif()
 
 # Check compilers for GPU offloading using OMP5
-if(GPU AND OMP5)
- if (NOT CMAKE_Fortran_COMPILER MATCHES "gfortran" AND 
-      CMAKE_Fortran_COMPILER_VERSION LESS 1400) 
-   message(FATAL_ERROR "GPU offload of loops is only supported by gfortran version >= 14")
- endif()
-endif()
+# if(GPU AND OMP5)
+#  if (NOT CMAKE_Fortran_COMPILER MATCHES "gfortran" AND
+#       CMAKE_Fortran_COMPILER_VERSION LESS 1400)
+#    message(FATAL_ERROR "GPU offload of loops is only supported by gfortran version >= 14")
+#  endif()
+# endif()
 
 # Set MKL as linear algebra library
 
@@ -105,7 +105,7 @@ elseif(CMAKE_Fortran_COMPILER MATCHES "gfortran")
       set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -fopenmp \
                             -foffload-options=-lm ")
       set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cpp -O3 -fPIC \
-                                -ffree-line-length-512 -fopenmp -fopenmp-allocators \
+                                -ffree-line-length-512 -fopenmp  \
                                 -foffload-options=-lgfortran -foffload-options=-lm")
     else()
       set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -fopenmp")
