@@ -108,12 +108,12 @@ elseif(CMAKE_Fortran_COMPILER MATCHES "gfortran")
                                 -ffree-line-length-512 -fopenmp -fopenmp-allocators \
                                 -foffload-options=-lgfortran -foffload-options=-lm")
     else()
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -flto -fPIC -fopenmp")
-      set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cpp -flto -O3 -fPIC \
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -fopenmp")
+      set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cpp -O3 -fPIC \
                                 -ffree-line-length-512 -fopenmp \
                                 ")
     endif()
-    set(linalg_lib "openblas")
+    set(linalg_lib "openblasp")
 elseif(CMAKE_Fortran_COMPILER MATCHES "nvfortran")
     message(STATUS "NVIDIA compilers")
     set(CMAKE_CXX_COMPILER "nvc++")
@@ -129,7 +129,7 @@ elseif(CMAKE_Fortran_COMPILER MATCHES "nvfortran")
                               -mp \
                                 ")
     endif(GPU)
-    set(linalg_lib "openblas")
+    set(linalg_lib "openblasp")
 else()
     message(FATAL_ERROR "Compiler is not recognized: only GNU, Intel (ifx not ifort) and NVIDIA compilers are officially supported")
 endif()

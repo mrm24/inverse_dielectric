@@ -44,8 +44,8 @@ program procedures_3d
     type(idiel_t) :: inv_diel
 
     ! In case that no SPG we set only Identity (i.e. no symmetry)
-    integer(i32) :: nsym = 1
-    real(aip)    :: crot(3,3,1)
+    integer(i32) :: nsym = 8
+    real(aip)    :: crot(3,3,8)
 
     ! Lattice vectors
     a(:) = [3.13061478636775_aip, -9.89555085794508_aip, 0.00000000000000_aip]
@@ -79,10 +79,15 @@ program procedures_3d
 #ifdef USE_SPGLIB
     call inv_diel%init_common(lattice, redpos, types, ngrid, 3_i32)
 #else 
-    crot = 0.0_aip
-    crot(1,1,1) = 1.0_aip
-    crot(2,2,1) = 1.0_aip
-    crot(3,3,1) = 1.0_aip
+    crot(:,:,1 ) = reshape(real([  1.0,  0.0, 0.0,  0.0,  1.0,  0.0, 0.0, 0.0,  1.0 ], kind = aip ), [3,3])
+    crot(:,:,2 ) = reshape(real([ -1.0,  0.0, 0.0,  0.0, -1.0,  0.0, 0.0, 0.0, -1.0 ], kind = aip ), [3,3])
+    crot(:,:,3 ) = reshape(real([ -1.0,  0.0, 0.0,  0.0, -1.0,  0.0, 0.0, 0.0,  1.0 ], kind = aip ), [3,3])
+    crot(:,:,4 ) = reshape(real([  1.0,  0.0, 0.0,  0.0,  1.0,  0.0, 0.0, 0.0, -1.0 ], kind = aip ), [3,3])
+    crot(:,:,5 ) = reshape(real([  1.0,  0.0, 0.0,  0.0, -1.0,  0.0, 0.0, 0.0, -1.0 ], kind = aip ), [3,3])
+    crot(:,:,6 ) = reshape(real([ -1.0,  0.0, 0.0,  0.0,  1.0,  0.0, 0.0, 0.0,  1.0 ], kind = aip ), [3,3])
+    crot(:,:,7 ) = reshape(real([ -1.0,  0.0, 0.0,  0.0,  1.0,  0.0, 0.0, 0.0, -1.0 ], kind = aip ), [3,3])
+    crot(:,:,8 ) = reshape(real([  1.0,  0.0, 0.0,  0.0, -1.0,  0.0, 0.0, 0.0,  1.0 ], kind = aip ), [3,3])
+
     call inv_diel%init_common(lattice, redpos, types, ngrid, 3_i32, nsym, crot)
 #endif
 

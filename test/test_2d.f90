@@ -57,8 +57,8 @@ program test_2d
     type(idiel_t) :: inv_diel
 
     ! In case that no SPG we set only Identity (i.e. no symmetry)
-    integer(i32) :: nsym = 1
-    real(aip)    :: crot(3,3,1)
+    integer(i32) :: nsym = 12
+    real(aip)    :: crot(3,3,12)
 
     ! Lattice vectors
     a(:) = [0.00000000_aip, 6.020289060_aip, 0.00000000_aip]
@@ -82,11 +82,19 @@ program test_2d
     ! Init common objects
 #ifdef USE_SPGLIB
     call inv_diel%init_common(lattice, redpos, types, ngrid, 2_i32)
-#else 
-    crot = 0.0_aip
-    crot(1,1,1) = 1.0_aip
-    crot(2,2,1) = 1.0_aip
-    crot(3,3,1) = 1.0_aip
+#else
+    crot(:,:, 1 ) = reshape(real([   1.00,        0.0000000000000000,        0.0,        0.0000000000000000,        1.00, 0.0, 0.0 , 0.0,  1.0 ], kind = aip), [3,3])
+    crot(:,:, 2 ) = reshape(real([ -0.500,      -0.86602540446306686,        0.0,       0.86602540310581044,      -0.500, 0.0, 0.0 , 0.0, -1.0 ], kind = aip), [3,3])
+    crot(:,:, 3 ) = reshape(real([ -0.500,       0.86602540446306686,        0.0,      -0.86602540310581044,      -0.500, 0.0, 0.0 , 0.0,  1.0 ], kind = aip), [3,3])
+    crot(:,:, 4 ) = reshape(real([   1.00,        0.0000000000000000,        0.0,        0.0000000000000000,        1.00, 0.0, 0.0 , 0.0, -1.0 ], kind = aip), [3,3])
+    crot(:,:, 5 ) = reshape(real([ -0.500,      -0.86602540446306686,        0.0,       0.86602540310581044,      -0.500, 0.0, 0.0 , 0.0,  1.0 ], kind = aip), [3,3])
+    crot(:,:, 6 ) = reshape(real([ -0.500,       0.86602540446306686,        0.0,      -0.86602540310581044,      -0.500, 0.0, 0.0 , 0.0, -1.0 ], kind = aip), [3,3])
+    crot(:,:, 7 ) = reshape(real([ -0.500,      -0.86602540446306686,        0.0,      -0.86602540310581044,       0.500, 0.0, 0.0 , 0.0, -1.0 ], kind = aip), [3,3])
+    crot(:,:, 8 ) = reshape(real([   1.00,        0.0000000000000000,        0.0,        0.0000000000000000,       -1.00, 0.0, 0.0 , 0.0,  1.0 ], kind = aip), [3,3])
+    crot(:,:, 9 ) = reshape(real([ -0.500,       0.86602540446306686,        0.0,       0.86602540310581044,       0.500, 0.0, 0.0 , 0.0, -1.0 ], kind = aip), [3,3])
+    crot(:,:,10 ) = reshape(real([ -0.500,      -0.86602540446306686,        0.0,      -0.86602540310581044,       0.500, 0.0, 0.0 , 0.0,  1.0 ], kind = aip), [3,3])
+    crot(:,:,11 ) = reshape(real([   1.00,        0.0000000000000000,        0.0,        0.0000000000000000,       -1.00, 0.0, 0.0 , 0.0, -1.0 ], kind = aip), [3,3])
+    crot(:,:,12 ) = reshape(real([ -0.500,       0.86602540446306686,        0.0,       0.86602540310581044,       0.500, 0.0, 0.0 , 0.0,  1.0 ], kind = aip), [3,3])
     call inv_diel%init_common(lattice, redpos, types, ngrid, 2_i32, nsym, crot)
 #endif
 

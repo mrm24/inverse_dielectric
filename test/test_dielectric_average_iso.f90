@@ -38,8 +38,8 @@ program test_dielectric_average_iso
     real(aip), allocatable :: redpos(:,:)
     integer(i32), allocatable :: types(:)
     ! In case that no SPG we set only Identity (i.e. no symmetry)
-    integer(i32) :: nsym = 1
-    real(aip)    :: crot(3,3,1)
+    integer(i32) :: nsym = 48
+    real(aip)    :: crot(3,3,48)
 
     ! Dielectric data
     complex(aip), allocatable :: head(:,:,:), wingL(:,:,:)
@@ -93,10 +93,54 @@ program test_dielectric_average_iso
 #ifdef USE_SPGLIB
     call inv_diel%init_common(lattice, redpos, types, ngrid)
 #else 
-    crot = 0.0_aip
-    crot(1,1,1) = 1.0_aip
-    crot(2,2,1) = 1.0_aip
-    crot(3,3,1) = 1.0_aip
+    crot(:,:, 1 ) = reshape(real([   1.0,  0.0,  0.0,  0.0,  1.0,  0.0,  0.0,  0.0,  1.0], kind = aip), [3,3])
+    crot(:,:, 2 ) = reshape(real([   0.0,  1.0,  0.0, -1.0,  0.0,  0.0,  0.0,  0.0,  1.0], kind = aip), [3,3])
+    crot(:,:, 3 ) = reshape(real([  -1.0,  0.0,  0.0,  0.0, -1.0,  0.0,  0.0,  0.0,  1.0], kind = aip), [3,3])
+    crot(:,:, 4 ) = reshape(real([   0.0, -1.0,  0.0,  1.0,  0.0,  0.0,  0.0,  0.0,  1.0], kind = aip), [3,3])
+    crot(:,:, 5 ) = reshape(real([   1.0,  0.0,  0.0,  0.0, -1.0,  0.0,  0.0,  0.0, -1.0], kind = aip), [3,3])
+    crot(:,:, 6 ) = reshape(real([   0.0, -1.0,  0.0, -1.0,  0.0,  0.0,  0.0,  0.0, -1.0], kind = aip), [3,3])
+    crot(:,:, 7 ) = reshape(real([  -1.0,  0.0,  0.0,  0.0,  1.0,  0.0,  0.0,  0.0, -1.0], kind = aip), [3,3])
+    crot(:,:, 8 ) = reshape(real([   0.0,  1.0,  0.0,  1.0,  0.0,  0.0,  0.0,  0.0, -1.0], kind = aip), [3,3])
+    crot(:,:, 9 ) = reshape(real([   0.0,  1.0,  0.0,  0.0,  0.0,  1.0,  1.0,  0.0,  0.0], kind = aip), [3,3])
+    crot(:,:,10 ) = reshape(real([   0.0,  0.0,  1.0,  0.0, -1.0,  0.0,  1.0,  0.0,  0.0], kind = aip), [3,3])
+    crot(:,:,11 ) = reshape(real([   0.0, -1.0,  0.0,  0.0,  0.0, -1.0,  1.0,  0.0,  0.0], kind = aip), [3,3])
+    crot(:,:,12 ) = reshape(real([   0.0,  0.0, -1.0,  0.0,  1.0,  0.0,  1.0,  0.0,  0.0], kind = aip), [3,3])
+    crot(:,:,13 ) = reshape(real([   0.0,  1.0,  0.0,  0.0,  0.0, -1.0, -1.0,  0.0,  0.0], kind = aip), [3,3])
+    crot(:,:,14 ) = reshape(real([   0.0,  0.0, -1.0,  0.0, -1.0,  0.0, -1.0,  0.0,  0.0], kind = aip), [3,3])
+    crot(:,:,15 ) = reshape(real([   0.0, -1.0,  0.0,  0.0,  0.0,  1.0, -1.0,  0.0,  0.0], kind = aip), [3,3])
+    crot(:,:,16 ) = reshape(real([   0.0,  0.0,  1.0,  0.0,  1.0,  0.0, -1.0,  0.0,  0.0], kind = aip), [3,3])
+    crot(:,:,17 ) = reshape(real([   0.0,  0.0,  1.0,  1.0,  0.0,  0.0,  0.0,  1.0,  0.0], kind = aip), [3,3])
+    crot(:,:,18 ) = reshape(real([   1.0,  0.0,  0.0,  0.0,  0.0, -1.0,  0.0,  1.0,  0.0], kind = aip), [3,3])
+    crot(:,:,19 ) = reshape(real([   0.0,  0.0, -1.0, -1.0,  0.0,  0.0,  0.0,  1.0,  0.0], kind = aip), [3,3])
+    crot(:,:,20 ) = reshape(real([  -1.0,  0.0,  0.0,  0.0,  0.0,  1.0,  0.0,  1.0,  0.0], kind = aip), [3,3])
+    crot(:,:,21 ) = reshape(real([   0.0,  0.0,  1.0, -1.0,  0.0,  0.0,  0.0, -1.0,  0.0], kind = aip), [3,3])
+    crot(:,:,22 ) = reshape(real([  -1.0,  0.0,  0.0,  0.0,  0.0, -1.0,  0.0, -1.0,  0.0], kind = aip), [3,3])
+    crot(:,:,23 ) = reshape(real([   0.0,  0.0, -1.0,  1.0,  0.0,  0.0,  0.0, -1.0,  0.0], kind = aip), [3,3])
+    crot(:,:,24 ) = reshape(real([   1.0,  0.0,  0.0,  0.0,  0.0,  1.0,  0.0, -1.0,  0.0], kind = aip), [3,3])
+    crot(:,:,25 ) = reshape(real([  -1.0,  0.0,  0.0,  0.0, -1.0,  0.0,  0.0,  0.0, -1.0], kind = aip), [3,3])
+    crot(:,:,26 ) = reshape(real([   0.0, -1.0,  0.0,  1.0,  0.0,  0.0,  0.0,  0.0, -1.0], kind = aip), [3,3])
+    crot(:,:,27 ) = reshape(real([   1.0,  0.0,  0.0,  0.0,  1.0,  0.0,  0.0,  0.0, -1.0], kind = aip), [3,3])
+    crot(:,:,28 ) = reshape(real([   0.0,  1.0,  0.0, -1.0,  0.0,  0.0,  0.0,  0.0, -1.0], kind = aip), [3,3])
+    crot(:,:,29 ) = reshape(real([  -1.0,  0.0,  0.0,  0.0,  1.0,  0.0,  0.0,  0.0,  1.0], kind = aip), [3,3])
+    crot(:,:,30 ) = reshape(real([   0.0,  1.0,  0.0,  1.0,  0.0,  0.0,  0.0,  0.0,  1.0], kind = aip), [3,3])
+    crot(:,:,31 ) = reshape(real([   1.0,  0.0,  0.0,  0.0, -1.0,  0.0,  0.0,  0.0,  1.0], kind = aip), [3,3])
+    crot(:,:,32 ) = reshape(real([   0.0, -1.0,  0.0, -1.0,  0.0,  0.0,  0.0,  0.0,  1.0], kind = aip), [3,3])
+    crot(:,:,33 ) = reshape(real([   0.0, -1.0,  0.0,  0.0,  0.0, -1.0, -1.0,  0.0,  0.0], kind = aip), [3,3])
+    crot(:,:,34 ) = reshape(real([   0.0,  0.0, -1.0,  0.0,  1.0,  0.0, -1.0,  0.0,  0.0], kind = aip), [3,3])
+    crot(:,:,35 ) = reshape(real([   0.0,  1.0,  0.0,  0.0,  0.0,  1.0, -1.0,  0.0,  0.0], kind = aip), [3,3])
+    crot(:,:,36 ) = reshape(real([   0.0,  0.0,  1.0,  0.0, -1.0,  0.0, -1.0,  0.0,  0.0], kind = aip), [3,3])
+    crot(:,:,37 ) = reshape(real([   0.0, -1.0,  0.0,  0.0,  0.0,  1.0,  1.0,  0.0,  0.0], kind = aip), [3,3])
+    crot(:,:,38 ) = reshape(real([   0.0,  0.0,  1.0,  0.0,  1.0,  0.0,  1.0,  0.0,  0.0], kind = aip), [3,3])
+    crot(:,:,39 ) = reshape(real([   0.0,  1.0,  0.0,  0.0,  0.0, -1.0,  1.0,  0.0,  0.0], kind = aip), [3,3])
+    crot(:,:,40 ) = reshape(real([   0.0,  0.0, -1.0,  0.0, -1.0,  0.0,  1.0,  0.0,  0.0], kind = aip), [3,3])
+    crot(:,:,41 ) = reshape(real([   0.0,  0.0, -1.0, -1.0,  0.0,  0.0,  0.0, -1.0,  0.0], kind = aip), [3,3])
+    crot(:,:,42 ) = reshape(real([  -1.0,  0.0,  0.0,  0.0,  0.0,  1.0,  0.0, -1.0,  0.0], kind = aip), [3,3])
+    crot(:,:,43 ) = reshape(real([   0.0,  0.0,  1.0,  1.0,  0.0,  0.0,  0.0, -1.0,  0.0], kind = aip), [3,3])
+    crot(:,:,44 ) = reshape(real([   1.0,  0.0,  0.0,  0.0,  0.0, -1.0,  0.0, -1.0,  0.0], kind = aip), [3,3])
+    crot(:,:,45 ) = reshape(real([   0.0,  0.0, -1.0,  1.0,  0.0,  0.0,  0.0,  1.0,  0.0], kind = aip), [3,3])
+    crot(:,:,46 ) = reshape(real([   1.0,  0.0,  0.0,  0.0,  0.0,  1.0,  0.0,  1.0,  0.0], kind = aip), [3,3])
+    crot(:,:,47 ) = reshape(real([   0.0,  0.0,  1.0, -1.0,  0.0,  0.0,  0.0,  1.0,  0.0], kind = aip), [3,3])
+    crot(:,:,48 ) = reshape(real([  -1.0,  0.0,  0.0,  0.0,  0.0, -1.0,  0.0,  1.0,  0.0], kind = aip), [3,3])
     call inv_diel%init_common(lattice, redpos, types, ngrid, 3_i32, nsym, crot)
 #endif
     ! Read the dielectric data from previous G0W0 run
