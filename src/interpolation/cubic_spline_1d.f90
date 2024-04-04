@@ -1,4 +1,4 @@
-! Copyright 2023 EXCITING developers
+! Copyright (C) 2020-2024 GreenX library
 !
 ! Licensed under the Apache License, Version 2.0 (the "License");
 ! you may not use this file except in compliance with the License.
@@ -16,36 +16,10 @@
 !> Contains elements to compute a natural cubic spline, its integrals and first derivative
 module idiel_cubic_spline
 
-    use idiel_constants,   only: i64, r64, zone, zzero 
-
+    use idiel_constants,   only: i32, aip, zone, zzero 
     implicit none
 
-    type cubic_spline_t
-        !> The upper limit of each spline
-        real(r64), private, allocatable :: x(:) 
-        !> The splines (a,b,c,d,xj)
-        complex(r64), private, allocatable :: splines(:,:)
-        !> The integrate of a fragment
-        complex(r64), private, allocatable :: integrals(:)
-    contains
-        procedure, public  :: initialize=>init_cubic_spline_t, interpolate, integrate, derivative
-        procedure, private :: cubic_poly_integral
-        final :: clean
-    end type
-
 contains
-
-    !> Deallocates all
-    !> @param[in] this - the obj to deallocate things from
-    subroutine clean(this)
-
-        type(cubic_spline_t), intent(inout) :: this
-
-        if (allocated(this%x))         deallocate(this%x)
-        if (allocated(this%splines))   deallocate(this%splines)
-        if (allocated(this%integrals)) deallocate(this%integrals)
-
-    end subroutine clean
 
     !> Returns an index pointing to the first element in the array such that element < value using binary search
     !> Adapted from std c++ library routine. 
@@ -54,12 +28,16 @@ contains
     !> @return answer   - the index such that array(i) < value 
     pure function lower_bound(array, value) result(answer)
 
-        real(r64), intent(in) :: array(:)
-        real(r64), intent(in) :: value 
+#if defined(USE_GPU) && defined(HAVEOMP5)
+    !$omp declare target
+#endif  
 
-        integer(i64) :: answer, right, mid
+        real(aip), intent(in) :: array(:)
+        real(aip), intent(in) :: value 
 
-        answer  = 1_i64
+        integer(i32) :: answer, right, mid
+
+        answer  = 1_i32
         right   = size(array)
 
         do while (answer <= right)
@@ -85,20 +63,26 @@ contains
     !> @param[inout] this - the spline object to initialize
     !> @param[in]    x    - the variable at which the data is taken
     !> @param[in]    y    - data that need to be interpolated
-    subroutine init_cubic_spline_t(this, x, y)
-        class(cubic_spline_t), intent(inout) :: this
-        real(r64),    intent(in)             :: x(:)
-        complex(r64), intent(in)             :: y(:)
+    subroutine init_cubic_spline_t(xlim, splines, integrals, x, y)
 
-        integer(i64) :: n    ! number of splines
-        integer(i64) :: i, j ! Index
-        complex(r64), allocatable :: a(:), b(:), c(:), d(:) ! The splines factors d*x**3 + c*x**2 + b*x + a
-        real(r64), allocatable    :: h(:) ! The step size
-        real(r64), allocatable    :: l(:), mu(:)
-        complex(r64), allocatable :: alpha(:), z(:)
+#if defined(USE_GPU) && defined(HAVEOMP5)
+        !$omp declare target
+#endif  
+        real(aip),    allocatable, intent(inout)  :: xlim(:)
+        complex(aip), allocatable, intent(inout)  :: splines(:,:)
+        complex(aip), allocatable, intent(inout)  :: integrals(:)
+        real(aip),    intent(in)                  :: x(:)
+        complex(aip), intent(in)                  :: y(:)
+
+        integer(i32) :: n    ! number of splines
+        integer(i32) :: i, j ! Index
+        complex(aip), allocatable :: a(:), b(:), c(:), d(:) ! The splines factors d*x**3 + c*x**2 + b*x + a
+        real(aip), allocatable    :: h(:) ! The step size
+        real(aip), allocatable    :: l(:), mu(:)
+        complex(aip), allocatable :: alpha(:), z(:)
 
         ! Given a set of coordinates C with size n+1 the number of splines will be n:
-        n = size(y) - 1_i64
+        n = size(y) - 1_i32
         ! Create a new array a of size n+1 and set a_i = y_i
         allocate(a,source=y)
         ! Create new arrays b and d of size n
@@ -113,9 +97,10 @@ contains
         ! Create a new array alpha of size n and set for
         ! alpha(i) = 3/h(i)*(a(i+1)-a(i)( - 3/h(i-1) * (a(i)-a(i-1))
         allocate(alpha(n))
-        do i = 2, n
-            alpha(i) = 3.0_r64 / h(i) * (a(i + 1) - a(i)) - 3.0_r64 / h(i - 1) * (a(i) - a(i - 1))
+        do i = 1, n
+            alpha(i) = 3.0_aip / h(i) * (a(i + 1) - a(i))
         end do
+        alpha(2:n) = alpha(2:n) - alpha(1:n-1)
 
         ! Create new arrays c,l,mu and z of size n+1
         allocate(c(n + 1), l(n + 1), mu(n + 1), z(n + 1))
@@ -125,7 +110,7 @@ contains
         z(1)  = zzero
         ! Iterate to fill l,mu,z:
         do i = 2, n
-            l(i) = 2.0_r64 * (x(i + 1) - x(i - 1)) - h(i - 1) * mu(i - 1)
+            l(i) = 2.0_aip * (x(i + 1) - x(i - 1)) - h(i - 1) * mu(i - 1)
             mu(i) = h(i) / l(i)
             z(i) = (alpha(i) - h(i - 1) * z(i - 1)) / l(i)
         end do
@@ -135,26 +120,26 @@ contains
         
         do i = n, 1, -1
             c(i) = z(i) - mu(i) * c(i + 1)
-            b(i) = (a(i + 1) - a(i)) / h(i) - h(i) * (c(i + 1) + 2 * c(i)) / 3.0_r64
+            b(i) = (a(i + 1) - a(i)) / h(i) - h(i) * (c(i + 1) + 2 * c(i)) / 3.0_aip
             d(i) = (c(i + 1) - c(i)) / (3 * h(i))
         end do
 
-        allocate(this%splines(5, n))
-        allocate(this%integrals(n))
-        allocate(this%x(n), source=x(2:))
+        allocate(splines(5, n))
+        allocate(integrals(n))
+        allocate(xlim(n), source=x(2:))
+
         do i = 1, n 
-            this%splines(1, i) = a(i)
-            this%splines(2, i) = b(i)
-            this%splines(3, i) = c(i)
-            this%splines(4, i) = d(i)
-            this%splines(5, i) = x(i)
-            this%integrals(i)  = this%cubic_poly_integral(a(i), b(i), c(i), d(i), x(i), x(i), x(i+1))
+            splines(1, i) = a(i)
+            splines(2, i) = b(i)
+            splines(3, i) = c(i)
+            splines(4, i) = d(i)
+            splines(5, i) = x(i)
+            integrals(i)  = cubic_poly_integral(a(i), b(i), c(i), d(i), x(i), x(i), x(i+1))
         end do
 
     end subroutine init_cubic_spline_t
 
     !> This function computes the cubic polynonmial integral
-    !> @param[in] this - the interpolator
     !> @param[in] a - a from the cubic polynomial
     !> @param[in] b - a from the cubic polynomial
     !> @param[in] c - a from the cubic polynomial
@@ -163,21 +148,24 @@ contains
     !> @param[in] xa - lower limit of the integral
     !> @param[in] xb - upper limit of the integral
     !> @result    integral - the integral between a and b
-    pure function cubic_poly_integral(this, a, b, c, d, x0, xa, xb) result(integral)
+    pure function cubic_poly_integral(a, b, c, d, x0, xa, xb) result(integral)
 
-        class(cubic_spline_t),  intent(in) :: this
-        complex(r64), intent(in)           :: a
-        complex(r64), intent(in)           :: b
-        complex(r64), intent(in)           :: c
-        complex(r64), intent(in)           :: d
-        real(r64), intent(in)              :: x0
-        real(r64), intent(in)              :: xa
-        real(r64), intent(in)              :: xb
+#if defined(USE_GPU) && defined(HAVEOMP5)
+    !$omp declare target
+#endif  
 
-        complex(r64) :: integral
+        complex(aip), intent(in)           :: a
+        complex(aip), intent(in)           :: b
+        complex(aip), intent(in)           :: c
+        complex(aip), intent(in)           :: d
+        real(aip), intent(in)              :: x0
+        real(aip), intent(in)              :: xa
+        real(aip), intent(in)              :: xb
 
-        integral = a * xb - b * x0 * xb + b / 2_r64 * xb**2 - c / 3.0_r64 * (x0 - xb)**3 + d / 4.0_r64 * (xb - x0)**4 - &
-                   a * xa + b * x0 * xa - b / 2_r64 * xa**2 + c / 3.0_r64 * (x0 - xa)**3 - d / 4.0_r64 * (xa - x0)**4
+        complex(aip) :: integral
+
+        integral = a * xb - b * x0 * xb + b / 2_aip * xb**2 - c / 3.0_aip * (x0 - xb)**3 + d / 4.0_aip * (xb - x0)**4 - &
+                   a * xa + b * x0 * xa - b / 2_aip * xa**2 + c / 3.0_aip * (x0 - xa)**3 - d / 4.0_aip * (xa - x0)**4
 
     end function cubic_poly_integral
 
@@ -185,31 +173,28 @@ contains
     !> @param[in] this - the interpolator 
     !> @param[in] new_x - the x at which the data should be interpolated
     !> @result interpolated_y - the interpolated data
-    function interpolate(this, new_x) result(interpolated_y)
-        
-        class(cubic_spline_t), target, intent(in) :: this
-        real(r64), intent(in)                     :: new_x
+    pure function interpolate(xlim, splines, new_x) result(interpolated_y)
 
-        complex(r64) :: interpolated_y
-        complex(r64), pointer :: sp(:)
-        real(r64) :: dx 
+#if defined(USE_GPU) && defined(HAVEOMP5)
+    !$omp declare target
+#endif  
+        real(aip),    intent(in)  :: xlim(:)
+        complex(aip), intent(in)  :: splines(:,:)
+        real(aip),    intent(in)  :: new_x
 
-        integer(i64) :: i
-#ifdef DEBUG
-        ! Check if within interpolation range
-        if (new_x < real(this%splines(5,1)) .or. new_x > real(this%x(size(this%x)))) then
-            error stop "cubic_spline_t%interpolate: x is out of the interpolator range"
-        end if
-#endif
-        i = lower_bound(this%x, new_x)
+        complex(aip) :: interpolated_y
+        complex(aip) :: sp(5)
+        real(aip) :: dx 
 
-        sp(1:5) => this%splines(1:5,i)
+        integer(i32) :: i
 
-        dx = new_x - real(sp(5), r64)
+        i = lower_bound(xlim, new_x)
+
+        sp(1:5) = splines(1:5,i)
+
+        dx = new_x - real(sp(5), aip)
 
         interpolated_y = sp(1) + dx * (sp(2) + dx * (sp(3) + sp(4)*dx)) 
-
-        nullify(sp) 
 
     end function interpolate
 
@@ -217,66 +202,59 @@ contains
     !> @param[in] this - the interpolator from which to compute the integral
     !> @param[in] low  - the low limit of the integral
     !> @param[in] up   - the upper limit of the integral
-     function integrate(this, low, up) result(integral)
-        
-        class(cubic_spline_t), intent(in) :: this
-        real(r64),             intent(in) :: low 
-        real(r64),             intent(in) :: up
+    pure function integrate(xlim, splines, integrals, low, up) result(integral)
+    
+#if defined(USE_GPU) && defined(HAVEOMP5)
+    !$omp declare target
+#endif  
+        real(aip),    intent(in)          :: xlim(:)
+        complex(aip), intent(in)          :: splines(:,:)
+        complex(aip), intent(in)          :: integrals(:)
+        real(aip),             intent(in) :: low
+        real(aip),             intent(in) :: up
 
-        complex(r64) :: integral
+        complex(aip) :: integral
 
-        integer(i64) :: i, i0, i1
-        real(r64)    :: x0
-        complex(r64) :: a, b, c, d
-
-#ifdef DEBUG
-        ! Check that order of integral limits is correct
-        if ( up < low ) then
-            error stop "cubic_spline_t%integrate: the integration limits are incorrect"
-        end if
-
-        ! Check if within interpolation range
-        if (low < real(this%splines(5,1)) .or. up > real(this%x(size(this%x)))) then
-            error stop "cubic_spline_t%integrate: some limits are out the interpolator range"
-        end if
-#endif
+        integer(i32) :: i, i0, i1
+        real(aip)    :: x0
+        complex(aip) :: a, b, c, d
 
         ! Get where the blocks are locate
-        i0 = lower_bound(this%x, low)
-        i1 = lower_bound(this%x, up)
+        i0 = lower_bound(xlim, low)
+        i1 = lower_bound(xlim, up)
 
         ! Init integral value
         integral = zzero
 
         ! Add here the middle block ranges (we simply sum from precomputed integrals of each full piece)
-        integral = sum(this%integrals(i0+1:i1-1))
+        integral = sum(integrals(i0+1:i1-1))
 
         ! Process starting and ending blocks 
         ! If start and end in the same block
         if (i0 == i1) then
-            a  = this%splines(1,i0)
-            b  = this%splines(2,i0)
-            c  = this%splines(3,i0)
-            d  = this%splines(4,i0)
-            x0 = real(this%splines(5,i0))
-            integral = integral + this%cubic_poly_integral(a, b, c, d, x0, low, up)
+            a  = splines(1,i0)
+            b  = splines(2,i0)
+            c  = splines(3,i0)
+            d  = splines(4,i0)
+            x0 = real(splines(5,i0))
+            integral = integral + cubic_poly_integral(a, b, c, d, x0, low, up)
         else
             ! Otherwise we need to treat each of them separately
             ! Left end
-            a  = this%splines(1,i0)
-            b  = this%splines(2,i0)
-            c  = this%splines(3,i0)
-            d  = this%splines(4,i0)
-            x0 = real(this%splines(5,i0))
-            integral = integral + this%cubic_poly_integral(a, b, c, d, x0, low, this%x(i0))
+            a  = splines(1,i0)
+            b  = splines(2,i0)
+            c  = splines(3,i0)
+            d  = splines(4,i0)
+            x0 = real(splines(5,i0))
+            integral = integral + cubic_poly_integral(a, b, c, d, x0, low, xlim(i0))
 
             ! Right end
-            a  = this%splines(1,i1)
-            b  = this%splines(2,i1)
-            c  = this%splines(3,i1)
-            d  = this%splines(4,i1)
-            x0 = real(this%splines(5,i1))
-            integral = integral + this%cubic_poly_integral(a, b, c, d, x0, x0, up)
+            a  = splines(1,i1)
+            b  = splines(2,i1)
+            c  = splines(3,i1)
+            d  = splines(4,i1)
+            x0 = real(splines(5,i1))
+            integral = integral + cubic_poly_integral(a, b, c, d, x0, x0, up)
 
         end if
 
@@ -286,28 +264,31 @@ contains
     !> @param[in] this - the interpolator 
     !> @param[in] x - the x at which the derivative should be interpolated
     !> @result dydx - the derivative at x
-    function derivative(this, x) result(dydx)
-        
-        class(cubic_spline_t), target, intent(in) :: this
-        real(r64), intent(in)                     :: x
+    pure function derivative(xlim, splines, x) result(dydx)
 
-        complex(r64) :: dydx
-        real(r64)    :: dx
-        complex(r64), pointer :: sp(:)
+#if defined(USE_GPU) && defined(HAVEOMP5)
+    !$omp declare target
+#endif  
 
-        integer(i64) :: i
+        real(aip),    intent(in)  :: xlim(:)
+        complex(aip), intent(in)  :: splines(:,:)
+        real(aip), intent(in)     :: x
 
-        i = lower_bound(this%x, x)
+        complex(aip) :: dydx
+        real(aip)    :: dx
+        complex(aip) :: sp(5)
 
-        if (i > size(this%splines,2)) i = i - 1_i64
+        integer(i32) :: i
 
-        sp(1:5) => this%splines(1:5,i)
+        i = lower_bound(xlim, x)
 
-        dx = x - real(sp(5), r64)
+        if (i > size(splines,2)) i = i - 1_i32
 
-        dydx =  sp(2)  + 2.0_r64 * sp(3) * dx + 3.0_r64 * sp(4) * dx**2
+        sp(1:5) = splines(1:5,i)
 
-        nullify(sp) 
+        dx = x - real(sp(5), aip)
+
+        dydx =  sp(2)  + 2.0_aip * sp(3) * dx + 3.0_aip * sp(4) * dx**2
 
     end function derivative
 

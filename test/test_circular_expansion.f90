@@ -1,4 +1,4 @@
-! Copyright 2023 EXCITING developers
+! Copyright (C) 2020-2024 GreenX library
 !
 ! Licensed under the Apache License, Version 2.0 (the "License");
 ! you may not use this file except in compliance with the License.
@@ -16,21 +16,25 @@
 !> Tests the circular expansion and quadrature
 program test_circular_expansion
 
-    use idiel_constants, only: r64, i64, twopi, pi, fourpi, zzero
+    use idiel_constants, only: aip, i32, twopi, pi, fourpi, zzero
     use idiel_circular_harmonics
     use idiel_circle_quadrature 
 
     implicit none
 
-    integer(i64), parameter :: msize = 75_i64
-    integer(i64), parameter :: lmax  = 20_i64
-    real(r64),    parameter :: tolerance = 1.0e-12_r64
-    real(r64), allocatable :: rphi(:,:), w(:), xyz(:,:)
-    complex(r64), allocatable :: blm(:,:)
-    complex(r64), allocatable :: f2expand(:), fexact(:), fint(:)
-    complex(r64) :: clm(2*lmax+1)
-    real(r64) :: integral, rdiff
-    integer(i64) :: i
+    integer(i32), parameter :: msize = 75_i32
+    integer(i32), parameter :: lmax  = 20_i32
+#ifdef USE_SINGLE_PRECISION
+    real(aip), parameter    :: tolerance = 1.0e-4_aip
+#else
+    real(aip), parameter    :: tolerance = 1.0e-12_aip
+#endif
+    real(aip), allocatable :: rphi(:,:), w(:), xyz(:,:)
+    complex(aip), allocatable :: blm(:,:)
+    complex(aip), allocatable :: f2expand(:), fexact(:), fint(:)
+    complex(aip) :: clm(2*lmax+1)
+    real(aip) :: integral, rdiff
+    integer(i32) :: i
 
 
     write(*,*) '[TEST : idiel_circular_harmonics and idiel_circle_quadrature]' 
@@ -43,29 +47,29 @@ program test_circular_expansion
 
     ! Check that the quadrature integrates the circular harmonics
     integral = real(sum(w * blm(:,1)))
-    if ( abs(integral-2.50662827463100_r64)/2.50662827463100_r64 <= tolerance) then
-        write(*,*)  '[TEST : idiel_circular_harmonics and idiel_circle_quadrature: PASSED]'
+    if ( abs(integral-2.50662827463100_aip)/2.50662827463100_aip <= tolerance) then
+        write(*,*)  '[TEST : idiel_circular_harmonics and idiel_circle_quadrature: PASSED]', rdiff
     else   
-        write(*,*)  '[TEST : idiel_circular_harmonics and idiel_circle_quadrature: FAILED]'
+        write(*,*)  '[TEST : idiel_circular_harmonics and idiel_circle_quadrature: FAILED]', rdiff
         stop 1
     end if
 
     do i = 2, 2*lmax+1
         integral = real(sum(w * blm(:,i)))
         if ( integral <= tolerance) then
-            write(*,*)  '[TEST : idiel_circular_harmonics and idiel_circle_quadrature: PASSED]'
+            write(*,*)  '[TEST : idiel_circular_harmonics and idiel_circle_quadrature: PASSED]', rdiff
         else   
-            write(*,*)  '[TEST : idiel_circular_harmonics and idiel_circle_quadrature: FAILED]'
+            write(*,*)  '[TEST : idiel_circular_harmonics and idiel_circle_quadrature: FAILED]', rdiff
             stop 1
         end if
     end do
 
     write(*,*)  '[TEST : circ_harm_expansion]'
     f2expand = f1(xyz)
-    call circ_harm_expansion(10_i64, f2expand, w, blm, clm)
+    call circ_harm_expansion(lmax, f2expand, w, blm, clm)
     deallocate(rphi, w, xyz, blm)
     
-    call compute_angular_mesh_gauss_legendre(10*msize, rphi, w, xyz)
+    call compute_angular_mesh_gauss_legendre(10_i32*msize, rphi, w, xyz)
     call circ_harm(msize, rphi(:,2), blm)
     fexact = f1(xyz)
     allocate(fint, mold=fexact)
@@ -80,9 +84,9 @@ program test_circular_expansion
     do i = 1, 10*msize
         rdiff = abs(real(fint(i))-real(fexact(i))) / abs(real(fexact(i)))
         if ( rdiff <= tolerance) then
-            write(*,*)  '[TEST : circ_harm_expansion: PASSED]'
+            write(*,*)  '[TEST : circ_harm_expansion: PASSED]', rdiff
         else   
-            write(*,*)  '[TEST : circ_harm_expansion: FAILED]'
+            write(*,*)  '[TEST : circ_harm_expansion: FAILED]', rdiff
             stop 1
         end if
     end do 
@@ -93,18 +97,18 @@ contains
 
     pure function f1(r)
         !> Mesh in which to compute
-        real(r64), intent(in)  :: r(:,:)
+        real(aip), intent(in)  :: r(:,:)
         !> Result
-        complex(r64), allocatable :: f1(:)
+        complex(aip), allocatable :: f1(:)
         !> Elements
-        real(r64), allocatable :: x(:), y(:)
+        real(aip), allocatable :: x(:), y(:)
 
         x = r(:,1)
         y = r(:,2)
         
         allocate(f1(size(r,1)))
 
-        f1 = cmplx(1.0_r64 + x + y**2 + y * x**2 + x**4 + y**5 + (x*y)**3, 0.0_r64, r64)
+        f1 = cmplx(1.0_aip + x + y**2 + y * x**2 + x**4 + y**5 + (x*y)**3, 0.0_aip, aip)
 
     end function f1
 

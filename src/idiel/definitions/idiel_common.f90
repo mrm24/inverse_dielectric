@@ -1,4 +1,4 @@
-! Copyright 2023 EXCITING developers
+! Copyright (C) 2020-2024 GreenX library
 !
 ! Licensed under the Apache License, Version 2.0 (the "License");
 ! you may not use this file except in compliance with the License.
@@ -18,38 +18,41 @@
 !> This module contains the procedures for the computation of the dielectric matrix averages
 submodule (idiel) idiel_common
 
+    use iso_c_binding
+
     implicit none
 
 contains
 
-    module subroutine init_common(this, lattice, redpos, elements, nq, dim)
+    module subroutine init_common(this, lattice, redpos, elements, nq, dim, nsym, crot)
 
-        class(idiel_t), intent(inout) :: this
-        real(r64), intent(in)         :: lattice(3,3)
-        real(r64),  intent(in)        :: redpos(:,:) 
-        integer(r64),  intent(in)     :: elements(:)
-        integer(i64), intent(in)      :: nq(3)
-        integer(i64), intent(in), optional :: dim
+        class(idiel_t), target, intent(inout) :: this
+        real(aip), intent(in)                 :: lattice(3,3)
+        real(aip),  intent(in)                :: redpos(:,:)
+        integer(i32),  intent(in)             :: elements(:)
+        integer(i32), intent(in)              :: nq(3)
+        integer(i32), intent(in), optional    :: dim
+        integer(i32), intent(in), optional    :: nsym
+        real(aip), intent(in), optional       :: crot(:,:,:)
 
         ! Locals
-        integer(i64) :: ii, ll, mm
-        real(r64) :: v_bz
-        real(r64) :: rel_error
-        real(r64), parameter :: onethird = 1.0_r64 / 3.0_r64
-        real(r64), allocatable :: xyz(:,:)
+        integer(i32) :: ii, ll, mm
+        real(aip) :: v_bz
+        real(aip) :: rel_error
+        real(aip), allocatable :: xyz(:,:)
 
         ! The volume in which the integral is performed
-        real(r64) :: v_integral
+        real(aip) :: v_integral
         ! The distance to subcell surface with Gamma in the center
-        real(r64), allocatable :: kmax(:)
+        real(aip), allocatable :: kmax(:)
         ! Geometric part of the integral at given point, note that is multiplied by the weight
-        real(r64), allocatable :: kmax_f(:)
+        real(aip), allocatable :: kmax_f(:)
         ! Spherical harmonics
-        complex(r64), allocatable :: ylm(:,:), ylm_pair(:,:)
+        complex(aip), allocatable :: ylm(:,:), ylm_pair(:,:)
         ! Some cutoff values to create the radial mesh for the 2D case
-        real(r64) :: rmax, dx
+        real(aip) :: rmax, dx
         ! The reciprocal vectors
-        real(r64) :: a(3), b(3)
+        real(aip) :: a(3), b(3)
 
         ! Initialize the crystal structure
         call this%cell%initialize(lattice, redpos, elements)
@@ -57,18 +60,31 @@ contains
         ! Init reciprocal mesh size
         this%nq = nq
 
-        ! Initialize the symmetry
-        call this%symmetry%initialize(this%cell)
+        ! Initialize the symmetry using the external code if not fallback to SPGLIB (if available otherwise we raise error)
+        if (present(nsym) .and. present(crot)) then
+            this%symmetry%nsym = nsym
+            allocate(this%symmetry%crot(3,3,nsym))
+            this%symmetry%crot = crot
+        else
+#ifdef USE_SPGLIB
+            call this%symmetry%initialize(this%cell)      
+#else 
+            error stop "Error(idiel_t%init_common): missing symmetry information"
+#endif  
+        endif
 
         ! Process dimensionality
         if (present(dim)) this%dim = dim
         
+        ! Init algebra world
+        call this%world%init()
+
         select case(this%dim)
         
         case(2) ! 2D case
 
             ! rcut
-            this%rcut = 0.5_r64 * this%cell%lattice(3,3) 
+            this%rcut = 0.5_aip * this%cell%lattice(3,3) 
 
             ! Initalize the big angular mesh and the weights for the angular part of the integral
             call compute_angular_mesh_gauss_legendre(size_mesh_2d_fine , this%ang, this%weights_fine, xyz)
@@ -92,23 +108,68 @@ contains
             call this%cell%get_kmax_subcell_bz(this%nq, xyz, this%rmax2d)
 
             ! Init the radial mesh (this mesh is intended to provide good treatment of the queue)
-            rmax = 1.02_r64 * maxval(this%rmax2d)
+            rmax = 1.02_aip * maxval(this%rmax2d)
             dx = rmax / (nr - 1)
+            allocate(this%radii(nr))
             do ii = 1, nr
                 this%radii(ii) = (ii - 1) * dx
             end do
 
+            ! Precompte exponential factors
+            allocate(this%vr(size_mesh_2d_coarse,nr))
             do ii = 1, nr
-                this%vr(:,ii) = fourpi * (1.0_r64 - exp(-this%rcut * this%radii(ii)))
+                this%vr(:,ii) = fourpi * (1.0_aip - exp(-this%rcut * this%radii(ii)))
             end do
 
             ! Compute the small mesh
             deallocate(this%ang, xyz)
             call compute_angular_mesh_gauss_legendre(size_mesh_2d_coarse, this%ang, this%weights, xyz)
-            allocate(this%xyz, source=transpose(cmplx(xyz,0.0,r64)))
+            allocate(this%xyz, source=transpose(cmplx(xyz,0.0,aip)))
             this%quadrature_npoints = size(xyz, 1)
             ! Compute circular basis in the coarse mesh
             call circ_harm(lmax, this%ang(:,2), this%blm_coarse)
+
+#ifdef USE_GPU
+            ! Alloc in the GPU
+            call this%world%register%alloc("q", size(this%xyz) * c_sizeof(zzero), this%world%get_device())
+            call this%world%register%alloc("blm_coarse"   , size(this%blm_coarse  ) * c_sizeof(zzero),  this%world%get_device())
+            call this%world%register%alloc("weights"      , size(this%weights     ) * c_sizeof(pi),  this%world%get_device())
+            call this%world%register%alloc("blm_fine"     , size(this%blm_fine    ) * c_sizeof(zzero),  this%world%get_device())
+            call this%world%register%alloc("weights_fine" , size(this%weights_fine) * c_sizeof(pi),  this%world%get_device())
+            call this%world%register%alloc("radii"        , size(this%radii       ) * c_sizeof(pi),  this%world%get_device())
+            call this%world%register%alloc("rmax2d"       , size(this%rmax2d      ) * c_sizeof(pi),  this%world%get_device())
+            call this%world%register%alloc("vr"           , size(this%vr          ) * c_sizeof(zzero),  this%world%get_device())
+
+            ! Associate 
+            call this%world%register%assoc("q", C_loc(this%xyz))
+            call this%world%register%assoc("blm_coarse"   , C_loc(this%blm_coarse)  )
+            call this%world%register%assoc("weights"      , C_loc(this%weights)     )
+            call this%world%register%assoc("blm_fine"     , C_loc(this%blm_fine)    )
+            call this%world%register%assoc("weights_fine" , C_loc(this%weights_fine))
+            call this%world%register%assoc("radii"        , C_loc(this%radii)       )
+            call this%world%register%assoc("rmax2d"       , C_loc(this%rmax2d)      )
+            call this%world%register%assoc("vr"           , C_loc(this%vr)          )
+            ! Copy
+            call this%world%register%to_device("q")
+            call this%world%register%to_device("blm_coarse"   )
+            call this%world%register%to_device("weights"      )
+            call this%world%register%to_device("blm_fine"     )
+            call this%world%register%to_device("weights_fine" )
+            call this%world%register%to_device("radii"        )
+            call this%world%register%to_device("rmax2d"       )
+            call this%world%register%to_device("vr"           )
+
+            ! Deassociate
+            call this%world%register%deassoc("q")
+            call this%world%register%deassoc("blm_coarse"   )
+            call this%world%register%deassoc("weights"      )
+            call this%world%register%deassoc("blm_fine"     )
+            call this%world%register%deassoc("weights_fine" )
+            call this%world%register%deassoc("radii"        )
+            call this%world%register%deassoc("rmax2d"       )
+            call this%world%register%deassoc("vr"           )
+
+#endif
 
         case(3) ! 3D case
             ! Compute the volume in which the integral will be performed
@@ -141,7 +202,7 @@ contains
             ylm_pair(:,1) = ylm(:,1)
             ii = 2
             do ll = 1, lmax
-                if ( modulo(ll, 2_i64) /= 0) cycle
+                if ( modulo(ll, 2_i32) /= 0) cycle
                 do mm = -ll, ll
                     ylm_pair(:,ii) = ylm(:,ll**2 + mm + ll + 1)
                     ii = ii + 1
@@ -163,7 +224,7 @@ contains
             deallocate(this%ang, this%weights_fine, xyz, ylm, ylm_pair)
             ! Recompute things in the small mesh
             call compute_angular_mesh_lebedev_41(this%ang, this%weights, xyz)
-            allocate(this%xyz,source=transpose(cmplx(xyz,0.0,r64)))
+            allocate(this%xyz,source=transpose(cmplx(xyz,0.0,aip)))
             this%quadrature_npoints = size(xyz, 1)
 
             ! Compute the spherical harmonics in the smaller mesh (save only the pair values)
@@ -173,7 +234,7 @@ contains
             this%ylm(:,1) = ylm(:,1)
             ii = 2
             do ll = 1, lmax
-                if ( modulo(ll, 2_i64) /= 0_i64) cycle
+                if ( modulo(ll, 2_i32) /= 0_i32) cycle
                 do mm = -ll, ll
                     this%ylm(:, ii) = ylm(:,ll**2 + mm + ll + 1)
                     ii = ii + 1
@@ -182,15 +243,33 @@ contains
 
             deallocate(ylm, xyz)
 
+#ifdef USE_GPU
+            ! Alloc in the GPU
+            call this%world%register%alloc("q", size(this%xyz) * c_sizeof(zzero), this%world%get_device())
+            call this%world%register%alloc("ylm", size(this%ylm) * c_sizeof(zzero), this%world%get_device())
+            call this%world%register%alloc("weights", size(this%weights) * c_sizeof(pi), this%world%get_device())
+            call this%world%register%alloc("angular_integrals", size(this%angular_integrals) * c_sizeof(zzero), this%world%get_device())
+            ! Associate 
+            call this%world%register%assoc("q", C_loc(this%xyz))
+            call this%world%register%assoc("ylm", C_loc(this%ylm))
+            call this%world%register%assoc("weights", C_loc(this%weights))
+            call this%world%register%assoc("angular_integrals", C_loc(this%angular_integrals))
+            ! Copy
+            call this%world%register%to_device("q")
+            call this%world%register%to_device("ylm")
+            call this%world%register%to_device("weights")
+            call this%world%register%to_device("angular_integrals")
+            ! Deassociate
+            call this%world%register%deassoc("q")
+            call this%world%register%deassoc("ylm")
+            call this%world%register%deassoc("weights")
+            call this%world%register%deassoc("angular_integrals")
+#endif
+
         case default
             error stop "Error(idiel_t%init_common): Error dimension should be either 3 or 2"
         end select 
-
-        ! Init algebra world
-        call this%world%init()
-        call this%ref_xyz%allocate_gpu(this%xyz)
-        call this%ref_xyz%transfer_cpu_gpu(this%xyz, this%world)
-
+        
     end subroutine init_common
 
     !> This nullify and deallocates the objects
@@ -198,6 +277,8 @@ contains
     module subroutine clean(this)
 
         class(idiel_t), intent(inout) :: this
+
+        if (this%world%is_queue_set()) call this%world%finish()
 
         if (associated(this%head))        nullify(this%head)
         if (associated(this%wingL))       nullify(this%wingL)
@@ -211,14 +292,14 @@ contains
         if (allocated(this%idiel_wingL))  deallocate(this%idiel_wingL)
         if (allocated(this%idiel_wingU))  deallocate(this%idiel_wingU)
         if (allocated(this%idiel_body))   deallocate(this%idiel_body)
-        call this%ref_xyz%destroy()
-        if (this%world%is_queue_set()) call this%world%finish()
-
+        
         ! 2D stuff
         if (allocated(this%phi))         deallocate(this%phi)
         if (allocated(this%rmax2d))      deallocate(this%rmax2d)
         if (allocated(this%blm_coarse))  deallocate(this%blm_coarse)
         if (allocated(this%blm_fine))    deallocate(this%blm_fine)
+        if (allocated(this%vr))          deallocate(this%vr)
+        if (allocated(this%radii))       deallocate(this%radii)
         
         ! 3D stuff
         if (allocated(this%angular_integrals)) deallocate(this%angular_integrals)
@@ -235,10 +316,10 @@ contains
     module subroutine set_dielectric_blocks(this, h, wl, wu, ib)
         
         class(idiel_t), intent(inout) :: this
-        complex(r64), target, intent(in)      :: h(:,:)
-        complex(r64), target, intent(in)      :: wl(:,:)
-        complex(r64), target, intent(in)      :: wu(:,:)
-        complex(r64), target, optional, intent(in) :: ib(:,:)
+        complex(aip), target, intent(in)      :: h(:,:)
+        complex(aip), target, intent(in)      :: wl(:,:)
+        complex(aip), target, intent(in)      :: wu(:,:)
+        complex(aip), target, optional, intent(in) :: ib(:,:)
 
         ! Associating to internal objects
         this%head    =>  h
@@ -254,7 +335,7 @@ contains
         use idiel_linalg, only: inverse_complex_LU
 
         class(idiel_t), intent(inout), target :: this
-        complex(r64), intent(in) :: body(:,:)
+        complex(aip), intent(in) :: body(:,:)
         
         ! If we have GPU and this was not inited we start the service
         if (.not. this%world%is_queue_set()) call this%world%init()
@@ -264,7 +345,7 @@ contains
         if (allocated(this%Binv_data)) deallocate(this%Binv_data)
         
         ! Compute
-        call inverse_complex_LU(body, this%Binv_data, this%world)    
+        call inverse_complex_LU(body, this%Binv_data, this%world)
         
         ! Associate vector    
         this%Binv => this%Binv_data
@@ -273,7 +354,7 @@ contains
 
     module function get_n_basis(this) result(nbasis)
         class(idiel_t), intent(inout), target :: this
-        integer(i64) :: nbasis
+        integer(i32) :: nbasis
         if (.not. associated(this%Binv)) error stop "idiel_t%get_n_basis: Error set inverse dielectric matrix for this" 
         nbasis = size(this%Binv, 1)
     end function

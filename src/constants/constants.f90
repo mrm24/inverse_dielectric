@@ -1,4 +1,4 @@
-! Copyright 2023 EXCITING developers
+! Copyright (C) 2020-2024 GreenX library
 !
 ! Licensed under the Apache License, Version 2.0 (the "License");
 ! you may not use this file except in compliance with the License.
@@ -17,37 +17,43 @@
 !>
 module idiel_constants
     
-    use iso_fortran_env, only: real64, real128, int32, int64
+    use iso_fortran_env, only: real32, real64, int32
     
     implicit none
     
     public 
     
-    !> Real double precision
-    integer, parameter :: r64 = real64
-    !> Real long double precision
-    integer, parameter :: r128 = real128
     !> Integer single precision
-    integer, parameter :: i32 = int32
-    !> Integer double precision
-    integer, parameter :: i64 = int64
-    
+    integer, parameter :: i32  = int32
+    !> Real single precision
+    integer, parameter :: r32  = real32
+    !> Real double precision
+    integer, parameter :: r64  = real64
+
+#ifdef USE_SINGLE_PRECISION
+    !> Real precision used by the ab initio code
+    integer, parameter :: aip  = real32
+#else
+    !> Real precision used by the ab initio code
+    integer, parameter :: aip  = real64
+#endif
+
     !> Pi 
-    real(r64), parameter :: pi    = 4.0_r64 * atan(1.0_r64)
+    real(r64), parameter :: pi       = 4.0_r64 * atan(1.0_r64)
     !> Two pi
-    real(r64), parameter :: twopi = 2.0_r64 * pi
+    real(r64), parameter :: twopi    = 2.0_r64 * pi
     !> Four pi
-    real(r64), parameter :: fourpi = 4.0_r64 * pi
+    real(r64), parameter :: fourpi   = 4.0_r64 * pi
     !> 1.0/3.0
     real(r64), parameter :: onethird = 1.0_r64 / 3.0_r64
     !> The Y_{0}^{0} spherical harmonic
-    complex(r64), parameter :: y00 = cmplx(0.5_r64 * sqrt(1.0/pi),  0.0_r64, kind=r64)
+    complex(r64), parameter :: y00   = (0.28209479177387814_r64,  0.0_r64)
     
     !> Imaginary unit
-    complex(r64), parameter :: iunit = cmplx(0.0_r64, 1.0_r64, kind=r64)
+    complex(aip), parameter :: iunit = cmplx(0.0_aip, 1.0_aip, kind=aip)
     !> Complex one
-    complex(r64), parameter :: zone  = cmplx(1.0_r64, 0.0_r64, kind=r64)
+    complex(aip), parameter :: zone  = cmplx(1.0_aip, 0.0_aip, kind=aip)
     !> Complex zero
-    complex(r64), parameter :: zzero = cmplx(0.0_r64, 0.0_r64, kind=r64)
+    complex(aip), parameter :: zzero = cmplx(0.0_aip, 0.0_aip, kind=aip)
     
 end module idiel_constants

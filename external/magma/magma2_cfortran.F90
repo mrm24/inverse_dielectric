@@ -48,6 +48,25 @@ interface
         integer(c_int), target :: info  !! int*
     end subroutine
 
+    subroutine magma_cgetri_gpu( n, dA, lda, ipiv, dwork, lwork, info ) &
+        bind(C, name="magma_cgetri_gpu")
+            use iso_c_binding
+            integer(c_int), value  :: n
+            type(c_ptr),    value  :: dA
+            integer(c_int), value  :: lda
+            integer(c_int), target :: ipiv(*)
+            type(c_ptr),    value  :: dwork
+            integer(c_int), value  :: lwork
+            integer(c_int), target :: info  !! int*
+    end subroutine
+
+    function magma_get_cgetri_nb( n ) result(size) &
+        bind(C, name="magma_get_cgetri_nb")
+            use iso_c_binding
+            integer(c_int) :: n
+            integer(c_int) :: size
+    end function 
+
     !! -------------------------------------------------------------------------
     !! batched GPU interfaces (all arrays in GPU memory)
     subroutine magma_cgetrf_batched( &

@@ -1,4 +1,4 @@
-! Copyright 2023 EXCITING developers
+! Copyright (C) 2020-2024 GreenX library
 !
 ! Licensed under the Apache License, Version 2.0 (the "License");
 ! you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 !> This module contains the procedures for the test of averaging of the dielectric matrix in 2D cases
 program test_2d
 
-    use idiel_constants, only: r64, i64, pi, twopi, zzero
+    use idiel_constants, only: aip, i32, pi, twopi, zzero
     use idiel, only: idiel_t
 
     implicit none
@@ -26,33 +26,44 @@ program test_2d
     ! GW data
     integer, parameter :: mbsize = 438 ! Mixed basis size
     integer, parameter :: nomega = 12  ! Number of frequencies
-    integer(i64) :: iom
+    integer(i32) :: iom
 
     ! Mesh data
-    integer(i64), parameter :: ngrid(3) = [2,2,1]
+    integer(i32), parameter :: ngrid(3) = [2,2,1]
 
     ! Silicon crystal data
-    integer(i64), parameter :: natoms = 3_i64
-    real(r64) :: a(3), b(3), c(3), lattice(3,3)
-    real(r64), allocatable :: redpos(:,:)
-    integer(i64), allocatable :: types(:)
+    integer(i32), parameter :: natoms = 3_i32
+    real(aip) :: a(3), b(3), c(3), lattice(3,3)
+    real(aip), allocatable :: redpos(:,:)
+    integer(i32), allocatable :: types(:)
 
     ! Dielectric data
-    complex(r64), allocatable :: head(:,:,:), wingL(:,:,:)
-    complex(r64), allocatable :: wingU(:,:,:), body(:,:,:)
+    complex(aip), allocatable :: head(:,:,:), wingL(:,:,:)
+    complex(aip), allocatable :: wingU(:,:,:), body(:,:,:)
 
     ! Reference data to compare
-    real(r64) :: head_ref(4) = [ -0.27165343E+03_r64, -0.97552958E+02_r64, -0.49406608E+02_r64, -0.46006706E+01_r64]
-    real(r64) :: rdiff
-    real(r64), parameter    :: tolerance = 0.05_r64
-
+    real(aip) :: head_ref(4) = [ -0.27165343E+03_aip, -0.97552958E+02_aip, -0.49406608E+02_aip, -0.46006706E+01_aip]
+    complex(aip) :: body_ref(4) = [ (-1.98341339762901914E-002_aip,-3.38140317306334658E-019_aip), &
+                                    (-9.59818027259629059E-003_aip,-4.06834974195416980E-020_aip), &
+                                    (-6.16528641837310598E-003_aip, 1.23527194124926345E-019_aip), &
+                                    (-9.44568563628567226E-004_aip,-2.00846029587093419E-021_aip)] 
+    real(aip) :: rdiff
+#ifdef USE_SINGLE_PRECISION
+    real(aip), parameter    :: tolerance = 0.07_aip
+#else
+    real(aip), parameter    :: tolerance = 0.05_aip
+#endif
     ! Computation object
     type(idiel_t) :: inv_diel
 
+    ! In case that no SPG we set only Identity (i.e. no symmetry)
+    integer(i32) :: nsym = 12
+    real(aip)    :: crot(3,3,12)
+
     ! Lattice vectors
-    a(:) = [0.00000000_r64, 6.020289060_r64, 0.00000000_r64]
-    b(:) = [5.213723260_r64, 3.010144530_r64, 0.00000000_r64]
-    c(:) = [0.0_r64,  0.0_r64, 20.0_r64]
+    a(:) = [0.00000000_aip, 6.020289060_aip, 0.00000000_aip]
+    b(:) = [5.213723260_aip, 3.010144530_aip, 0.00000000_aip]
+    c(:) = [0.0_aip,  0.0_aip, 20.0_aip]
 
     lattice(1,:) = a(:)
     lattice(2,:) = b(:)
@@ -60,23 +71,37 @@ program test_2d
 
     ! Atomic types (they might differ that the atomic number)
     allocate(types(natoms))
-    types(:) = [1_i64, 2_i64, 2_i64]
+    types(:) = [1_i32, 2_i32, 2_i32]
 
     ! Reduced positions
     allocate(redpos(3,natoms))
-    redpos(:,1) = [0.00_r64, 0.00_r64, 0.00_r64]
-    redpos(:,2) = [2.0_r64/3.0_r64 , 2.0_r64/3.0_r64,  0.14764992_r64]
-    redpos(:,3) = [2.0_r64/3.0_r64 , 2.0_r64/3.0_r64, -0.14764992_r64]
+    redpos(:,1) = [0.00_aip, 0.00_aip, 0.00_aip]
+    redpos(:,2) = [2.0_aip/3.0_aip , 2.0_aip/3.0_aip,  0.14764992_aip]
+    redpos(:,3) = [2.0_aip/3.0_aip , 2.0_aip/3.0_aip, -0.14764992_aip]
 
     ! Init common objects
-    call inv_diel%init_common(lattice, redpos, types, ngrid, 2_i64)
+#ifdef USE_SPGLIB
+    call inv_diel%init_common(lattice, redpos, types, ngrid, 2_i32)
+#else
+    crot(:,:, 1 ) = reshape(real([   1.00,        0.0000000000000000,        0.0,        0.0000000000000000,        1.00, 0.0, 0.0 , 0.0,  1.0 ], kind = aip), [3,3])
+    crot(:,:, 2 ) = reshape(real([ -0.500,      -0.86602540446306686,        0.0,       0.86602540310581044,      -0.500, 0.0, 0.0 , 0.0, -1.0 ], kind = aip), [3,3])
+    crot(:,:, 3 ) = reshape(real([ -0.500,       0.86602540446306686,        0.0,      -0.86602540310581044,      -0.500, 0.0, 0.0 , 0.0,  1.0 ], kind = aip), [3,3])
+    crot(:,:, 4 ) = reshape(real([   1.00,        0.0000000000000000,        0.0,        0.0000000000000000,        1.00, 0.0, 0.0 , 0.0, -1.0 ], kind = aip), [3,3])
+    crot(:,:, 5 ) = reshape(real([ -0.500,      -0.86602540446306686,        0.0,       0.86602540310581044,      -0.500, 0.0, 0.0 , 0.0,  1.0 ], kind = aip), [3,3])
+    crot(:,:, 6 ) = reshape(real([ -0.500,       0.86602540446306686,        0.0,      -0.86602540310581044,      -0.500, 0.0, 0.0 , 0.0, -1.0 ], kind = aip), [3,3])
+    crot(:,:, 7 ) = reshape(real([ -0.500,      -0.86602540446306686,        0.0,      -0.86602540310581044,       0.500, 0.0, 0.0 , 0.0, -1.0 ], kind = aip), [3,3])
+    crot(:,:, 8 ) = reshape(real([   1.00,        0.0000000000000000,        0.0,        0.0000000000000000,       -1.00, 0.0, 0.0 , 0.0,  1.0 ], kind = aip), [3,3])
+    crot(:,:, 9 ) = reshape(real([ -0.500,       0.86602540446306686,        0.0,       0.86602540310581044,       0.500, 0.0, 0.0 , 0.0, -1.0 ], kind = aip), [3,3])
+    crot(:,:,10 ) = reshape(real([ -0.500,      -0.86602540446306686,        0.0,      -0.86602540310581044,       0.500, 0.0, 0.0 , 0.0,  1.0 ], kind = aip), [3,3])
+    crot(:,:,11 ) = reshape(real([   1.00,        0.0000000000000000,        0.0,        0.0000000000000000,       -1.00, 0.0, 0.0 , 0.0, -1.0 ], kind = aip), [3,3])
+    crot(:,:,12 ) = reshape(real([ -0.500,       0.86602540446306686,        0.0,       0.86602540310581044,       0.500, 0.0, 0.0 , 0.0,  1.0 ], kind = aip), [3,3])
+    call inv_diel%init_common(lattice, redpos, types, ngrid, 2_i32, nsym, crot)
+#endif
 
     ! Read the dielectric data from previous G0W0 run
     call load_from_file('head.2d.dat',  head)
     call load_from_file('wings.2d.dat', wingL, wingU)
     call load_from_file('body.2d.dat',  body)
-
-    write(*,*) sum(abs(wingL-conjg(wingU)))
 
     ! Do the average
     write(*,*) '[TEST: idiel_t (2d)]'
@@ -86,15 +111,25 @@ program test_2d
         ! Load the data to the worker
         call inv_diel%set_dielectric_blocks(head(:,:,iom), wingL(:,:,iom), wingU(:,:,iom))
         ! Compute the average
-        call inv_diel%compute_anisotropic_avg_scrcoulomb_2d(.false.)
+        call inv_diel%compute_anisotropic_avg_scrcoulomb_2d(.true.)
 
         ! Check the head
         rdiff = abs(inv_diel%idiel_head - head_ref(iom))/abs(head_ref(iom))
         write(*,'(A,I2,A,e20.13)')  '  * Regression (HEAD,',iom,') result (relative difference): ', rdiff
         if ( rdiff .lt. tolerance) then
-             write(*,*)  '[TEST: idiel_t (2d) (HEAD,',iom,'): PASSED]'
+             write(*,*)  '[TEST: idiel_t (2d) (HEAD,',iom,'): PASSED]', abs(inv_diel%idiel_head), abs(head_ref(iom))
         else
-             write(*,*)  '[TEST: idiel_t (2d) (HEAD,',iom,'): FAILED]'
+             write(*,*)  '[TEST: idiel_t (2d) (HEAD,',iom,'): FAILED]', abs(inv_diel%idiel_head), abs(head_ref(iom))
+             stop 1
+        end if
+
+        ! Check the body (only first element)
+        rdiff = abs(inv_diel%idiel_body(1,1) - body_ref(iom))/abs(body_ref(iom))
+        write(*,'(A,I2,A,e20.13)')  '  * Regression (BODY,',iom,') result (relative difference): ', rdiff
+        if ( rdiff .lt. tolerance) then
+             write(*,*)  '[TEST: idiel_t (2d) (BODY,',iom,'): PASSED]', abs(inv_diel%idiel_body(1,1)), abs(body_ref(iom))
+        else
+             write(*,*)  '[TEST: idiel_t (2d) (BODY,',iom,'): FAILED]', abs(inv_diel%idiel_body(1,1)), abs(body_ref(iom))
              stop 1
         end if
 
@@ -111,12 +146,12 @@ contains
     subroutine load_from_file(fname, data, data2)
 
         character(len=*), intent(in) :: fname
-        complex(r64), allocatable, intent(out) :: data(:,:,:)
-        complex(r64), allocatable, optional, intent(out) :: data2(:,:,:)
+        complex(aip), allocatable, intent(out) :: data(:,:,:)
+        complex(aip), allocatable, optional, intent(out) :: data2(:,:,:)
 
         integer :: fin
-        real(r64), allocatable  :: dreal(:,:,:), dimag(:,:,:)
-        integer(i64) :: data_shape(3)
+        real(aip), allocatable  :: dreal(:,:,:), dimag(:,:,:)
+        integer(i32) :: data_shape(3)
         
         open(file=fname, newunit=fin, status='old', action='read')
 
@@ -129,17 +164,17 @@ contains
             allocate(data2, mold=data)
             read(fin, *) dreal
             read(fin, *) dimag
-            data = cmplx(dreal, dimag, r64) 
+            data = cmplx(dreal, dimag, aip) 
             read(fin, *) dreal
             read(fin, *) dimag
-            data2 = cmplx(dreal, dimag, r64) 
+            data2 = cmplx(dreal, dimag, aip) 
         else
             allocate(data(data_shape(1),data_shape(2),data_shape(3)))
             allocate(dreal(data_shape(1),data_shape(2),data_shape(3)))
             allocate(dimag, mold=dreal)
             read(fin, *) dreal
             read(fin, *) dimag
-            data = cmplx(dreal, dimag, r64) 
+            data = cmplx(dreal, dimag, aip) 
         end if
 
         close(fin)

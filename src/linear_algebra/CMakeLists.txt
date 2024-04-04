@@ -1,10 +1,4 @@
-# Library for linear algebra
-if(GPU)
-   set(SRC_LINALG ${CMAKE_CURRENT_SOURCE_DIR}/gpu_magma_t.f90)
-else()
-   set(SRC_LINALG ${CMAKE_CURRENT_SOURCE_DIR}/cpu_magma_t.f90)
-endif(GPU)
-
+# Computation of auxiliary vectors
 set(SRC_LINALG ${SRC_LINALG}
     ${CMAKE_CURRENT_SOURCE_DIR}/linalg.f90)
 

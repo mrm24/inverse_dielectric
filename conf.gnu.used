@@ -1,0 +1,3 @@
+export CUDADIR=/usr/local/cuda-12.3/
+export FC=gfortran
+cmake -DGPU=ON -DMAGMA_DIR=/home/mrm/progs/magma-openblas/magma/mrm ..

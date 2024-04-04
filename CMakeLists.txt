@@ -4,63 +4,144 @@ cmake_minimum_required(VERSION 3.20.0 FATAL_ERROR)
 option(GPU "GPU support" OFF)
 option(BENCHMARK "Generate the benchmark executables" OFF)
 option(INTERFACES "Python bindings" OFF)
+option(SPGLIB "Compile with spglib" ON)
+option(OMP5 "If OMP5 support is enabled it offload body corrections to the GPU : only gfortran >= 14.00 -- though it is slow" OFF)
+option(DOUBLE "Use double precision in real and complex" ON)
+option(NVIDIA "NVIDIA GPU" OFF)
+option(AMD "AMD GPU" OFF)
+option(INTEL "INTEL GPU" OFF)
+
+# Set precision settings
+if(NOT DOUBLE)
+    message(STATUS "Compiling with single precision")
+    add_compile_definitions(USE_SINGLE_PRECISION)
+endif()
 
 # Check GPU support
 if(GPU)
-    project(inverse_dielectric_library Fortran CUDA CXX)
-    set(CMAKE_CXX_STANDARD 14)
-    set(CMAKE_CXX_STANDARD_REQUIRED on)
-    set(CMAKE_CXX_COMPILER "icpc")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3 -fPIC -qopenmp")
-    set(CMAKE_Fortran_COMPILER "ifx")
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O3 -fPIC \
-                            -no-wrap-margin -fp-model source -qopenmp \
-                            ")
-    add_compile_definitions(USE_GPU) 
-    set(MAGMA_F90_DIR ${PROJECT_SOURCE_DIR}/external/magma)
-    set(SRC_MAGMA_F90 
-           ${MAGMA_F90_DIR}/magma2.F90
-           ${MAGMA_F90_DIR}/magma2_common.F90
-           ${MAGMA_F90_DIR}/magma2_sfortran.F90
-           ${MAGMA_F90_DIR}/magma2_cfortran.F90
-           ${MAGMA_F90_DIR}/magma2_dfortran.F90
-           ${MAGMA_F90_DIR}/magma2_zfortran.F90)
-    set(MAGMA_DIR "None" CACHE PATH "Path to magma library")
-    message(STATUS "magma library path : ${MAGMA_DIR}")
+    # This is only to automatically link GPU libraries
+    project(inverse_dielectric_library Fortran CXX)
+    add_compile_definitions(USE_GPU)
+
+    # Now select the vendor
+    if(NVIDIA)
+      message(STATUS "GPU :  NVIDIA")
+      add_compile_definitions(NVIDIAGPU)
+    elseif(AMD)
+      message(STATUS "GPU :  AMD")
+      add_compile_definitions(AMDGPU)
+    elseif(INTEL)
+      message(STATUS "GPU :  INTEL")
+      add_compile_definitions(INTELGPU)
+    else()
+      message(FATAL_ERROR "GPU vendor has not been selected, supported GPUs are: AMD, NVIDIA, and INTEL")
+    endif()
+
+    if (OMP5)
+      add_compile_definitions(HAVEOMP5)
+    endif()
+
+    if(NVIDIA OR AMD)
+      # Setting MAGMA library for NVIDIA and AMD case
+      set(MAGMA_F90_DIR ${PROJECT_SOURCE_DIR}/external/magma)
+      set(SRC_MAGMA_F90
+            ${MAGMA_F90_DIR}/magma2.F90
+            ${MAGMA_F90_DIR}/magma2_common.F90
+            ${MAGMA_F90_DIR}/magma2_sfortran.F90
+            ${MAGMA_F90_DIR}/magma2_cfortran.F90
+            ${MAGMA_F90_DIR}/magma2_dfortran.F90
+            ${MAGMA_F90_DIR}/magma2_zfortran.F90)
+      set(MAGMA_DIR "None" CACHE PATH "Path to magma library")
+      message(STATUS "magma library path : ${MAGMA_DIR}")
+    else()
+      # In INTEL case one uses the MKL offloading to the GPU through openMP 5.0
+      set(MAGMA_F90_DIR "")
+      set(SRC_MAGMA_F90 "")  
+    endif()
 else()
     project(inverse_dielectric_library Fortran CXX)
-    set(CMAKE_CXX_STANDARD 14)
-    set(CMAKE_CXX_STANDARD_REQUIRED on)
-    set(CMAKE_CXX_COMPILER "icpx")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3 -fPIC -qopenmp")
-    set(CMAKE_Fortran_COMPILER "ifx")
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O3 -fPIC \
-                            -no-wrap-margin -fp-model source -qopenmp \
-                            ")
     set(MAGMA_F90_DIR "")
     set(SRC_MAGMA_F90 "")
-endif(GPU)
+endif()
 
-# Set BOOST library
-set(Boost_USE_STATIC_LIBS OFF) 
-set(Boost_USE_MULTITHREADED ON)  
-set(Boost_USE_STATIC_RUNTIME OFF) 
-find_package(Boost) 
+# Check compilers for GPU offloading using OMP5
+# if(GPU AND OMP5)
+#  if (NOT CMAKE_Fortran_COMPILER MATCHES "gfortran" AND
+#       CMAKE_Fortran_COMPILER_VERSION LESS 1400)
+#    message(FATAL_ERROR "GPU offload of loops is only supported by gfortran version >= 14")
+#  endif()
+# endif()
 
-if(Boost_FOUND)
-    include_directories(${Boost_INCLUDE_DIRS})
+# Set MKL as linear algebra library
+
+# Select compilers
+if(CMAKE_Fortran_COMPILER MATCHES "ifx")
+    message(STATUS "Intel compilers")
+    set(CMAKE_CXX_COMPILER "icpx")
+    set(CMAKE_Fortran_COMPILER "ifx")
+    if (GPU)
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3 -fPIC -fiopenmp \
+                              -fopenmp-targets=spir64 -qmkl=parallel -fsycl")
+      set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -fpp -O3 -fPIC \
+                              -no-wrap-margin -fp-model source -fiopenmp \
+                              -fopenmp-targets=spir64 -qmkl=parallel -fsycl -fpp -free")
+    else()
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3 -fPIC -qopenmp")
+      set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -fpp -O3 -fPIC \
+                              -no-wrap-margin -fp-model source -qopenmp \
+                              ")
+    endif()
+    find_package(MKL REQUIRED)
+    include_directories(${MKL_INCLUDE_DIRS})
+    set(linalg_lib "${MKL_LIBRARIES}")
+    if (GPU)
+      set(linalg_lib "${linalg_lib}")
+    endif()
+elseif(CMAKE_Fortran_COMPILER MATCHES "gfortran")
+    message(STATUS "GNU compilers")
+    set(CMAKE_CXX_COMPILER "g++")
+    set(CMAKE_Fortran_COMPILER "gfortran")
+    if(GPU)
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -fopenmp \
+                            -foffload-options=-lm ")
+      set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cpp -O3 -fPIC \
+                                -ffree-line-length-512 -fopenmp  \
+                                -foffload-options=-lgfortran -foffload-options=-lm")
+    else()
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -fopenmp")
+      set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cpp -O3 -fPIC \
+                                -ffree-line-length-512 -fopenmp \
+                                ")
+    endif()
+    set(linalg_lib "openblasp")
+elseif(CMAKE_Fortran_COMPILER MATCHES "nvfortran")
+    message(STATUS "NVIDIA compilers")
+    set(CMAKE_CXX_COMPILER "nvc++")
+    set(CMAKE_Fortran_COMPILER "nvfortran")
+    if (GPU)
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3 -fPIC -mp=gpu")
+      set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O3 -fPIC \
+                              -mp=gpu \
+                                ")
+    else()
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O3 -fPIC -mp")
+      set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -cpp -O3 -fPIC \
+                              -mp \
+                                ")
+    endif(GPU)
+    set(linalg_lib "openblasp")
 else()
-    message(STATUS "Using Boost_INCLUDE_DIRS variable")
-    set(Boost_INCLUDE_DIRS "None" CACHE PATH "Path to Boost include")
-    include_directories(${Boost_INCLUDE_DIRS})
-    message(STATUS "Boost path : ${Boost_INCLUDE_DIRS}")
+    message(FATAL_ERROR "Compiler is not recognized: only GNU, Intel (ifx not ifort) and NVIDIA compilers are officially supported")
 endif()
 
 # Find SPGLIB
-set(SPGLIBDIR "None" CACHE PATH "Path to spglib")
-set(CMAKE_PREFIX_PATH ${SPGLIBDIR})
-find_library(spg_lib NAMES spg spglib libsymspg symspg PATHS ${SPGLIBDIR} REQUIRED)
-message(STATUS "SPGLIB found : ${spg_lib}")
+if (SPGLIB)
+  add_compile_definitions(USE_SPGLIB)
+  set(SPGLIBDIR "None" CACHE PATH "Path to spglib")
+  set(CMAKE_PREFIX_PATH ${SPGLIBDIR})
+  find_library(spg_lib NAMES spg spglib libsymspg symspg PATHS ${SPGLIBDIR} REQUIRED)
+  message(STATUS "SPGLIB found : ${spg_lib}")
+endif()
 
 # Create INSTALL DIRECTORY
 set(INSTALL_DIR "${PROJECT_SOURCE_DIR}/IDieL")
@@ -85,6 +166,7 @@ endif(INTERFACES)
 add_subdirectory(test)
 
 # If selected compile benchmark programs
+# it also downloads all needed data for the benchmark
 if(BENCHMARK)
   add_subdirectory(benchmark)
 endif(BENCHMARK)

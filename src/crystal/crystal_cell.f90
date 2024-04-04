@@ -1,4 +1,4 @@
-! Copyright 2023 EXCITING developers
+! Copyright (C) 2020-2024 GreenX library
 !
 ! Licensed under the Apache License, Version 2.0 (the "License");
 ! you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 !> Module containing the information about crystal structure except for symmetry
 module idiel_crystal_cell
 
-    use idiel_constants, only: i64, r64, twopi
+    use idiel_constants, only: i32, aip, twopi
 
     implicit none
 
@@ -28,23 +28,23 @@ module idiel_crystal_cell
     !> This class contains the structural information 
     type cell_t 
         !> The lattice each row is a lattice vector (Fortran order)
-        real(r64) :: lattice(3,3)
+        real(aip) :: lattice(3,3)
         !>  The reciprocal lattice (Fortran order)
-        real(r64) :: rlattice(3,3) 
+        real(aip) :: rlattice(3,3) 
         !>  The lattice volume
-        real(r64) :: vuc
+        real(aip) :: vuc
         !>  Area between b1xb2 vectors (reciprocal)
-        real(r64) :: area_r_12
+        real(aip) :: area_r_12
         !>  Area between b1xb3 vectors (reciprocal)
-        real(r64) :: area_r_13
+        real(aip) :: area_r_13
         !>  Area between b2xb3 vectors (reciprocal)
-        real(r64) :: area_r_23
+        real(aip) :: area_r_23
         !>  The number of atoms in the unit cell
-        integer(i64) :: natoms
+        integer(i32) :: natoms
         !>  The reduced positions (3,natoms),  this in Fortran is already compatible with what expected from spglib
-        real(r64), allocatable :: redpos(:,:) 
+        real(aip), allocatable :: redpos(:,:) 
         !> The id of elements
-        integer(i64), allocatable :: elements(:)
+        integer(i32), allocatable :: elements(:)
     contains
         procedure, public :: initialize=>init_cell_t, get_kmax_subcell_bz
         final :: clean
@@ -71,13 +71,13 @@ contains
     !> @param[in]     elements_ - list of elements
     subroutine init_cell_t(this, lattice_, redpos_, elements_)
         class(cell_t), intent(inout) :: this
-        real(r64), intent(in)        :: lattice_(3,3)
-        real(r64), intent(in)        :: redpos_(:,:) 
-        integer(r64), intent(in)     :: elements_(:)
+        real(aip), intent(in)        :: lattice_(3,3)
+        real(aip), intent(in)        :: redpos_(:,:) 
+        integer(i32), intent(in)     :: elements_(:)
 
         ! Locals
-        real(r64) :: a(3), b(3), c(3)
-        real(r64) :: ap(3), bp(3), cp(3)
+        real(aip) :: a(3), b(3), c(3)
+        real(aip) :: ap(3), bp(3), cp(3)
 
         ! Init class variables
         this%lattice  = lattice_
@@ -116,9 +116,9 @@ contains
         !> @result    v3 - the v1 X v2
         function cross(v1,v2) result(v3)
             
-            real(r64), intent(in) :: v1(3)
-            real(r64), intent(in) :: v2(3)
-            real(r64) :: v3(3)
+            real(aip), intent(in) :: v1(3)
+            real(aip), intent(in) :: v2(3)
+            real(aip) :: v3(3)
 
             v3(1) = v1(2) * v2(3) - v1(3) * v2(2)
             v3(2) = v1(3) * v2(1) - v1(1) * v2(3)
@@ -138,16 +138,16 @@ contains
     pure subroutine get_kmax_subcell_bz(this, nqgrid, kdir, kmax)
         
         class(cell_t), intent(in)           :: this
-        integer(i64),  intent(in)           :: nqgrid(3)
-        real(r64),     intent(in)           :: kdir(:,:)
-        real(r64), allocatable, intent(out) :: kmax(:)
+        integer(i32),  intent(in)           :: nqgrid(3)
+        real(aip),     intent(in)           :: kdir(:,:)
+        real(aip), allocatable, intent(out) :: kmax(:)
 
         ! Locals
-        real(r64), allocatable :: kred(:,:) ! k in reduced coordinates (3,nr)
-        integer(i64) :: nr                  ! number of points
-        integer(i64) :: i, j
-        real(r64) :: lambda_candidates(3), lambda ! The scaling factor in the line equation, i.e. (kx,ky,kz) = (0,0,0) + lambda * kdir  
-        real(r64) :: k_check              ! The value to check for the intersection with one of the planes 
+        real(aip), allocatable :: kred(:,:) ! k in reduced coordinates (3,nr)
+        integer(i32) :: nr                  ! number of points
+        integer(i32) :: i, j
+        real(aip) :: lambda_candidates(3), lambda ! The scaling factor in the line equation, i.e. (kx,ky,kz) = (0,0,0) + lambda * kdir  
+        real(aip) :: k_check              ! The value to check for the intersection with one of the planes 
 
         ! Get the number of points
         nr = size(kdir,1) 
@@ -165,12 +165,12 @@ contains
                 ! Compute all lambdas that provides a collision with one of the planes defining the boundaries
                 ! Handle vectors parallel to the planes
                 if (abs(kred(j,i)) .lt. 1.0e-12) then 
-                    kred(j,i) = 0.0_r64
-                    lambda_candidates(j) = 1.0e+42_r64
+                    kred(j,i) = 0.0_aip
+                    lambda_candidates(j) = huge(1.0_aip)
                 else
                     ! The collision points for the planes defining a subcell (given uniform division) of the unit cube centered in 0 is by definition sgn(kdir(i)) * 0.5/nq(i)
                     ! The sign is to constrain our search to lambda > 0
-                    k_check = sign(0.5_r64 / nqgrid(j), kred(j,i)) 
+                    k_check = sign(0.5_aip / nqgrid(j), kred(j,i)) 
                     lambda_candidates(j) = k_check / kred(j,i)
                 end if
             end do 
