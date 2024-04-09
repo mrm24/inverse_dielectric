@@ -14,6 +14,7 @@
 
 !> @file
 !> Contains Fortran interface for C functions contained in gpu_register.cpp
+!> See gpu_register.cpp for the detailed documentation
 module m_gpu_register_fortran
 
     use iso_c_binding

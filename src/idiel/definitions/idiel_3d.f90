@@ -42,7 +42,6 @@ contains
     module subroutine compute_anisotropic_avg_hermitian(this)
 
         use idiel_linalg
-
         class(idiel_t), target, intent(inout) :: this
 
         ! Auxiliary vectors
@@ -67,11 +66,7 @@ contains
         integer(i32) :: ii, jj, kk
 
         ! For device
-        integer(i32)              :: nr
-        complex(aip), allocatable :: ylm(:,:)
-        real(aip), allocatable    :: weights(:)
-        complex(aip), allocatable :: angular_integrals(:)
-        complex(aip), allocatable :: body(:,:)
+        integer(i32) :: quadrature_npoints
 
         ! Get the basis size
         nbasis = size(this%Binv, 1)
@@ -124,11 +119,13 @@ contains
         ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
 #if defined(USE_GPU) && defined(HAVEOMP5)
         ! We need to use associations for OMP to understand
-        associate(quadrature_npoints => this%quadrature_npoints, body => this%idiel_body, &
+        associate( body => this%idiel_body, &
                   ylm => this%ylm, weights => this%weights, angular_integrals => this%angular_integrals, &
                   world => this%world)
 
+            quadrature_npoints = this%quadrature_npoints
             allocate(body_f(quadrature_npoints), clm_body(nsph_pair))
+
 
             call world%register%alloc("body", size(body) * c_sizeof(zzero), world%get_device())
             call world%register%assoc("body", C_loc(body))
@@ -147,7 +144,7 @@ contains
             call world%register%assoc("qS", C_loc(wingL_f))
             call world%register%assoc("invqLq", C_loc(head_f))
 
-            !$omp target teams distribute private(ii, jj, body_f, clm_body) collapse(2)
+            !$omp target teams distribute private(ii, jj, body_f, clm_body) collapse(2) 
             do ii = 1, nbasis
                 do jj = 1, nbasis
                     !$omp workshare
@@ -160,7 +157,7 @@ contains
                 end do
             end do
             !$omp end target teams distribute
-            
+
             call world%register%from_device("body")
 
             call world%register%deassoc("ylm")
