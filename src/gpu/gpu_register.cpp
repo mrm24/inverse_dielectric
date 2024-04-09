@@ -17,6 +17,7 @@
 ///  create a fine map host-device map address (even for derived types). 
 ///  I have exposed C functions for Fortran interfacing.
 ///  Limits: each host must have its own register, though it can connect to several devices.
+///  Limits: does not work with Unified Shared Memory (USM)
 ///  Dependencies: OMP4.5 or higher
 ///
 #include <unordered_map>

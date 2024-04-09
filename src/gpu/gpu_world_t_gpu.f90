@@ -21,6 +21,7 @@ module idiel_gpu_world_t
     use iso_c_binding
 #if defined(NVIDIAGPU) || defined(AMDGPU)
     use magma2
+    use omp_lib
 #endif
 #if defined(INTELGPU)
     use omp_lib
@@ -36,13 +37,15 @@ module idiel_gpu_world_t
     !> Type to handle the GPU Magma queue and world
     type gpu_world_t
         !> Device id taking care of control
-        integer :: device = -1
+        integer, private :: device = -1
         !> GPU queue
-        type(C_ptr), private  :: queue    = C_null_ptr
+        type(C_ptr), private  :: queue = C_null_ptr
+        !> The number of teams in the GPU
+        integer, private :: num_teams
         !> Device host register
         type(device_host_register) :: register
     contains
-        procedure, public :: init, finish, is_queue_set, get_queue, syncronize, get_device
+        procedure, public :: init, finish, is_queue_set, get_queue, syncronize, get_device, get_num_teams
     end type gpu_world_t
 
 contains
@@ -58,6 +61,9 @@ contains
             
         class(gpu_world_t), intent(inout) :: this
         integer, optional,  intent(in)    :: device
+
+        integer :: num_teams
+
 #if defined(NVIDIAGPU) || defined(AMDGPU)
         ! Init MAGMA
         call magma_init()
@@ -80,6 +86,12 @@ contains
         ! Init the GPU queue
         call magma_queue_create(this%device, this%queue)
 #endif
+
+        ! Init the number of teams 
+        !$omp target teams map(from: num_teams)
+        num_teams = omp_get_num_teams()
+        !$omp end target teams
+        this%num_teams = num_teams
     
         ! Init register
         call this%register%init()
@@ -142,5 +154,13 @@ contains
         integer :: device
         device = this%device
     end function get_device
+    
+    !> This provides the number of teams
+    !> @param[in] this - return the number of teams of the device
+    pure function get_num_teams(this) result(num_teams)
+        class(gpu_world_t), intent(in) :: this
+        integer :: num_teams
+        num_teams = this%num_teams
+    end function get_num_teams
 
 end module idiel_gpu_world_t

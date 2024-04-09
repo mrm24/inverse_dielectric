@@ -1,7 +1,4 @@
 #Process the folders
-
-add_compile_definitions(NVIDIA_GPU)
-
 # Constants
 add_subdirectory(constants)
 

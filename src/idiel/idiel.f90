@@ -17,7 +17,7 @@
 
 !> This module contains the procedures for the computation of the dielectric matrix averages
 module idiel
-    
+
     use idiel_constants, only: i32, r64, aip, pi, onethird, twopi, fourpi, zzero, zone, iunit
     use idiel_crystal_cell, only: cell_t
     use idiel_crystal_symmetry, only: symmetry_t
