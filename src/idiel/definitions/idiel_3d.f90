@@ -18,6 +18,17 @@
 !> This module contains the procedures for the computation of the dielectric matrix averages
 submodule (idiel) idiel_3D
 
+#include "offload.fpp"
+
+
+
+#ifdef DEVICEOFFLOAD
+    use omp_lib
+#define _omp_get_team_num omp_get_team_num()
+#else 
+#define _omp_get_team_num 1
+#endif
+
     implicit none
 
 contains
@@ -53,20 +64,20 @@ contains
         ! Function from which to compute the integral 
         complex(aip), target, allocatable :: head_f(:) 
         complex(aip), target, allocatable :: wingL_f(:,:)
-        complex(aip), target, allocatable :: body_f(:)
+        complex(aip), target, allocatable :: body_f(:,:)
 
         ! Harmonic expansion coefficients
         complex(aip), target, allocatable :: clm_head(:)
-        complex(aip), target, allocatable :: clm_body(:)
+        complex(aip), target, allocatable :: clm_body(:,:)
 
         ! Basis size
         integer(i32) :: nbasis
         
         ! Dummy indexes
-        integer(i32) :: ii, jj, kk
+        integer(i32) :: ii, jj, kk, my_team
 
-        ! For device
-        integer(i32) :: quadrature_npoints
+        ! For device aware compilation the team id
+        integer(i32) :: my_team
 
         ! Get the basis size
         nbasis = size(this%Binv, 1)
@@ -115,27 +126,47 @@ contains
         call sph_harm_expansion(nsph_pair, head_f, this%weights, this%ylm, clm_head)
         this%idiel_head  = sum(clm_head(:) * this%angular_integrals(:))
         deallocate(clm_head)
+
         ! Here we compute the body 
         ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
-        !$omp parallel shared(this, head_f, wingL_f, nbasis) private(ii, jj, body_f, clm_body)
-        allocate(body_f(this%quadrature_npoints), clm_body(nsph_pair))
-        !$omp do collapse(2)
+        
+        allocate(body_f(this%quadrature_npoints, this%world%get_num_teams()))
+        allocate(clm_body(nsph_pair, this%world%get_num_teams()))
+        
+        OMP_OFFLOAD target enter data map(to: this%idiel_body, clm_body, body_f, head_f, wingL_f)
+
+        OMP_OFFLOAD target
+        OMP_OFFLOAD teams distribute num_teams(this%world%get_num_teams()) &
+        OMP_NO_OFFLOAD parallel do &
+        !$omp collapse(2) default(none) shared(this, head_f, wingL_f, nbasis, body_f, clm_body) private(ii, jj, kk, my_team)
         do ii = 1, nbasis
             do jj = 1, nbasis
-                body_f(:) = head_f(:) * wingL_f(:, jj) * conjg(wingL_f(:, ii))
-                call sph_harm_expansion(nsph_pair, body_f, this%weights, this%ylm, clm_body)
+                my_team = _omp_get_team_num
+
+                OMP_OFFLOAD parallel do default(none) shared(body_f, head_f, wingL_f, ii, jj, my_team) private(kk)
+                do kk = 1, this%quadrature_npoints
+                    body_f(kk, my_team) = head_f(kk) * wingL_f(kk, jj) * conjg(wingL_f(kk, ii))
+                end do
+                OMP_OFFLOAD end parallel do
+                
+                call sph_harm_expansion(nsph_pair, body_f(:,my_team), this%weights, this%ylm, clm_body(:,my_team))
+                
                 this%idiel_body(jj,ii) = this%idiel_body(jj,ii) + &
-                    sum(clm_body(:) * this%angular_integrals(:))
+                    sum(clm_body(:, my_team) * this%angular_integrals(:))
             end do
         end do 
-        !$omp end do
-        deallocate(body_f, clm_body)
-        !$omp end parallel
+        OMP_NO_OFFLOAD end parallel do
+        OMP_OFFLOAD end teams distribute
+        OMP_OFFLOAD end target
+
+        OMP_OFFLOAD target update from(this%idiel_body)
+        OMP_OFFLOAD target exit data map(delete: this%idiel_body, clm_body, body_f, head_f, wingL_f)
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !            Clean              !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+        deallocate(body_f, clm_body)
         deallocate(head_f, wingL_f)
 
     end subroutine compute_anisotropic_avg_hermitian
@@ -156,17 +187,20 @@ contains
         complex(aip), target, allocatable :: head_f(:) 
         complex(aip), target, allocatable :: wingL_f(:,:)
         complex(aip), target, allocatable :: wingU_f(:,:)
-        complex(aip), target, allocatable :: body_f(:)
+        complex(aip), target, allocatable :: body_f(:,:)
 
         ! Harmonic expansion coefficients
         complex(aip), target, allocatable :: clm_head(:)
-        complex(aip), target, allocatable :: clm_body(:)
+        complex(aip), target, allocatable :: clm_body(:,:)
 
         ! Basis size
         integer(i32) :: nbasis
         
         ! Dummy indexes
-        integer(i32) :: ii, jj
+        integer(i32) :: ii, jj, kk
+
+        ! For device aware compilation the team id
+        integer(i32) :: my_team
 
         ! Get the basis size
         nbasis = size(this%Binv, 1)
@@ -221,26 +255,46 @@ contains
 
         ! Here we compute the body 
         ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
-        !$omp parallel shared(this, head_f, wingL_f, wingU_f, nbasis) private(ii, jj, body_f, clm_body)
-        allocate(body_f(this%quadrature_npoints),  clm_body(nsph_pair))
-        !$omp do collapse(2)
+
+        allocate(body_f(this%quadrature_npoints, this%world%get_num_teams()))
+        allocate(clm_body(nsph_pair, this%world%get_num_teams()))
+
+        OMP_OFFLOAD target enter data map(to: this%idiel_body, clm_body, body_f, head_f, wingL_f, wingU_f)
+
+        OMP_OFFLOAD target
+        OMP_OFFLOAD teams distribute num_teams(this%world%get_num_teams()) &
+        OMP_NO_OFFLOAD parallel do &
+        !$omp collapse(2) default(none) shared(this, head_f, wingL_f, wingU_f, nbasis, body_f, clm_body) private(ii, jj, kk, my_team)
         do ii = 1, nbasis
             do jj = 1, nbasis
-                body_f(:) = head_f(:) * wingL_f(:, jj) * wingU_f(:, ii)
-                call sph_harm_expansion(nsph_pair, body_f, this%weights, this%ylm, clm_body)
+                my_team = _omp_get_team_num
+
+                OMP_OFFLOAD parallel do default(none) shared(body_f, head_f, wingL_f, wingU_f, ii, jj, my_team) private(kk)
+                do kk = 1, this%quadrature_npoints
+                    body_f(kk, my_team) = head_f(kk) * wingL_f(kk, jj) * wingU_f(kk, ii)
+                end do
+                OMP_OFFLOAD end parallel do
+
+                call sph_harm_expansion(nsph_pair, body_f(:,my_team), this%weights, this%ylm, clm_body(:,my_team))
+
                 this%idiel_body(jj,ii) = this%idiel_body(jj,ii) + &
-                    sum(clm_body(:) * this%angular_integrals(:))
+                    sum(clm_body(:, my_team) * this%angular_integrals(:))
             end do
-        end do 
-        !$omp end do
-        deallocate(body_f,  clm_body)
-        !$omp end parallel
+        end do
+        OMP_NO_OFFLOAD end parallel do
+        OMP_OFFLOAD end teams distribute
+        OMP_OFFLOAD end target
+
+        OMP_OFFLOAD target update from(this%idiel_body)
+        OMP_OFFLOAD target exit data map(delete: this%idiel_body, clm_body, body_f, head_f, wingL_f, wingU_f)
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !            Clean              !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+        deallocate(body_f, clm_body)
         deallocate(head_f, wingL_f, wingU_f)
+
 
     end subroutine compute_anisotropic_avg_general
 

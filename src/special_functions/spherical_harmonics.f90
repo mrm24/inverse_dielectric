@@ -19,6 +19,7 @@
 module idiel_spherical_harmonics
    
    use idiel_constants,   only: i32, r64, aip, fourpi, y00, zzero, zone
+#include "offload.fpp"
 
    implicit none 
 
@@ -124,9 +125,10 @@ contains
    !> @param[in] ylm     - the spherical harmonics in the mesh
    !> @param[out] clm     - the expansion coefficients
    subroutine sph_harm_expansion(n, f, weights, ylm, clm)
-#if defined(USE_GPU) && defined(HAVEOMP5)
-      !$omp declare target 
-#endif 
+      
+      ! Instruct the compiler to generate the offloaded version of this function
+      OMP_OFFLOAD declare target
+
       integer(i32), intent(in)  :: n
       complex(aip), intent(in)  :: f(:)
       real(aip),    intent(in)  :: weights(:)
@@ -138,26 +140,16 @@ contains
 
       ! Multiply the function with the weights so the matrix-vector products solves the integral for all the (l,m)
       allocate(fw, mold=f)
-#if defined(USE_GPU) && defined(HAVEOMP5)
-      !$omp workshare
-#endif 
       fw(:) = f(:) * weights(:)
-#if defined(USE_GPU) && defined(HAVEOMP5)
-      !$omp end workshare 
-#endif 
 
       ! This is a small calculation so it is done with a hand-made definition of matmul so the GPU kernel can be built
       ! clm = Ylm**H \cdot f
       ! TODO: Change to metadirective whenever those become standard
-#if defined(USE_GPU) && defined(HAVEOMP5)
-      !$omp parallel do private(i)
-#endif 
+      OMP_OFFLOAD parallel do private(i)
       do i = 1, n
           clm(i) = dot_product(ylm(:,i),fw(:))
       end do
-#if defined(USE_GPU) && defined(HAVEOMP5)
-      !$omp end parallel do
-#endif
+      OMP_OFFLOAD end parallel do
       return
 
    end subroutine sph_harm_expansion
