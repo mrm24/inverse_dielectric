@@ -1,0 +1,12 @@
+- Martí Raya-Moreno
+    - Main developer and maintainer.
+- Sven Lubeck
+    - Reviewer
+- Hannah Kleine 
+    - Reviewer
+- Benedickt Moritz Maurer
+    - Reviewer
+- Nakib H. Protik
+    - Reviewer
+- Andris Gulans
+    - Reviewer

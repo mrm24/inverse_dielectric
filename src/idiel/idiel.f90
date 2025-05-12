@@ -25,7 +25,7 @@ module idiel
     use idiel_spherical_harmonics, only: sph_harm, sph_harm_expansion
     use idiel_circle_quadrature, only: compute_angular_mesh_gauss_legendre
     use idiel_circular_harmonics, only: circ_harm, circ_harm_expansion
-    use idiel_gpu_world_t, only: gpu_world_t
+    use m_device_world_t, only: device_world_t
 
     implicit none
 
@@ -88,8 +88,10 @@ module idiel
         complex(aip), allocatable :: idiel_body(:,:)
         !> Number of points of the quadrature
         integer(i32), private :: quadrature_npoints 
-        !> The handler of linear algebra queues
-        type(gpu_world_t), private :: world
+        !> Pointer to the handler of GPU-CPU
+        type(device_world_t), pointer, private :: world
+        !> Logical to know if the world is external or allocated in the object
+        logical, private :: internal_world
         !> Dimensionaly
         integer(i32), private :: dim = 3
         !> 2D angle for large integral
@@ -119,22 +121,27 @@ interface
 
     !> This initializes everything common (i.e. without frequency dependency) to all computations
     !> @param[in,out] this - idiel_t object
-    !> @param[in]     lattice  - lattice vectors given in rows 
-    !> @param[in]     redpos   - reduced positions (3,natoms)
-    !> @param[in]     elements - list of elements
-    !> @param[in]     nq       - the BZ mesh
-    !> @param[in]     dim      - the dim of the system
-    !> @param[in]     nysm     - the number of symmetry operations
-    !> @param[in]     crot     - the rotations in Cartesian coordinates (last index is the space group operation id)
-    module subroutine init_common(this, lattice, redpos, elements, nq, dim, nsym, crot)
-        class(idiel_t), target, intent(inout) :: this
-        real(aip), intent(in)                 :: lattice(3,3)
-        real(aip),  intent(in)                :: redpos(:,:)
-        integer(i32),  intent(in)             :: elements(:)
-        integer(i32), intent(in)              :: nq(3)
-        integer(i32), intent(in), optional    :: dim
-        integer(i32), intent(in), optional    :: nsym
-        real(aip), intent(in), optional       :: crot(:,:,:)
+    !> @param[in]     lattice       - lattice vectors given in rows
+    !> @param[in]     redpos        - reduced positions (3,natoms)
+    !> @param[in]     elements      - list of elements
+    !> @param[in]     nq            - the BZ mesh
+    !> @param[in]     dim           - the dim of the system
+    !> @param[in]     nysm          - the number of symmetry operations
+    !> @param[in]     crot          - the rotations in Cartesian coordinates (last index is the space group operation id)
+    !> @param[in]     device_world  - the GPU-CPU communicator
+    !> @param[in]     host_world    - the MPI communicator
+    module subroutine init_common(this, lattice, redpos, elements, nq, dim, nsym, crot, device_world, host_world)
+        use iso_c_binding, only: c_int
+        class(idiel_t), target, intent(inout)              :: this
+        real(aip), intent(in)                              :: lattice(3,3)
+        real(aip),  intent(in)                             :: redpos(:,:)
+        integer(i32),  intent(in)                          :: elements(:)
+        integer(i32), intent(in)                           :: nq(3)
+        integer(i32), intent(in), optional                 :: dim
+        integer(i32), intent(in), optional                 :: nsym
+        real(aip), intent(in), optional                    :: crot(:,:,:)
+        type(device_world_t), intent(in), target, optional :: device_world
+        integer(c_int), intent(in), optional               :: host_world
     end subroutine init_common
 
     !> This nullify and deallocates the objects

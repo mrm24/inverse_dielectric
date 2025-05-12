@@ -21,6 +21,11 @@ program test_2d
     use idiel_constants, only: aip, i32, pi, twopi, zzero
     use idiel, only: idiel_t
 
+
+#if defined(DEVICEOFFLOAD)
+    use mpi
+#endif
+
     implicit none
 
     ! GW data
@@ -59,6 +64,16 @@ program test_2d
     ! In case that no SPG we set only Identity (i.e. no symmetry)
     integer(i32) :: nsym = 12
     real(aip)    :: crot(3,3,12)
+
+    ! MPI
+    integer(i32) :: mpi_world, err
+
+
+#if defined(DEVICEOFFLOAD)
+    ! Init MPI world
+    call mpi_init(err)
+    mpi_world = MPI_COMM_WORLD
+#endif
 
     ! Lattice vectors
     a(:) = [0.00000000_aip, 6.020289060_aip, 0.00000000_aip]
@@ -134,6 +149,10 @@ program test_2d
         end if
 
     end do
+
+#if defined(DEVICEOFFLOAD)
+    call mpi_finalize(err)
+#endif
 
     stop 0
 

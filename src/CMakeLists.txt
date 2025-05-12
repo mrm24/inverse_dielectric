@@ -14,9 +14,6 @@ add_subdirectory(interpolation)
 # Spherical quadrature
 add_subdirectory(quadrature)
 
-# GPU stuff, if not supported it generate CPU backends
-add_subdirectory(gpu)
-
 # Linear algebra
 add_subdirectory(linear_algebra)
 
@@ -27,28 +24,20 @@ message(STATUS "FILES: ${SRC}")
 set(MOD_DIR "${CMAKE_BINARY_DIR}/include")
 file(MAKE_DIRECTORY ${MOD_DIR})
 set(CMAKE_Fortran_MODULE_DIRECTORY ${MOD_DIR})
-if(CMAKE_Fortran_COMPILER MATCHES "ifx")
+if(CMAKE_Fortran_COMPILER MATCHES "IntelLLVM")
     set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -module ${MOD_DIR}")
 endif()
-message(STATUS "MODULES dir : ${MOD_DIR}")
 add_library(IDieL_objects OBJECT ${SRC})
 add_library(IDieL SHARED $<TARGET_OBJECTS:IDieL_objects>)
 set_target_properties(IDieL PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
 
 # Add symbols to the static library so we only need to link against it and not its dependencies
-if (GPU)
-    if (NVIDIA OR AMD)
-        set(LINKS ${spg_lib} ${linalg_lib} ${MAGMA_DIR}/lib/libmagma.so)
-    else()
-        set(LINKS ${spg_lib} ${linalg_lib})
-    endif()
-else()
-    set(LINKS ${spg_lib} ${linalg_lib})
-endif(GPU)
+if (NVIDIA OR AMD)
+    target_link_libraries(IDieL PUBLIC ${MAGMA_DIR}/lib/libmagma.so)
+endif()
 
-target_link_libraries(IDieL ${LINKS})
 set_target_properties(IDieL PROPERTIES
-    INSTALL_RPATH "${MAGMA_DIR}/lib/libmagma.so ${SPGLIBDIR}"
+    INSTALL_RPATH "${MAGMA_DIR}/lib/libmagma.so"
     INSTALL_RPATH_USE_LINK_PATH TRUE
 )
 

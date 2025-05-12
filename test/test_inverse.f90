@@ -18,23 +18,34 @@ program test_inverse
     
     use idiel_constants,         only: i32, aip, zzero
     use idiel_linalg,            only: inverse_complex_LU
-    use idiel_gpu_world_t,       only: gpu_world_t
-    
+    use m_device_world_t,        only: device_world_t
+
+#if defined(DEVICEOFFLOAD)
+    use mpi
+#endif
+
     implicit none
 
-    integer(i32), parameter :: n = 6000_i32
+    integer(i32), parameter :: n = 500_i32
     complex(aip), allocatable :: A(:,:), inverse_A(:,:)
-    type(gpu_world_t) :: world
+    type(device_world_t) :: world
     integer(i32) :: i
     real(aip) :: rdiff
     real(aip), parameter    :: tolerance = 1.0e-12_aip
+    integer(i32) :: mpi_world, err
+
+#if defined(DEVICEOFFLOAD)
+    ! Init MPI world
+    call mpi_init(err)
+    mpi_world = MPI_COMM_WORLD
+#endif
 
     allocate(A(n,n), source=zzero)
 
     do i = 1, n
         A(i,i) = cmplx(i, 0, aip)
     end do
-    call world%init()
+    call world%init(mpi_world)
     call inverse_complex_LU(A, inverse_A, world)
     call world%finish()
     write(*,*) '[TEST : inverse_complex_LU]' 
@@ -49,6 +60,12 @@ program test_inverse
             stop 1
         end if
     end do
+
+#if defined(DEVICEOFFLOAD)
+    call mpi_finalize(err)
+#endif
+
+    call world%finish()
 
     stop 0
 

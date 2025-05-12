@@ -22,7 +22,7 @@
 module idiel_f90_C
 
     use iso_c_binding
-    use idiel_constants, only: i64, r64
+    use idiel_constants, only: i32, r64
     use idiel, only: idiel_t
     
     implicit none
@@ -54,11 +54,11 @@ contains
     subroutine init_common(object_ptr, lattice, natoms, redpos, elements, nq, dim) bind(C)
         type(c_ptr),  intent(inout)      :: object_ptr
         real(r64),    intent(in)         :: lattice(3,3)
-        integer(i64), intent(in), value  :: natoms
+        integer(i32), intent(in), value  :: natoms
         real(r64),    intent(in)         :: redpos(3,natoms) 
-        integer(r64), intent(in)         :: elements(natoms)
-        integer(i64), intent(in)         :: nq(3)
-        integer(i64), intent(in), value  :: dim
+        integer(i32), intent(in)         :: elements(natoms)
+        integer(i32), intent(in)         :: nq(3)
+        integer(i32), intent(in), value  :: dim
         
         type(idiel_t), pointer :: object
 
@@ -121,7 +121,7 @@ contains
 
     function get_n_basis(object_ptr) result(nbasis) bind(C)
         type(c_ptr), intent(inout) :: object_ptr
-        integer(i64) :: nbasis
+        integer(i32) :: nbasis
         
         type(idiel_t), pointer :: object
         call C_F_pointer(object_ptr, object)

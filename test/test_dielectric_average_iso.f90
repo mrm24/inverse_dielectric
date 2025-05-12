@@ -21,6 +21,11 @@ program test_dielectric_average_iso
     use idiel_constants, only: aip, i32, pi, twopi, zzero
     use idiel, only: idiel_t
 
+#if defined(DEVICEOFFLOAD)
+    use mpi
+#endif
+
+
     implicit none
 
     ! GW data
@@ -70,6 +75,15 @@ program test_dielectric_average_iso
     ! Computation object
     type(idiel_t) :: inv_diel
 
+    ! MPI
+    integer(i32) :: mpi_world, err
+
+#if defined(DEVICEOFFLOAD)
+    ! Init MPI world
+    call mpi_init(err)
+    mpi_world = MPI_COMM_WORLD
+#endif
+
     ! Lattice vectors
     a(:) = latpar * [0.5_aip,  0.5_aip, 0.0_aip]
     b(:) = latpar * [0.5_aip,  0.0_aip, 0.5_aip]
@@ -91,7 +105,11 @@ program test_dielectric_average_iso
 
     ! Init common objects
 #ifdef USE_SPGLIB
+#ifdef DEVICEOFFLOAD
+    call inv_diel%init_common(lattice, redpos, types, ngrid, host_world=mpi_world)
+#else
     call inv_diel%init_common(lattice, redpos, types, ngrid)
+#endif
 #else 
     crot(:,:, 1 ) = reshape(real([   1.0,  0.0,  0.0,  0.0,  1.0,  0.0,  0.0,  0.0,  1.0], kind = aip), [3,3])
     crot(:,:, 2 ) = reshape(real([   0.0,  1.0,  0.0, -1.0,  0.0,  0.0,  0.0,  0.0,  1.0], kind = aip), [3,3])
@@ -141,7 +159,11 @@ program test_dielectric_average_iso
     crot(:,:,46 ) = reshape(real([   1.0,  0.0,  0.0,  0.0,  0.0,  1.0,  0.0,  1.0,  0.0], kind = aip), [3,3])
     crot(:,:,47 ) = reshape(real([   0.0,  0.0,  1.0, -1.0,  0.0,  0.0,  0.0,  1.0,  0.0], kind = aip), [3,3])
     crot(:,:,48 ) = reshape(real([  -1.0,  0.0,  0.0,  0.0,  0.0, -1.0,  0.0,  1.0,  0.0], kind = aip), [3,3])
+#ifdef DEVICEOFFLOAD
+    call inv_diel%init_common(lattice, redpos, types, ngrid, 3_i32, nsym, crot, host_world=mpi_world)
+#else
     call inv_diel%init_common(lattice, redpos, types, ngrid, 3_i32, nsym, crot)
+#endif
 #endif
     ! Read the dielectric data from previous G0W0 run
     call load_from_file('head.dat', head)
@@ -151,7 +173,7 @@ program test_dielectric_average_iso
 
     ! Do the average
     write(*,*) '[TEST : idiel_t]' 
-    do iom = 1, size(head,3)
+    do iom = 1, 2
         ! Load the data to the worker
         call inv_diel%set_dielectric_blocks(head(:,:,iom), wingL(:,:,iom), wingU(:,:,iom), Binv(:,:,iom))
         ! Compute the average
@@ -197,6 +219,10 @@ program test_dielectric_average_iso
         end if
 
     end do 
+
+#if defined(DEVICEOFFLOAD)
+    call mpi_finalize(err)
+#endif
 
     stop 0
 

@@ -30,7 +30,7 @@ namespace py = pybind11;
 using Complex = std::complex<double>;
 using NumpyComplexArray = py::array_t<Complex,py::array::f_style>;
 using NumpyRealArray = py::array_t<double,py::array::f_style>;
-using NumpyIntArray = py::array_t<long int,py::array::f_style>;
+using NumpyIntArray = py::array_t< int,py::array::f_style>;
 
 
 /// External functions to call Fortran functions
@@ -38,12 +38,12 @@ using NumpyIntArray = py::array_t<long int,py::array::f_style>;
 extern "C" {
     extern void allocate_idiel_t(void** object_ptr);
     extern void deallocate_idiel_t(void** object_ptr);
-    extern void init_common(void** object_ptr, double* lattice, long int natoms, double* redpos, long int* elements, long int* nq, long int dim);
+    extern void init_common(void** object_ptr, double* lattice,  int natoms, double* redpos,  int* elements,  int* nq,  int dim);
     extern void set_dielectric_blocks(void** object_ptr, Complex* h, Complex* wl, Complex* wu, Complex* ib);
     extern void compute_anisotropic_avg_inversedielectric_3d(void** object_ptr, bool hermitian);
     extern void compute_anisotropic_avg_scrcoulomb_2d(void** object_ptr, bool hermitian);
     extern void invert_body(void** object_ptr, Complex* body);
-    extern long int get_n_basis(void** object_ptr);
+    extern  int get_n_basis(void** object_ptr);
     extern void* head(void** object_ptr);
     extern void* wing_lower(void** object_ptr);
     extern void* wing_upper(void** object_ptr);
@@ -63,7 +63,6 @@ public:
     // Constructor: we need this call as Fortran to be manipulated pointers
     // must be initialized by Fortran
     idiel_cxx() {
-        std::cout << "Allocate" << std::endl;
         allocate_idiel_t(&idiel_f90);
     }
 
@@ -84,7 +83,7 @@ public:
     }
 
     /// Initialize common elements, note that I make dim mandatory as it makes the interfacing easier
-    void initialize(double* lattice, long int natoms, double* redpos, long int* elements, long int* nq, long int dim) {
+    void initialize(double* lattice,  int natoms, double* redpos,  int* elements,  int* nq,  int dim) {
         init_common(&idiel_f90, lattice, natoms, redpos, elements, nq, dim);
     }
 
@@ -114,7 +113,7 @@ public:
     }
 
     /// Return the basis size
-    long int getNBasis(){
+     int getNBasis(){
         return get_n_basis(&idiel_f90);
     }
 
@@ -156,10 +155,10 @@ PYBIND11_MODULE(IDieLPy, m) {
             // Get rid of constness
             double* lattice_data = const_cast<double*>(lattice_ptr.data(0, 0));
             double* redpos_data = const_cast<double*>(redpos_ptr.data(0, 0));
-            long int* elements_data = const_cast<long int*>(elements_ptr.data(0));
-            long int* nq_data = const_cast<long int*>(nq_ptr.data(0));
+             int* elements_data = const_cast< int*>(elements_ptr.data(0));
+             int* nq_data = const_cast< int*>(nq_ptr.data(0));
 
-            self.initialize(lattice_data, static_cast<long int>(natoms), redpos_data, elements_data, nq_data, static_cast<long int>(dim));
+            self.initialize(lattice_data, static_cast< int>(natoms), redpos_data, elements_data, nq_data, static_cast< int>(dim));
         })
         .def("setDielectricBlocksFull", [](idiel_cxx &self, NumpyComplexArray& head, NumpyComplexArray& wingL, NumpyComplexArray& wingU, NumpyComplexArray& Binv){
 

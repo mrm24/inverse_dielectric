@@ -1,0 +1,78 @@
+# Work around for some misconfigured virtualenv
+# https://github.com/pre-commit/pre-commit/issues/1375
+default_language_version:
+  python: python3
+exclude: src\/msg_database.c
+
+fail_fast: false
+repos:
+  - repo: https://github.com/Takishima/cmake-pre-commit-hooks
+    rev: v1.9.6
+    hooks:
+      - id: clang-format
+        additional_dependencies: [ clang-format >= 16 ]
+        args:
+          - '-B_build-pre-commit'
+          - '-DSPGLIB_WITH_Fortran=ON'
+          - '-DSPGLIB_WITH_TESTS=ON'
+          - '-i'
+      - id: clang-tidy
+        args:
+          - '-B_build-pre-commit'
+          - '-DSPGLIB_WITH_Fortran=ON'
+          - '-DSPGLIB_WITH_TESTS=ON'
+        stages: [ manual ]
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.9
+    hooks:
+      - id: ruff
+        args: [ "--fix", "--show-fixes" ]
+      - id: ruff-format
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.15.0
+    hooks:
+    - id: mypy
+      pass_filenames: false
+      additional_dependencies:
+        - types-PyYAML
+  - repo: https://github.com/executablebooks/mdformat
+    rev: 0.7.22
+    hooks:
+      - id: mdformat
+        additional_dependencies:
+          - mdformat-gfm
+          - mdformat-tables
+        exclude: docs\/(?!README\.md).*
+    # TODO: Temporarily separate docs formatiing
+    # https://github.com/executablebooks/mdformat/issues/234
+  - repo: https://github.com/executablebooks/mdformat
+    rev: 0.7.22
+    hooks:
+      - id: mdformat
+        additional_dependencies:
+          - mdformat-myst
+        files: docs\/(?!README).*\.md$
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.31.2
+    hooks:
+      - id: check-github-workflows
+      - id: check-readthedocs
+  - repo: https://github.com/fortran-lang/fprettify
+    rev: v0.3.7
+    hooks:
+      - id: fprettify
+        args: [ '-i', '4' ]
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: "v2.4.1"
+    hooks:
+      - id: codespell
+        additional_dependencies:
+          - tomli

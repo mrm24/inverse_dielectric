@@ -19,21 +19,24 @@
 submodule (idiel) idiel_common
 
     use iso_c_binding
+#include "offload.fpp"
 
     implicit none
 
 contains
 
-    module subroutine init_common(this, lattice, redpos, elements, nq, dim, nsym, crot)
+    module subroutine init_common(this, lattice, redpos, elements, nq, dim, nsym, crot, device_world, host_world)
 
-        class(idiel_t), target, intent(inout) :: this
-        real(aip), intent(in)                 :: lattice(3,3)
-        real(aip),  intent(in)                :: redpos(:,:)
-        integer(i32),  intent(in)             :: elements(:)
-        integer(i32), intent(in)              :: nq(3)
-        integer(i32), intent(in), optional    :: dim
-        integer(i32), intent(in), optional    :: nsym
-        real(aip), intent(in), optional       :: crot(:,:,:)
+        class(idiel_t), target, intent(inout)              :: this
+        real(aip), intent(in)                              :: lattice(3,3)
+        real(aip),  intent(in)                             :: redpos(:,:)
+        integer(i32),  intent(in)                          :: elements(:)
+        integer(i32), intent(in)                           :: nq(3)
+        integer(i32), intent(in), optional                 :: dim
+        integer(i32), intent(in), optional                 :: nsym
+        real(aip), intent(in), optional                    :: crot(:,:,:)
+        type(device_world_t), intent(in), target, optional :: device_world
+        integer(c_int), intent(in), optional               :: host_world
 
         ! Locals
         integer(i32) :: ii, ll, mm
@@ -73,11 +76,25 @@ contains
 #endif  
         endif
 
+        ! Process the GPU-CPU communicator
+        if (present(device_world)) then
+            this%world => device_world
+            this%internal_world = .false.
+        else
+#ifdef DEVICEOFFLOAD
+            if (.not. present(host_world)) error stop "Error(idiel_t%init_common): For device either the MPI communicator or the device communicator are needed"
+            allocate(this%world)
+            call this%world%init(host_world)
+#else
+            allocate(this%world)
+            call this%world%init(0)
+#endif
+            this%internal_world = .true.
+        end if
+
+
         ! Process dimensionality
         if (present(dim)) this%dim = dim
-        
-        ! Init algebra world
-        call this%world%init()
 
         select case(this%dim)
         
@@ -129,47 +146,7 @@ contains
             ! Compute circular basis in the coarse mesh
             call circ_harm(lmax, this%ang(:,2), this%blm_coarse)
 
-#ifdef USE_GPU
-            ! Alloc in the GPU
-            call this%world%register%alloc("q", size(this%xyz) * c_sizeof(zzero), this%world%get_device())
-            call this%world%register%alloc("blm_coarse"   , size(this%blm_coarse  ) * c_sizeof(zzero),  this%world%get_device())
-            call this%world%register%alloc("weights"      , size(this%weights     ) * c_sizeof(pi),  this%world%get_device())
-            call this%world%register%alloc("blm_fine"     , size(this%blm_fine    ) * c_sizeof(zzero),  this%world%get_device())
-            call this%world%register%alloc("weights_fine" , size(this%weights_fine) * c_sizeof(pi),  this%world%get_device())
-            call this%world%register%alloc("radii"        , size(this%radii       ) * c_sizeof(pi),  this%world%get_device())
-            call this%world%register%alloc("rmax2d"       , size(this%rmax2d      ) * c_sizeof(pi),  this%world%get_device())
-            call this%world%register%alloc("vr"           , size(this%vr          ) * c_sizeof(zzero),  this%world%get_device())
-
-            ! Associate 
-            call this%world%register%assoc("q", C_loc(this%xyz))
-            call this%world%register%assoc("blm_coarse"   , C_loc(this%blm_coarse)  )
-            call this%world%register%assoc("weights"      , C_loc(this%weights)     )
-            call this%world%register%assoc("blm_fine"     , C_loc(this%blm_fine)    )
-            call this%world%register%assoc("weights_fine" , C_loc(this%weights_fine))
-            call this%world%register%assoc("radii"        , C_loc(this%radii)       )
-            call this%world%register%assoc("rmax2d"       , C_loc(this%rmax2d)      )
-            call this%world%register%assoc("vr"           , C_loc(this%vr)          )
-            ! Copy
-            call this%world%register%to_device("q")
-            call this%world%register%to_device("blm_coarse"   )
-            call this%world%register%to_device("weights"      )
-            call this%world%register%to_device("blm_fine"     )
-            call this%world%register%to_device("weights_fine" )
-            call this%world%register%to_device("radii"        )
-            call this%world%register%to_device("rmax2d"       )
-            call this%world%register%to_device("vr"           )
-
-            ! Deassociate
-            call this%world%register%deassoc("q")
-            call this%world%register%deassoc("blm_coarse"   )
-            call this%world%register%deassoc("weights"      )
-            call this%world%register%deassoc("blm_fine"     )
-            call this%world%register%deassoc("weights_fine" )
-            call this%world%register%deassoc("radii"        )
-            call this%world%register%deassoc("rmax2d"       )
-            call this%world%register%deassoc("vr"           )
-
-#endif
+            OMP_OFFLOAD target enter data map(to: this%xyz, this%weights, this%blm_fine, this%weights_fine, this%radii, this%rmax2d, this%vr)
 
         case(3) ! 3D case
             ! Compute the volume in which the integral will be performed
@@ -243,28 +220,7 @@ contains
 
             deallocate(ylm, xyz)
 
-#ifdef USE_GPU
-            ! Alloc in the GPU
-            call this%world%register%alloc("q", size(this%xyz) * c_sizeof(zzero), this%world%get_device())
-            call this%world%register%alloc("ylm", size(this%ylm) * c_sizeof(zzero), this%world%get_device())
-            call this%world%register%alloc("weights", size(this%weights) * c_sizeof(pi), this%world%get_device())
-            call this%world%register%alloc("angular_integrals", size(this%angular_integrals) * c_sizeof(zzero), this%world%get_device())
-            ! Associate 
-            call this%world%register%assoc("q", C_loc(this%xyz))
-            call this%world%register%assoc("ylm", C_loc(this%ylm))
-            call this%world%register%assoc("weights", C_loc(this%weights))
-            call this%world%register%assoc("angular_integrals", C_loc(this%angular_integrals))
-            ! Copy
-            call this%world%register%to_device("q")
-            call this%world%register%to_device("ylm")
-            call this%world%register%to_device("weights")
-            call this%world%register%to_device("angular_integrals")
-            ! Deassociate
-            call this%world%register%deassoc("q")
-            call this%world%register%deassoc("ylm")
-            call this%world%register%deassoc("weights")
-            call this%world%register%deassoc("angular_integrals")
-#endif
+            OMP_OFFLOAD target enter data map(to: this%xyz, this%weights, this%ylm, this%angular_integrals)
 
         case default
             error stop "Error(idiel_t%init_common): Error dimension should be either 3 or 2"
@@ -278,7 +234,16 @@ contains
 
         class(idiel_t), intent(inout) :: this
 
-        if (this%world%is_queue_set()) call this%world%finish()
+        ! Clean the device objects
+        OMP_OFFLOAD target exit data map(delete: this%xyz, this%weights, this%ylm, this%angular_integrals) if(this%dim == 3)
+        OMP_OFFLOAD target exit data map(delet: this%xyz, this%weights, this%blm_fine, this%weights_fine, this%radii, this%rmax2d, this%vr) if(this%dim == 2)
+
+        if (this%internal_world) then
+            call this%world%finish()
+            deallocate(this%world)
+        else
+            nullify(this%world)
+        end if
 
         if (associated(this%head))        nullify(this%head)
         if (associated(this%wingL))       nullify(this%wingL)
@@ -336,9 +301,6 @@ contains
 
         class(idiel_t), intent(inout), target :: this
         complex(aip), intent(in) :: body(:,:)
-        
-        ! If we have GPU and this was not inited we start the service
-        if (.not. this%world%is_queue_set()) call this%world%init()
         
         ! Clean 
         if (associated(this%Binv)) nullify(this%Binv)

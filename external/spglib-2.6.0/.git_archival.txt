@@ -1,0 +1,3 @@
+node: c633404d67b2aa341ae748819c542e81c0c1f55d
+node-date: 2025-03-06T12:33:46Z
+describe-name: v2.6.0

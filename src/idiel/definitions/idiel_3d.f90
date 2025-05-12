@@ -117,64 +117,9 @@ contains
         deallocate(clm_head)
         ! Here we compute the body 
         ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
-#if defined(USE_GPU) && defined(HAVEOMP5)
-        ! We need to use associations for OMP to understand
-        associate( body => this%idiel_body, &
-                  ylm => this%ylm, weights => this%weights, angular_integrals => this%angular_integrals, &
-                  world => this%world)
-
-            quadrature_npoints = this%quadrature_npoints
-            allocate(body_f(quadrature_npoints), clm_body(nsph_pair))
-
-
-            call world%register%alloc("body", size(body) * c_sizeof(zzero), world%get_device())
-            call world%register%assoc("body", C_loc(body))
-            call world%register%to_device("body")
-
-            call world%register%alloc("body_f", size(body_f) * c_sizeof(zzero), world%get_device())
-            call world%register%assoc("body_f", C_loc(body_f))
-
-            call world%register%alloc("clm_body", size(clm_body) * c_sizeof(zzero), world%get_device())
-            call world%register%assoc("clm_body", C_loc(clm_body))
-
-            call world%register%assoc("ylm", C_loc(ylm))
-            call world%register%assoc("weights", C_loc(weights)) 
-            call world%register%assoc("angular_integrals", C_loc(angular_integrals))
-
-            call world%register%assoc("qS", C_loc(wingL_f))
-            call world%register%assoc("invqLq", C_loc(head_f))
-
-            !$omp target teams distribute private(ii, jj, body_f, clm_body) collapse(2) 
-            do ii = 1, nbasis
-                do jj = 1, nbasis
-                    !$omp workshare
-                    body_f(:) = head_f(:) * wingL_f(:, jj) * conjg(wingL_f(:, ii))
-                    !$omp end workshare
-                    ! This call itself is parallelized so each team can use its threads
-                    ! to solve it
-                    call sph_harm_expansion(nsph_pair, body_f, weights, ylm, clm_body)
-                    body(jj,ii) = body(jj,ii) + sum(clm_body(:) * angular_integrals(:))
-                end do
-            end do
-            !$omp end target teams distribute
-
-            call world%register%from_device("body")
-
-            call world%register%deassoc("ylm")
-            call world%register%deassoc("weights")
-            call world%register%deassoc("angular_integrals")
-            
-            call world%register%remove("body")
-            call world%register%remove("body_f")
-            call world%register%remove("clm_body")
-
-            deallocate(body_f, clm_body)
-
-        end associate
-#else
         !$omp parallel shared(this, head_f, wingL_f, nbasis) private(ii, jj, body_f, clm_body)
         allocate(body_f(this%quadrature_npoints), clm_body(nsph_pair))
-        !$omp do schedule(dynamic) collapse(2)
+        !$omp do collapse(2)
         do ii = 1, nbasis
             do jj = 1, nbasis
                 body_f(:) = head_f(:) * wingL_f(:, jj) * conjg(wingL_f(:, ii))
@@ -186,16 +131,10 @@ contains
         !$omp end do
         deallocate(body_f, clm_body)
         !$omp end parallel
-#endif
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !            Clean              !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-#ifdef USE_GPU
-        call this%world%register%remove("invqLq")
-        call this%world%register%remove("qS")
-#endif
 
         deallocate(head_f, wingL_f)
 
@@ -282,63 +221,9 @@ contains
 
         ! Here we compute the body 
         ! \frac{[\mathbf{\hat{q}} \cdot T_{\alpha}(\mathbf{G})] [\mathbf{\hat{q}} \cdot S_{\alpha}(\mathbf{G})]}{\mathbf{\hat{q} L \hat{q}}} 
-#if defined(USE_GPU) && defined(HAVEOMP5)
-        ! We need to use associations for OMP to understand
-        associate(quadrature_npoints => this%quadrature_npoints, body => this%idiel_body, &
-            ylm => this%ylm, weights => this%weights, angular_integrals => this%angular_integrals, &
-            world => this%world)
-
-            allocate(body_f(quadrature_npoints), clm_body(nsph_pair))
-
-            call world%register%alloc("body", size(body) * c_sizeof(zzero), world%get_device())
-            call world%register%assoc("body", C_loc(body))
-            call world%register%to_device("body")
-
-            call world%register%alloc("body_f", size(body_f) * c_sizeof(zzero), world%get_device())
-            call world%register%assoc("body_f", C_loc(body_f))
-
-            call world%register%alloc("clm_body", size(clm_body) * c_sizeof(zzero), world%get_device())
-            call world%register%assoc("clm_body", C_loc(clm_body))
-
-            call world%register%assoc("ylm", C_loc(ylm))
-            call world%register%assoc("weights", C_loc(weights)) 
-            call world%register%assoc("angular_integrals", C_loc(angular_integrals))
-
-            call world%register%assoc("qS", C_loc(wingL_f))
-            call world%register%assoc("qT", C_loc(wingU_f))
-            call world%register%assoc("invqLq", C_loc(head_f))
-
-            !$omp target teams distribute private(ii, jj, body_f, clm_body) collapse(2)
-            do ii = 1, nbasis
-                do jj = 1, nbasis
-                    !$omp workshare
-                    body_f(:) = head_f(:) * wingL_f(:, jj) * wingU_f(:, ii)
-                    !$omp end workshare
-                    ! This call itself is parallelized so each team can use its threads
-                    ! to solve it
-                    call sph_harm_expansion(nsph_pair, body_f, weights, ylm, clm_body)
-                    body(jj,ii) = body(jj,ii) + sum(clm_body(:) * angular_integrals(:))
-                end do
-            end do
-            !$omp end target teams distribute
-
-            call world%register%from_device("body")
-
-            call world%register%deassoc("ylm")
-            call world%register%deassoc("weights")
-            call world%register%deassoc("angular_integrals")
-
-            call world%register%remove("body")
-            call world%register%remove("body_f")
-            call world%register%remove("clm_body")
-
-            deallocate(body_f, clm_body)
-
-        end associate
-#else
         !$omp parallel shared(this, head_f, wingL_f, wingU_f, nbasis) private(ii, jj, body_f, clm_body)
         allocate(body_f(this%quadrature_npoints),  clm_body(nsph_pair))
-        !$omp do schedule(dynamic) collapse(2)
+        !$omp do collapse(2)
         do ii = 1, nbasis
             do jj = 1, nbasis
                 body_f(:) = head_f(:) * wingL_f(:, jj) * wingU_f(:, ii)
@@ -350,17 +235,10 @@ contains
         !$omp end do
         deallocate(body_f,  clm_body)
         !$omp end parallel
-#endif
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !            Clean              !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-#ifdef USE_GPU
-        call this%world%register%remove("invqLq")
-        call this%world%register%remove("qS")
-        call this%world%register%remove("qT")
-#endif
 
         deallocate(head_f, wingL_f, wingU_f)
 
