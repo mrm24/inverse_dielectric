@@ -236,7 +236,7 @@ contains
 
         ! Clean the device objects
         OMP_OFFLOAD target exit data map(delete: this%xyz, this%weights, this%ylm, this%angular_integrals) if(this%dim == 3)
-        OMP_OFFLOAD target exit data map(delet: this%xyz, this%weights, this%blm_fine, this%weights_fine, this%radii, this%rmax2d, this%vr) if(this%dim == 2)
+        OMP_OFFLOAD target exit data map(delete: this%xyz, this%weights, this%blm_fine, this%weights_fine, this%radii, this%rmax2d, this%vr) if(this%dim == 2)
 
         if (this%internal_world) then
             call this%world%finish()

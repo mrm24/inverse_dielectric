@@ -29,7 +29,9 @@ if(CMAKE_Fortran_COMPILER MATCHES "IntelLLVM")
 endif()
 add_library(IDieL_objects OBJECT ${SRC})
 add_library(IDieL SHARED $<TARGET_OBJECTS:IDieL_objects>)
-set_target_properties(IDieL PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
+if (CMAKE_Fortran_COMPILER MATCHES "GNU" OR CMAKE_Fortran_COMPILER MATCHES "Intel")
+    set_target_properties(IDieL PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif()
 
 # Add symbols to the static library so we only need to link against it and not its dependencies
 if (NVIDIA OR AMD)

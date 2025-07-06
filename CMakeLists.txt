@@ -13,7 +13,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 #Some options
 option(BENCHMARK "Generate the benchmark executables" OFF)
 option(INTERFACES "Python bindings" OFF)
-option(SPGLIB "Compile with spglib" OFF)
 option(DOUBLE "Use double precision in real and complex" ON)
 
 # Set precision settings
@@ -41,6 +40,9 @@ include(cmake/CompilerFlags.cmake)
 
 # Compiler warnings
 include(cmake/CompilerWarnings.cmake)
+
+# Create files
+include(cmake/create_files.cmake)
 
 # OpenMP support
 include(cmake/openmp.cmake)

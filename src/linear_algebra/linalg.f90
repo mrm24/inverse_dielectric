@@ -88,7 +88,7 @@ contains
         if (info /= 0) error stop "inverse_complex_LU: error calling Xgetri gpu"
 
         call deallocate_device_memory(dwork_ptr, world%get_device())
-        OMP_OFFLOAD target end data
+        OMP_OFFLOAD end target data
 
         deallocate(ipiv)
 
@@ -317,7 +317,7 @@ contains
         
         call world%synchronize()
         OMP_OFFLOAD target update from(qT)
-        OMP_OFFLOAD target exit data map(delete: S, qT)
+        OMP_OFFLOAD target exit data map(delete: qT)
 
         deallocate(T)
 
