@@ -2,17 +2,22 @@
 # is not found it decays to the prepacked version 
 
 option(SPGLIB "Compile with spglib support" ON)
+option(USE_INTERNAL_SPGLIB "Use bundled spglib" ON)
 
 if (SPGLIB)
   add_compile_definitions(USE_SPGLIB)
 
-  # Try to find an existing Spglib library
-  find_library(SPGLIB_STATIC
-    NAMES spg spglib libsymspg symspg
-    PATHS ${SPGLIBDIR}
-  )
+  if (NOT USE_INTERNAL_SPGLIB)
+    # Try to find an existing Spglib library
+    find_library(SPGLIB_STATIC
+      NAMES spg spglib libsymspg symspg
+      PATHS ${SPGLIBDIR}
+    )
 
-  if (SPGLIB_STATIC)
+    if (NOT SPGLIB_STATIC)
+        message(FATAL_ERROR "External spglib cannot be found. You can use USE_INTERNAL_SPGLIB option to use the bundled version.")
+    endif()
+
     set(spglibInstallDir "")
     add_library(libsymspg STATIC IMPORTED)
     set_target_properties(libsymspg PROPERTIES
