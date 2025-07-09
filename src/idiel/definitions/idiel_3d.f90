@@ -74,7 +74,7 @@ contains
         integer(i32) :: nbasis
         
         ! Dummy indexes
-        integer(i32) :: ii, jj, kk, my_team
+        integer(i32) :: ii, jj, kk
 
         ! For device aware compilation the team id
         integer(i32) :: my_team
@@ -143,7 +143,7 @@ contains
             do jj = 1, nbasis
                 my_team = _omp_get_team_num
 
-                OMP_OFFLOAD parallel do default(none) shared(body_f, head_f, wingL_f, ii, jj, my_team) private(kk)
+                OMP_OFFLOAD parallel do default(none) shared(this, body_f, head_f, wingL_f, ii, jj, my_team) private(kk)
                 do kk = 1, this%quadrature_npoints
                     body_f(kk, my_team) = head_f(kk) * wingL_f(kk, jj) * conjg(wingL_f(kk, ii))
                 end do
@@ -269,7 +269,7 @@ contains
             do jj = 1, nbasis
                 my_team = _omp_get_team_num
 
-                OMP_OFFLOAD parallel do default(none) shared(body_f, head_f, wingL_f, wingU_f, ii, jj, my_team) private(kk)
+                OMP_OFFLOAD parallel do default(none) shared(this, body_f, head_f, wingL_f, wingU_f, ii, jj, my_team) private(kk)
                 do kk = 1, this%quadrature_npoints
                     body_f(kk, my_team) = head_f(kk) * wingL_f(kk, jj) * wingU_f(kk, ii)
                 end do

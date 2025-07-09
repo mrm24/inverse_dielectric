@@ -35,6 +35,9 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release")
 endif()
 
+# Set openmp support
+include(cmake/openmp.cmake)
+
 # Compiler flags
 include(cmake/CompilerFlags.cmake)
 
